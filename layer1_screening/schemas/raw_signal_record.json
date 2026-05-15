@@ -1,0 +1,109 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "raw_signal_record",
+  "title": "Raw Signal Record",
+  "description": "Structured input data for a single ticker entering the screening layer. All fields from all data sources are normalized into this schema before scoring begins.",
+  "type": "object",
+  "required": ["ticker", "timestamp", "price_data", "relative_strength", "earnings_data"],
+  "properties": {
+
+    "ticker": {
+      "type": "string",
+      "description": "Exchange ticker symbol (e.g. AAPL, NVDA, JPM)"
+    },
+
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC timestamp of data collection (ISO 8601)"
+    },
+
+    "sector": {
+      "type": "string",
+      "description": "Sector ETF ticker (e.g. XLK, XLF, XLE, XLV, XLI)"
+    },
+
+    "price_data": {
+      "type": "object",
+      "description": "Price action and technical state. Source: TradingView.",
+      "required": ["current_price", "volume_ratio"],
+      "properties": {
+        "current_price":    { "type": "number", "description": "Last close or real-time price" },
+        "change_1d_pct":    { "type": "number", "description": "1-day price change %" },
+        "change_5d_pct":    { "type": "number", "description": "5-day price change %" },
+        "change_20d_pct":   { "type": "number", "description": "20-day price change %" },
+        "ma_20":            { "type": "number", "description": "20-day simple moving average" },
+        "ma_50":            { "type": "number", "description": "50-day simple moving average" },
+        "ma_200":           { "type": "number", "description": "200-day simple moving average" },
+        "above_ma_20":      { "type": "boolean" },
+        "above_ma_50":      { "type": "boolean" },
+        "above_ma_200":     { "type": "boolean" },
+        "volume_today":     { "type": "integer", "description": "Today's volume (shares)" },
+        "volume_avg_20d":   { "type": "integer", "description": "20-day average daily volume" },
+        "volume_ratio": {
+          "type": "number",
+          "description": "volume_today / volume_avg_20d. Values >1.5 indicate unusual activity."
+        },
+        "rsi_14":  { "type": "number", "minimum": 0, "maximum": 100, "description": "14-period RSI" },
+        "atr_14":  { "type": "number", "description": "14-period Average True Range (absolute $)" }
+      }
+    },
+
+    "relative_strength": {
+      "type": "object",
+      "description": "Outperformance vs benchmarks. Source: TradingView.",
+      "properties": {
+        "rs_vs_spy_10d":    { "type": "number", "description": "% outperformance vs SPY over 10 days" },
+        "rs_vs_spy_20d":    { "type": "number", "description": "% outperformance vs SPY over 20 days" },
+        "rs_vs_sector_10d": { "type": "number", "description": "% outperformance vs sector ETF over 10 days" },
+        "rs_vs_sector_20d": { "type": "number", "description": "% outperformance vs sector ETF over 20 days" },
+        "sector_rank_pct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Percentile rank within sector universe (100 = top performer)"
+        }
+      }
+    },
+
+    "news_data": {
+      "type": "object",
+      "description": "News velocity and sentiment. Sources: NewsAPI, RSS, Grok.",
+      "properties": {
+        "article_count_today":  { "type": "integer", "description": "Number of articles mentioning this ticker today" },
+        "article_count_7d_avg": { "type": "number",  "description": "7-day rolling average of daily article count" },
+        "velocity_ratio": {
+          "type": "number",
+          "description": "article_count_today / article_count_7d_avg. Values >2.0 indicate news acceleration."
+        },
+        "sentiment_score": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1,
+          "description": "Aggregate news sentiment. -1 = strongly negative, 0 = neutral, 1 = strongly positive."
+        },
+        "source_quality_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Quality-weighted score of sources (0 = pure social/blog, 1 = SEC/tier-1 financial press)"
+        }
+      }
+    },
+
+    "earnings_data": {
+      "type": "object",
+      "description": "Earnings calendar context. Sources: SEC EDGAR, earnings APIs.",
+      "properties": {
+        "next_earnings_date":    { "type": "string", "format": "date" },
+        "days_to_earnings":      { "type": "integer", "description": "Calendar days until next earnings report" },
+        "last_earnings_date":    { "type": "string", "format": "date" },
+        "days_since_earnings":   { "type": "integer", "description": "Calendar days since last earnings report" },
+        "last_eps_surprise_pct": {
+          "type": "number",
+          "description": "EPS surprise % on last report (positive = beat, negative = miss)"
+        }
+      }
+    }
+  }
+}
