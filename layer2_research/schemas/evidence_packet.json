@@ -1,0 +1,268 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "evidence_packet",
+  "title": "Evidence Packet",
+  "description": "Complete research output for a single ticker. The document Layer 3 scoring operates on. Every field used by the scoring, confidence, and risk layers must be present here.",
+  "type": "object",
+  "required": ["packet_id", "ticker", "screening_reference", "evidence_items", "summary"],
+
+  "properties": {
+
+    "packet_id":           { "type": "string", "description": "EP-{TICKER}-{YYYYMMDD}-{HHMM}-{RAND}" },
+    "ticker":              { "type": "string" },
+    "company_name":        { "type": "string" },
+    "sector":              { "type": "string", "description": "Sector ETF ticker (e.g. XLK)" },
+    "generated_at":        { "type": "string", "format": "date-time" },
+    "screening_reference": { "type": "string", "description": "screening_id from Layer 1 output" },
+    "screening_score":     { "type": "number" },
+    "screening_reason_codes": { "type": "array", "items": { "type": "string" } },
+    "screening_flags":        { "type": "array", "items": { "type": "string" } },
+
+    "fundamentals": {
+      "type": "object",
+      "description": "Structured financial data from SEC filings and earnings calls.",
+      "properties": {
+        "revenue_ttm_m":            { "type": ["number", "null"], "description": "TTM revenue in $M" },
+        "revenue_growth_yoy_pct":   { "type": ["number", "null"] },
+        "revenue_growth_qoq_pct":   { "type": ["number", "null"] },
+        "revenue_trend": {
+          "type": ["string", "null"],
+          "enum": ["accelerating", "decelerating", "stable", "reversing", null]
+        },
+        "eps_ttm":                  { "type": ["number", "null"] },
+        "eps_growth_yoy_pct":       { "type": ["number", "null"] },
+        "eps_surprise_last_pct":    { "type": ["number", "null"] },
+        "eps_surprise_avg_4q_pct":  { "type": ["number", "null"] },
+        "gross_margin_pct":         { "type": ["number", "null"] },
+        "gross_margin_trend": {
+          "type": ["string", "null"],
+          "enum": ["accelerating", "decelerating", "stable", "reversing", null]
+        },
+        "operating_margin_pct":     { "type": ["number", "null"] },
+        "operating_margin_trend": {
+          "type": ["string", "null"],
+          "enum": ["accelerating", "decelerating", "stable", "reversing", null]
+        },
+        "cash_m":                   { "type": ["number", "null"] },
+        "total_debt_m":             { "type": ["number", "null"] },
+        "net_cash_m":               { "type": ["number", "null"] },
+        "fcf_ttm_m":                { "type": ["number", "null"] },
+        "fcf_yield_pct":            { "type": ["number", "null"] },
+        "next_q_revenue_guide_m":   { "type": ["number", "null"] },
+        "guidance_vs_consensus_pct":{ "type": ["number", "null"], "description": "+ve = above street consensus" },
+        "management_tone": {
+          "type": ["string", "null"],
+          "enum": ["confident", "cautious", "mixed", "deteriorating", null]
+        }
+      }
+    },
+
+    "business_quality": {
+      "type": "object",
+      "properties": {
+        "moat_assessment": {
+          "type": ["string", "null"],
+          "enum": ["wide", "narrow", "none", "contested", null]
+        },
+        "moat_sources": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["network_effects", "switching_costs", "cost_advantage", "intangible_assets", "efficient_scale"]
+          }
+        },
+        "competitive_position": {
+          "type": ["string", "null"],
+          "enum": ["gaining", "holding", "losing", null]
+        },
+        "customer_concentration_risk": {
+          "type": ["string", "null"],
+          "enum": ["low", "medium", "high", null]
+        },
+        "management_signals": {
+          "type": ["string", "null"],
+          "enum": ["strong", "neutral", "weak", "flags", null]
+        },
+        "insider_activity": {
+          "type": ["string", "null"],
+          "enum": ["buying", "selling", "neutral", null]
+        }
+      }
+    },
+
+    "technical_state": {
+      "type": "object",
+      "properties": {
+        "trend_structure": {
+          "type": ["string", "null"],
+          "enum": ["uptrend", "downtrend", "consolidation", "breakout", "breakdown", null]
+        },
+        "key_support_levels":    { "type": "array", "items": { "type": "number" } },
+        "key_resistance_levels": { "type": "array", "items": { "type": "number" } },
+        "pattern":               { "type": ["string", "null"] },
+        "rs_line_trend": {
+          "type": ["string", "null"],
+          "enum": ["new_high", "rising", "flat", "declining", null]
+        },
+        "weeks_in_base":        { "type": ["integer", "null"] },
+        "prior_uptrend_weeks":  { "type": ["integer", "null"] }
+      }
+    },
+
+    "catalyst_map": {
+      "type": "array",
+      "description": "Identified upcoming catalysts, sorted by priority (imminent first).",
+      "items": {
+        "type": "object",
+        "required": ["catalyst_id", "type", "description", "expected_impact", "direction"],
+        "properties": {
+          "catalyst_id":        { "type": "string" },
+          "type": {
+            "type": "string",
+            "enum": ["earnings", "product_launch", "regulatory", "macro",
+                     "management_change", "analyst_action", "sector_rotation",
+                     "merger_acquisition", "guidance_update"]
+          },
+          "description":        { "type": "string" },
+          "date":               { "type": ["string", "null"], "format": "date" },
+          "days_away":          { "type": ["integer", "null"] },
+          "expected_impact":    { "type": "string", "enum": ["high", "medium", "low"] },
+          "direction":          { "type": "string", "enum": ["bullish", "bearish", "binary", "neutral"] },
+          "historical_pattern": { "type": ["string", "null"] },
+          "probability":        { "type": ["number", "null"], "minimum": 0, "maximum": 1 }
+        }
+      }
+    },
+
+    "evidence_items": {
+      "type": "array",
+      "minItems": 12,
+      "maxItems": 40,
+      "description": "All evidence gathered. Minimum 12 items. At least 3 must be bearish.",
+      "items": {
+        "type": "object",
+        "required": ["evidence_id", "content", "source", "source_type", "reliability", "direction", "category", "date"],
+        "properties": {
+          "evidence_id":       { "type": "string" },
+          "content":           { "type": "string", "description": "1-3 sentences describing what this evidence says" },
+          "source":            { "type": "string" },
+          "source_type": {
+            "type": "string",
+            "enum": ["sec_filing", "earnings_call", "management", "news_tier1",
+                     "macro", "technical", "analyst_report", "news_tier2",
+                     "perplexity", "grok", "news_social"]
+          },
+          "reliability":       { "type": "number", "minimum": 0, "maximum": 1 },
+          "direction":         { "type": "string", "enum": ["bullish", "bearish", "neutral", "binary"] },
+          "category": {
+            "type": "string",
+            "enum": ["revenue", "earnings", "margins", "balance_sheet", "guidance",
+                     "competitive", "management", "macro", "technical", "news",
+                     "regulatory", "catalyst"]
+          },
+          "date":              { "type": "string", "format": "date" },
+          "source_url":        { "type": ["string", "null"] },
+          "quote":             { "type": ["string", "null"], "maxLength": 400 },
+          "contradiction_flag":{ "type": "boolean", "default": false },
+          "contradiction_with":{ "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+
+    "contradictions": {
+      "type": "array",
+      "description": "Conflicts between evidence items in the same category. Generated by contradiction_detector.py.",
+      "items": {
+        "type": "object",
+        "required": ["contradiction_id", "bullish_evidence_id", "bearish_evidence_id", "severity"],
+        "properties": {
+          "contradiction_id":    { "type": "string" },
+          "bullish_evidence_id": { "type": "string" },
+          "bearish_evidence_id": { "type": "string" },
+          "description":         { "type": "string" },
+          "severity":            { "type": "string", "enum": ["high", "medium", "low"] },
+          "resolution":          { "type": "string", "enum": ["unresolved", "explained", "confirmed_risk", "dismissed"] },
+          "resolution_notes":    { "type": ["string", "null"] }
+        }
+      }
+    },
+
+    "thesis_invalidation_conditions": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 7,
+      "description": "Observable conditions that trigger thesis reassessment or abandonment.",
+      "items": {
+        "type": "object",
+        "required": ["condition_id", "description", "monitoring_trigger", "severity"],
+        "properties": {
+          "condition_id":       { "type": "string" },
+          "description":        { "type": "string" },
+          "monitoring_trigger": { "type": "string", "description": "Specific observable event that triggers this condition" },
+          "severity":           { "type": "string", "enum": ["fatal", "major", "minor"] },
+          "current_status":     { "type": "string", "enum": ["not_triggered", "monitoring", "triggered"] }
+        }
+      }
+    },
+
+    "risk_factors": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 7,
+      "items": {
+        "type": "object",
+        "required": ["risk_id", "category", "description", "probability", "impact"],
+        "properties": {
+          "risk_id":    { "type": "string" },
+          "category":   { "type": "string", "enum": ["company", "sector", "macro", "regulatory", "execution"] },
+          "description":{ "type": "string" },
+          "probability":{ "type": "string", "enum": ["high", "medium", "low"] },
+          "impact":     { "type": "string", "enum": ["high", "medium", "low"] },
+          "mitigants":  { "type": ["string", "null"] }
+        }
+      }
+    },
+
+    "summary": {
+      "type": "object",
+      "required": ["bull_case", "bear_case", "key_questions", "evidence_count"],
+      "properties": {
+        "bull_case":     { "type": "string", "description": "2-4 sentence evidence-based bullish synthesis" },
+        "bear_case":     { "type": "string", "description": "2-4 sentence evidence-based bearish synthesis (equal rigor to bull_case)" },
+        "key_questions": { "type": "array", "minItems": 3, "maxItems": 5, "items": { "type": "string" } },
+        "evidence_count":{ "type": "object",
+          "properties": {
+            "bullish": { "type": "integer" },
+            "bearish": { "type": "integer" },
+            "neutral": { "type": "integer" },
+            "binary":  { "type": "integer" }
+          }
+        }
+      }
+    },
+
+    "data_freshness": {
+      "type": "object",
+      "properties": {
+        "price_data_as_of":      { "type": ["string", "null"] },
+        "last_filing_date":      { "type": ["string", "null"] },
+        "last_earnings_date":    { "type": ["string", "null"] },
+        "news_coverage_through": { "type": ["string", "null"] },
+        "stale_fields":          { "type": "array", "items": { "type": "string" } }
+      }
+    },
+
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "contradiction_summary":  { "type": "object" },
+        "evidence_item_count":    { "type": "integer" },
+        "catalyst_count":         { "type": "integer" },
+        "risk_factor_count":      { "type": "integer" },
+        "tic_count":              { "type": "integer" },
+        "sources_consulted":      { "type": "array", "items": { "type": "string" } },
+        "warnings":               { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}
