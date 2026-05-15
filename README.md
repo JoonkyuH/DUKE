@@ -1,4 +1,4 @@
-# DUKE — Investment Intelligence Framework
+# DUKE ("Doesn't Usually Know Either") — Investment Intelligence Framework
 
 A multi-agent investment analysis system built around structured evidence,
 explicit uncertainty, and disciplined human review.
