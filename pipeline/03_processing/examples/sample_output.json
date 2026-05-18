@@ -1,0 +1,434 @@
+{
+  "packet_id": "EP-NVDA-20240601-1200-DRY1",
+  "ticker": "NVDA",
+  "company_name": "NVIDIA Corporation",
+  "sector": "XLK",
+  "generated_at": "2024-06-01T12:00:00Z",
+  "screening_reference": "SCR-NVDA-20240531-DEMO",
+  "screening_score": 84.5,
+  "screening_reason_codes": ["MOMENTUM", "RS_MARKET_LEADER", "MULTI_SIGNAL_CONFLUENCE", "VOLUME_BREAKOUT"],
+  "screening_flags": [],
+  "investment_archetype": "long_term_compounder",
+
+  "fundamentals": {
+    "revenue_ttm_m": 79768,
+    "revenue_growth_yoy_pct": 262.0,
+    "revenue_growth_qoq_pct": 18.4,
+    "revenue_trend": "accelerating",
+    "eps_ttm": 11.93,
+    "eps_growth_yoy_pct": 586.0,
+    "eps_surprise_last_pct": 9.2,
+    "eps_surprise_avg_4q_pct": 12.1,
+    "gross_margin_pct": 78.4,
+    "gross_margin_trend": "accelerating",
+    "operating_margin_pct": 61.6,
+    "operating_margin_trend": "accelerating",
+    "cash_m": 31440,
+    "total_debt_m": 8458,
+    "net_cash_m": 22982,
+    "fcf_ttm_m": 14900,
+    "fcf_yield_pct": 0.8,
+    "next_q_revenue_guide_m": 28000,
+    "guidance_vs_consensus_pct": 10.2,
+    "management_tone": "confident"
+  },
+
+  "business_quality": {
+    "moat_assessment": "wide",
+    "moat_sources": ["network_effects", "switching_costs", "intangible_assets"],
+    "competitive_position": "gaining",
+    "customer_concentration_risk": "high",
+    "management_signals": "strong",
+    "insider_activity": "neutral"
+  },
+
+  "technical_state": {
+    "trend_structure": "uptrend",
+    "key_support_levels": [800, 700],
+    "key_resistance_levels": [1100, 1250],
+    "pattern": "high_tight_flag",
+    "rs_line_trend": "new_high",
+    "weeks_in_base": 3,
+    "prior_uptrend_weeks": 28
+  },
+
+  "catalyst_map": [
+    {
+      "catalyst_id": "CAT-001",
+      "type": "regulatory",
+      "description": "US Bureau of Industry and Security reviewing export controls that may extend to Blackwell architecture chips. Outcome genuinely uncertain.",
+      "date": null,
+      "days_away": 45,
+      "expected_impact": "high",
+      "direction": "binary",
+      "historical_pattern": "Oct 2023 restrictions removed 5-7B in near-term China Data Center revenue.",
+      "probability": null
+    },
+    {
+      "catalyst_id": "CAT-002",
+      "type": "earnings",
+      "description": "Q2 FY2025 earnings report. Guidance of $28B already above consensus; beat would reinforce thesis.",
+      "date": "2024-08-21",
+      "days_away": 81,
+      "expected_impact": "high",
+      "direction": "bullish",
+      "historical_pattern": "Beat and raised last 4 consecutive quarters. Avg EPS surprise +12%.",
+      "probability": 0.75
+    }
+  ],
+
+  "evidence_items": [
+    {
+      "evidence_id": "EV-001",
+      "content": "NVDA Q1 FY2025 10-Q: Total revenue $26.0B (+262% YoY), Data Center segment $22.6B (+427% YoY). Sequential acceleration for the third consecutive quarter. Revenue trend explicitly classified as accelerating.",
+      "source": "NVDA 10-Q Q1 FY2025 (filed May 2024)",
+      "source_type": "sec_filing",
+      "reliability": 0.95,
+      "direction": "bullish",
+      "category": "revenue",
+      "date": "2024-05-22",
+      "source_url": null,
+      "quote": "Data Center revenue was $22.6 billion, up 427% from a year ago.",
+      "contradiction_flag": false,
+      "contradiction_with": []
+    },
+    {
+      "evidence_id": "EV-002",
+      "content": "NVDA Q1 FY2025: GAAP gross margin 78.4%, up from 64.6% year-over-year. Operating margin expanded to 61.6%. Both metrics at all-time highs for the company.",
+      "source": "NVDA 10-Q Q1 FY2025",
+      "source_type": "sec_filing",
+      "reliability": 0.95,
+      "direction": "bullish",
+      "category": "margins",
+      "date": "2024-05-22",
+      "source_url": null,
+      "quote": "GAAP gross margin was 78.4%, up from 64.6% a year earlier.",
+      "contradiction_flag": false,
+      "contradiction_with": []
+    },
+    {
+      "evidence_id": "EV-003",
+      "content": "NVDA Q1 FY2025: TTM free cash flow approximately $14.9B. Net cash position $23.0B (cash $31.4B minus total debt $8.5B). Company repurchased $3.6B in shares during the quarter.",
+      "source": "NVDA 10-Q Q1 FY2025",
+      "source_type": "sec_filing",
+      "reliability": 0.95,
+      "direction": "bullish",
+      "category": "balance_sheet",
+      "date": "2024-05-22",
+      "source_url": null,
+      "quote": null,
+      "contradiction_flag": false,
+      "contradiction_with": []
+    },
+    {
+      "evidence_id": "EV-004",
+      "content": "Q1 FY2025 earnings call: Q2 revenue guidance of $28.0B (+/- 2%), approximately 10.2% above street consensus of $25.4B at time of report. Guidance has exceeded consensus for four consecutive quarters.",
+      "source": "NVDA Q1 FY2025 Earnings Call (May 22, 2024)",
+      "source_type": "earnings_call",
+      "reliability": 0.85,
+      "direction": "bullish",
+      "category": "guidance",
+      "date": "2024-05-22",
+      "source_url": null,
+      "quote": "For the second quarter of fiscal 2025, we expect revenue to be $28 billion, plus or minus 2%.",
+      "contradiction_flag": false,
+      "contradiction_with": []
+    },
+    {
+      "evidence_id": "EV-005",
+      "content": "CEO Jensen Huang on Q1 FY2025 call: explicitly characterized demand as supply-constrained, not demand-constrained. Customers continue to order more than NVDA can currently supply.",
+      "source": "NVDA Q1 FY2025 Earnings Call",
+      "source_type": "earnings_call",
+      "reliability": 0.85,
+      "direction": "bullish",
+      "category": "competitive",
+      "date": "2024-05-22",
+      "source_url": null,
+      "quote": "Every customer wants more than we can supply. We are supply-constrained, not demand-constrained.",
+      "contradiction_flag": false,
+      "contradiction_with": []
+    },
+    {
+      "evidence_id": "EV-006",
+      "content": "Bloomberg analysis of hyperscaler capex guidance: Microsoft, Google, and Amazon collectively guided for $200B+ in combined AI infrastructure capex for calendar 2025, up from $125B in 2024. NVDA's data center segment is the primary beneficiary.",
+      "source": "Bloomberg Capital Expenditure Analysis, June 2024",
+      "source_type": "news_tier1",
+      "reliability": 0.75,
+      "direction": "bullish",
+      "category": "macro",
+      "date": "2024-06-01",
+      "source_url": null,
+      "quote": null,
+      "contradiction_flag": false,
+      "contradiction_with": []
+    },
+    {
+      "evidence_id": "EV-007",
+      "content": "Morgan Stanley analysis: CUDA software ecosystem has 3.5M+ developers with an estimated 2-3 year migration timeline to alternative platforms, even if competing silicon reaches performance parity. Switching costs are structural, not cyclical.",
+      "source": "Morgan Stanley NVDA Analysis (June 2024)",
+      "source_type": "analyst_report",
+      "reliability": 0.65,
+      "direction": "bullish",
+      "category": "competitive",
+      "date": "2024-06-01",
+      "source_url": null,
+      "quote": null,
+      "contradiction_flag": false,
+      "contradiction_with": []
+    },
+    {
+      "evidence_id": "EV-008",
+      "content": "Financial Times: Microsoft Azure, Google Cloud, and AWS all confirmed accelerating GPU infrastructure builds in Q1 2024 public filings and investor days. Hyperscaler order backlog signals multi-quarter demand visibility beyond current fiscal year.",
+      "source": "Financial Times, May 2024",
+      "source_type": "news_tier1",
+      "reliability": 0.75,
+      "direction": "bullish",
+      "category": "revenue",
+      "date": "2024-05-20",
+      "source_url": null,
+      "quote": null,
+      "contradiction_flag": true,
+      "contradiction_with": ["EV-016"]
+    },
+    {
+      "evidence_id": "EV-009",
+      "content": "CFO on Q1 FY2025 call: Blackwell architecture transition showing strong demand signals. First commercial deliveries expected Q3 FY2025. Demand for Blackwell described as 'well in excess of our supply.'",
+      "source": "NVDA Q1 FY2025 Earnings Call",
+      "source_type": "earnings_call",
+      "reliability": 0.85,
+      "direction": "bullish",
+      "category": "catalyst",
+      "date": "2024-05-22",
+      "source_url": null,
+      "quote": "Demand for Blackwell is well in excess of our supply.",
+      "contradiction_flag": false,
+      "contradiction_with": []
+    },
+    {
+      "evidence_id": "EV-010",
+      "content": "Form 4 filings (April-May 2024): No significant insider selling by Jensen Huang or top executives. CFO made minor automatic 10b5-1 plan sales only. Holdings of key executives unchanged.",
+      "source": "SEC Form 4 Filings, NVDA",
+      "source_type": "sec_filing",
+      "reliability": 0.95,
+      "direction": "bullish",
+      "category": "management",
+      "date": "2024-05-15",
+      "source_url": null,
+      "quote": null,
+      "contradiction_flag": false,
+      "contradiction_with": []
+    },
+    {
+      "evidence_id": "EV-011",
+      "content": "Bernstein equity research: NVDA trading at ~35x forward earnings vs. semiconductor sector average of 22x. For current valuation to be justified, revenue growth must sustain above 40% YoY for 3+ years — a threshold historically achieved by fewer than 5% of large-cap companies.",
+      "source": "Bernstein NVDA Valuation Analysis (May 2024)",
+      "source_type": "analyst_report",
+      "reliability": 0.65,
+      "direction": "bearish",
+      "category": "competitive",
+      "date": "2024-05-28",
+      "source_url": null,
+      "quote": null,
+      "contradiction_flag": false,
+      "contradiction_with": []
+    },
+    {
+      "evidence_id": "EV-012",
+      "content": "Reuters: AMD's MI300X accelerator gaining traction in large language model inference workloads. Meta and Microsoft reportedly testing MI300X as secondary supplier to reduce NVDA dependency. AMD market share in data center AI estimated at 5-8% and growing.",
+      "source": "Reuters, April 2024",
+      "source_type": "news_tier1",
+      "reliability": 0.75,
+      "direction": "bearish",
+      "category": "competitive",
+      "date": "2024-04-15",
+      "source_url": null,
+      "quote": null,
+      "contradiction_flag": false,
+      "contradiction_with": []
+    },
+    {
+      "evidence_id": "EV-013",
+      "content": "NVDA 10-K FY2024: US government export restrictions on A100 and H100 chips to China removed access to a significant market. Management estimates $5-7B in near-term constrained revenue. Restrictions are permanent absent policy reversal.",
+      "source": "NVDA 10-K FY2024 (filed February 2024)",
+      "source_type": "sec_filing",
+      "reliability": 0.95,
+      "direction": "bearish",
+      "category": "regulatory",
+      "date": "2024-02-21",
+      "source_url": null,
+      "quote": "Export control regulations restrict our ability to sell certain products in China.",
+      "contradiction_flag": false,
+      "contradiction_with": []
+    },
+    {
+      "evidence_id": "EV-014",
+      "content": "NVDA 10-K FY2024: Top 3 customers collectively represent 46% of total revenue. These are unnamed hyperscalers. A 10%+ order reduction from any one of the three would create a material revenue miss against current guidance.",
+      "source": "NVDA 10-K FY2024",
+      "source_type": "sec_filing",
+      "reliability": 0.95,
+      "direction": "bearish",
+      "category": "competitive",
+      "date": "2024-02-21",
+      "source_url": null,
+      "quote": "Three customers each accounted for 11% or more of our total revenue.",
+      "contradiction_flag": false,
+      "contradiction_with": []
+    },
+    {
+      "evidence_id": "EV-015",
+      "content": "NVDA corporate profile: Founded 1993, headquartered Santa Clara, CA. Fiscal year ends last Sunday of January. 26,196 full-time employees as of January 28, 2024. Primary business: graphics processing units and system-on-chip units.",
+      "source": "NVDA 10-K FY2024",
+      "source_type": "sec_filing",
+      "reliability": 0.95,
+      "direction": "neutral",
+      "category": "news",
+      "date": "2024-02-21",
+      "source_url": null,
+      "quote": null,
+      "contradiction_flag": false,
+      "contradiction_with": []
+    },
+    {
+      "evidence_id": "EV-016",
+      "content": "The Information: One unnamed hyperscaler (believed to be Microsoft) reportedly reduced forward NVDA GPU orders by 15% for Q3 calendar 2024, citing sufficient near-term inventory build. NVDA declined to comment. Source has one unnamed insider.",
+      "source": "The Information, May 2024",
+      "source_type": "news_tier2",
+      "reliability": 0.50,
+      "direction": "bearish",
+      "category": "revenue",
+      "date": "2024-05-28",
+      "source_url": null,
+      "quote": null,
+      "contradiction_flag": true,
+      "contradiction_with": ["EV-008"]
+    },
+    {
+      "evidence_id": "EV-017",
+      "content": "Reuters: US Department of Commerce reviewing additional export controls on advanced AI chips. Bureau of Industry and Security reportedly considering extending restrictions to next-generation architectures including Blackwell. Final outcome and timeline uncertain.",
+      "source": "Reuters, June 2024",
+      "source_type": "news_tier1",
+      "reliability": 0.75,
+      "direction": "binary",
+      "category": "regulatory",
+      "date": "2024-06-01",
+      "source_url": null,
+      "quote": null,
+      "contradiction_flag": false,
+      "contradiction_with": []
+    }
+  ],
+
+  "contradictions": [
+    {
+      "contradiction_id": "CON-001",
+      "bullish_evidence_id": "EV-008",
+      "bearish_evidence_id": "EV-016",
+      "description": "REVENUE conflict: 'Financial Times' (reliability 75%) reports accelerating hyperscaler GPU order backlog — 'The Information' (reliability 50%) reports a 15% order reduction from one named hyperscaler. Category: revenue.",
+      "severity": "medium",
+      "resolution": "unresolved",
+      "resolution_notes": null
+    }
+  ],
+
+  "thesis_invalidation_conditions": [
+    {
+      "condition_id": "TIC-001",
+      "description": "Revenue growth decelerates below 20% YoY for two consecutive quarters.",
+      "monitoring_trigger": "Two consecutive quarterly earnings reports showing YoY revenue growth below 20%.",
+      "severity": "fatal",
+      "current_status": "not_triggered"
+    },
+    {
+      "condition_id": "TIC-002",
+      "description": "US export restrictions expand to include Blackwell architecture chips, cutting off next-generation product sales to restricted markets.",
+      "monitoring_trigger": "Official BIS rule published in Federal Register restricting export of B100, B200, or successor architectures.",
+      "severity": "fatal",
+      "current_status": "monitoring"
+    },
+    {
+      "condition_id": "TIC-003",
+      "description": "Gross margin falls below 70% in any reported quarter, signaling loss of pricing power or product mix deterioration.",
+      "monitoring_trigger": "Any quarterly earnings report showing GAAP gross margin below 70%.",
+      "severity": "major",
+      "current_status": "not_triggered"
+    }
+  ],
+
+  "risk_factors": [
+    {
+      "risk_id": "RSK-001",
+      "category": "company",
+      "description": "Top 3 customers represent 46% of revenue; a 15%+ order reduction from any single hyperscaler would cause a material quarterly miss against current guidance.",
+      "probability": "medium",
+      "impact": "high",
+      "mitigants": "Multi-year AI infrastructure commitments from hyperscalers reduce near-term order risk; however, commitments are not contractually binding."
+    },
+    {
+      "risk_id": "RSK-002",
+      "category": "regulatory",
+      "description": "BIS export restriction expansion to Blackwell architecture would remove access to China's AI market and potentially allied markets, repeating or exceeding the $5-7B impact from 2023 restrictions.",
+      "probability": "high",
+      "impact": "high",
+      "mitigants": "NVDA has developed restricted-market compliant chips (H20) but at lower margin and lower performance; revenue impact would be material."
+    },
+    {
+      "risk_id": "RSK-003",
+      "category": "sector",
+      "description": "AMD MI300X and hyperscaler custom silicon (Google TPU, Amazon Trainium, Microsoft Maia) could displace NVDA in inference workloads over a 2-4 year horizon, pressuring market share.",
+      "probability": "medium",
+      "impact": "medium",
+      "mitigants": "CUDA ecosystem switching costs and training workload dominance provide 2-3 year buffer; inference disruption would not affect training leadership near-term."
+    }
+  ],
+
+  "summary": {
+    "bull_case": "NVDA is the dominant infrastructure platform for the AI investment cycle, with 262% YoY revenue growth, expanding margins at 78.4%, and a CUDA software moat that creates structural switching costs estimated at 2-3 years even with competitive silicon. Hyperscaler capex guidance of $200B+ for calendar 2025 provides multi-quarter demand visibility. Supply-constrained framing from management is supported by earnings call evidence and order backlog signals.",
+    "bear_case": "At 35x forward earnings, NVDA is priced for perfection in a market where export restrictions have already removed $5-7B in revenue and may expand to next-generation chips. Customer concentration at 46% in three hyperscalers creates structural fragility, and early AMD MI300X adoption signals the competitive moat may erode faster than the CUDA narrative implies. The balanced evidence picture does not justify a premium this far above sector norms.",
+    "key_questions": [
+      "Revenue guidance is 10.2% above consensus, but one hyperscaler reportedly reduced forward orders by 15% — which signal is more predictive for Q2 actuals?",
+      "Gross margin expanded 1,380bps YoY despite rapid revenue growth — what specific drivers are sustainable through the Blackwell transition and which are one-time?",
+      "TIC-002 is in monitoring status — what is the realistic probability and timeline of BIS extending restrictions to Blackwell, and what would the revenue impact be?",
+      "AMD MI300X is gaining in inference workloads — at what market share level does this represent a material threat to NVDA's pricing power?",
+      "The bull-bear gap is partly a valuation disagreement — what growth rate and time horizon is currently priced in, and is that assumption justified?"
+    ],
+    "evidence_count": {
+      "bullish": 10,
+      "bearish": 5,
+      "neutral": 1,
+      "binary": 1
+    }
+  },
+
+  "data_freshness": {
+    "price_data_as_of": "2024-06-01",
+    "last_filing_date": "2024-05-22",
+    "last_earnings_date": "2024-05-22",
+    "news_coverage_through": "2024-06-01",
+    "stale_fields": []
+  },
+
+  "metadata": {
+    "contradiction_summary": {
+      "total": 1,
+      "high": 0,
+      "medium": 1,
+      "low": 0,
+      "unresolved": 1
+    },
+    "evidence_item_count": 17,
+    "catalyst_count": 2,
+    "risk_factor_count": 3,
+    "tic_count": 3,
+    "sources_consulted": [
+      "SEC EDGAR (10-K FY2024, 10-Q Q1 FY2025)",
+      "NVDA Q1 FY2025 Earnings Call Transcript",
+      "Bloomberg News",
+      "Reuters",
+      "Financial Times",
+      "The Information",
+      "Morgan Stanley Equity Research",
+      "Bernstein Equity Research"
+    ],
+    "warnings": []
+  }
+}
