@@ -1,0 +1,134 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "debate_record",
+  "title": "Debate Record",
+  "description": "Layer 5 debate output for a single ticker. The document Layer 6 (synthesis) operates on. Contains bull and bear positions, auto-detected contentions, and debate-adjusted scores.",
+  "type": "object",
+  "required": [
+    "debate_id", "score_reference", "packet_reference", "ticker", "debated_at",
+    "bull_position", "bear_position", "contentions",
+    "base_evidence_score", "base_confidence_score",
+    "debate_evidence_score", "debate_confidence_score", "net_score_adjustment",
+    "outcome", "original_conviction", "original_recommendation"
+  ],
+
+  "properties": {
+
+    "debate_id":       { "type": "string", "description": "DB-{TICKER}-{YYYYMMDD}-{HHMM}-{RAND}" },
+    "score_reference": { "type": "string", "description": "ScoringOutput.score_id" },
+    "packet_reference":{ "type": "string", "description": "EvidencePacket.packet_id" },
+    "ticker":          { "type": "string" },
+    "company_name":    { "type": "string" },
+    "debated_at":      { "type": "string", "format": "date-time" },
+
+    "bull_position": { "$ref": "#/definitions/analyst_position" },
+    "bear_position": { "$ref": "#/definitions/analyst_position" },
+
+    "contentions": {
+      "type": "array",
+      "description": "Points of disagreement auto-detected from overlapping evidence citations. Sorted CRITICAL first.",
+      "items": {
+        "type": "object",
+        "required": ["contention_id", "category", "bull_claim", "bear_claim", "evidence_ids", "severity"],
+        "properties": {
+          "contention_id": { "type": "string", "description": "CON-D-{NNN}" },
+          "category":      { "type": "string", "description": "EvidenceCategory value (revenue, margins, etc.)" },
+          "bull_claim":    { "type": "string" },
+          "bear_claim":    { "type": "string" },
+          "evidence_ids":  { "type": "array", "items": { "type": "string" } },
+          "severity":      { "type": "string", "enum": ["critical", "material", "minor"] },
+          "adjudication":  {
+            "type": ["string", "null"],
+            "description": "Chief Analyst resolution set during Layer 6 synthesis. Null until adjudicated."
+          }
+        }
+      }
+    },
+
+    "base_evidence_score": {
+      "type": "number", "minimum": -100, "maximum": 100,
+      "description": "Layer 4 evidence_score, unchanged. Present for traceability."
+    },
+    "base_confidence_score": {
+      "type": "number", "minimum": 0, "maximum": 100,
+      "description": "Layer 4 confidence_score, unchanged. Present for traceability."
+    },
+
+    "debate_evidence_score": {
+      "type": "number", "minimum": -100, "maximum": 100,
+      "description": "evidence_score after applying net debate adjustment. Passed to Layer 6."
+    },
+    "debate_confidence_score": {
+      "type": "number", "minimum": 0, "maximum": 100,
+      "description": "confidence_score after applying net debate adjustment. Passed to Layer 6."
+    },
+    "net_score_adjustment": {
+      "type": "number",
+      "description": "(bull_score_adj + bear_score_adj) / 2. Positive = debate shifted bullish; negative = shifted bearish."
+    },
+
+    "outcome": {
+      "type": "string",
+      "enum": ["bull_prevails", "bear_prevails", "balanced", "inconclusive"],
+      "description": "bull_prevails: net_adj > +8. bear_prevails: net_adj < -8. inconclusive: analysts >15 pts apart with small net. balanced: otherwise."
+    },
+
+    "original_conviction":     { "type": "string", "description": "Layer 4 conviction, passed through for traceability." },
+    "original_recommendation": { "type": "string", "description": "Layer 4 recommendation, passed through for traceability." },
+
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "net_conf_adjustment":  { "type": "number" },
+        "contention_count":     { "type": "integer" },
+        "critical_contentions": { "type": "integer" },
+        "material_contentions": { "type": "integer" },
+        "bull_evidence_cited":  { "type": "integer" },
+        "bear_evidence_cited":  { "type": "integer" },
+        "bull_contested":       { "type": "integer" },
+        "bear_contested":       { "type": "integer" },
+        "raised_risks_count":   { "type": "integer" }
+      }
+    }
+  },
+
+  "definitions": {
+    "analyst_position": {
+      "type": "object",
+      "required": [
+        "analyst_role", "summary", "key_arguments",
+        "evidence_cited", "contested_items", "raised_risks",
+        "score_adjustment", "confidence_adjustment"
+      ],
+      "properties": {
+        "analyst_role":   { "type": "string", "enum": ["bull", "bear"] },
+        "summary":        { "type": "string", "description": "3-5 sentence case summary" },
+        "key_arguments":  {
+          "type": "array", "minItems": 1, "maxItems": 5,
+          "items": { "type": "string" },
+          "description": "Top arguments, one sentence each"
+        },
+        "evidence_cited": {
+          "type": "array", "items": { "type": "string" },
+          "description": "evidence_ids from the EvidencePacket supporting this case"
+        },
+        "contested_items": {
+          "type": "array", "items": { "type": "string" },
+          "description": "evidence_ids from the opposing case being actively disputed"
+        },
+        "raised_risks": {
+          "type": "array", "items": { "type": "string" },
+          "description": "New risk descriptions not present in the original EvidencePacket"
+        },
+        "score_adjustment": {
+          "type": "number", "minimum": -15, "maximum": 15,
+          "description": "Analyst's recommended adjustment to the Layer 4 evidence_score"
+        },
+        "confidence_adjustment": {
+          "type": "number", "minimum": -10, "maximum": 10,
+          "description": "Analyst's recommended adjustment to the Layer 4 confidence_score"
+        }
+      }
+    }
+  }
+}
