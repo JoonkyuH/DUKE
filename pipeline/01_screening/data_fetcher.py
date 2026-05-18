@@ -169,6 +169,8 @@ def fetch_market_data(ticker: str) -> dict:
     # ── Earnings ─────────────────────────────────────
     next_earnings_date = days_to_earnings = None
     last_earnings_date = days_since_earnings = last_eps_surprise = None
+
+    # Strategy 1: earnings_dates DataFrame (requires lxml)
     try:
         edates = t.earnings_dates
         if edates is not None and not edates.empty:
@@ -200,6 +202,58 @@ def fetch_market_data(ticker: str) -> dict:
                     pass
     except Exception:
         pass
+
+    # Strategy 2: calendar dict (no lxml needed)
+    if next_earnings_date is None:
+        try:
+            cal = t.calendar
+            if isinstance(cal, dict):
+                ed_val = cal.get("Earnings Date", [])
+                if not isinstance(ed_val, list):
+                    ed_val = [ed_val]
+                future = sorted(
+                    d for d in ed_val
+                    if isinstance(d, date) and d > today_d
+                )
+                if future:
+                    next_d             = future[0]
+                    next_earnings_date = next_d.isoformat()
+                    days_to_earnings   = (next_d - today_d).days
+                # Past calendar dates → last earnings proxy
+                if last_earnings_date is None:
+                    past = sorted(
+                        (d for d in ed_val if isinstance(d, date) and d <= today_d),
+                        reverse=True,
+                    )
+                    if past:
+                        last_d              = past[0]
+                        last_earnings_date  = last_d.isoformat()
+                        days_since_earnings = (today_d - last_d).days
+        except Exception:
+            pass
+
+    # Strategy 3: info timestamps (earningsTimestamp / mostRecentQuarter)
+    if next_earnings_date is None:
+        try:
+            ts = info.get("earningsTimestamp")
+            if ts:
+                next_d = datetime.utcfromtimestamp(int(ts)).date()
+                if next_d >= today_d:
+                    next_earnings_date = next_d.isoformat()
+                    days_to_earnings   = (next_d - today_d).days
+        except Exception:
+            pass
+
+    if last_earnings_date is None:
+        try:
+            ts = info.get("mostRecentQuarter")
+            if ts:
+                last_d = datetime.utcfromtimestamp(int(ts)).date()
+                if last_d < today_d:
+                    last_earnings_date  = last_d.isoformat()
+                    days_since_earnings = (today_d - last_d).days
+        except Exception:
+            pass
 
     # ── Assemble output ───────────────────────────────
     price_data_raw = {
