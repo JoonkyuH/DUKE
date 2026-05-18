@@ -1,0 +1,323 @@
+{
+  "packet_id": "EP-BEAR-20240601-1200-DRY1",
+  "ticker": "BEAR",
+  "company_name": "Bearmill Retail Corp.",
+  "sector": "XLY",
+  "generated_at": "2024-06-01T12:00:00Z",
+  "screening_reference": "SCR-BEAR-20240531-DEMO",
+  "screening_score": 38.5,
+  "screening_reason_codes": ["VALUE_SCREEN", "EARNINGS_MISS_WATCH"],
+  "screening_flags": ["MOMENTUM_BREACH", "EARNINGS_MISS"],
+  "investment_archetype": "does_not_fit",
+
+  "fundamentals": {
+    "revenue_ttm_m": 3205,
+    "revenue_growth_yoy_pct": -24.0,
+    "revenue_growth_qoq_pct": -8.2,
+    "revenue_trend": "decelerating",
+    "eps_ttm": -1.85,
+    "eps_growth_yoy_pct": -148.0,
+    "eps_surprise_last_pct": -22.0,
+    "eps_surprise_avg_4q_pct": -18.5,
+    "gross_margin_pct": 27.0,
+    "gross_margin_trend": "decelerating",
+    "operating_margin_pct": -8.5,
+    "operating_margin_trend": "decelerating",
+    "cash_m": 180,
+    "total_debt_m": 2840,
+    "net_cash_m": -2660,
+    "fcf_ttm_m": -182,
+    "fcf_yield_pct": -2.1,
+    "next_q_revenue_guide_m": 680,
+    "guidance_vs_consensus_pct": -15.2,
+    "management_tone": "cautious"
+  },
+
+  "business_quality": {
+    "moat_assessment": "none",
+    "moat_sources": [],
+    "competitive_position": "losing",
+    "customer_concentration_risk": "low",
+    "management_signals": "weak",
+    "insider_activity": "heavy_selling"
+  },
+
+  "technical_state": {
+    "trend_structure": "downtrend",
+    "key_support_levels": [8, 5],
+    "key_resistance_levels": [18, 22],
+    "pattern": "distribution",
+    "rs_line_trend": "new_low",
+    "weeks_in_base": 0,
+    "prior_uptrend_weeks": 0
+  },
+
+  "catalyst_map": [],
+
+  "evidence_items": [
+    {
+      "evidence_id": "EV-001",
+      "content": "Bearmill Q1 FY2025 10-Q: Revenue $742M, down -24% YoY and -8.2% QoQ. This follows Q4 FY2024 revenue declining -21% YoY. Two consecutive quarters of >20% YoY revenue decline confirmed in primary source filing.",
+      "source": "BEAR 10-Q Q1 FY2025 (filed May 2024)",
+      "source_type": "sec_filing",
+      "reliability": 0.95,
+      "direction": "bearish",
+      "category": "revenue",
+      "date": "2024-05-08",
+      "source_url": null,
+      "quote": "Net sales decreased 24.0% to $742 million compared to $976 million in the prior year period.",
+      "contradiction_flag": true,
+      "contradiction_with": ["EV-011"]
+    },
+    {
+      "evidence_id": "EV-002",
+      "content": "Bearmill Q1 FY2025 10-Q: GAAP gross margin 27.0%, compressed from 38.1% year-over-year, an 1,110bps decline. Management attributed compression to inventory clearance discounts, higher shrinkage, and deleverage on fixed occupancy costs as store traffic declined.",
+      "source": "BEAR 10-Q Q1 FY2025",
+      "source_type": "sec_filing",
+      "reliability": 0.95,
+      "direction": "bearish",
+      "category": "margins",
+      "date": "2024-05-08",
+      "source_url": null,
+      "quote": "Gross margin decreased to 27.0% from 38.1% in the prior year quarter.",
+      "contradiction_flag": false,
+      "contradiction_with": []
+    },
+    {
+      "evidence_id": "EV-003",
+      "content": "Bearmill Q1 FY2025 10-Q: TTM free cash flow negative $182M, third consecutive quarter of negative FCF. Operating cash flow was -$48M in Q1. Cash and equivalents declined to $180M from $340M a year ago, a $160M reduction in 12 months.",
+      "source": "BEAR 10-Q Q1 FY2025",
+      "source_type": "sec_filing",
+      "reliability": 0.95,
+      "direction": "bearish",
+      "category": "balance_sheet",
+      "date": "2024-05-08",
+      "source_url": null,
+      "quote": null,
+      "contradiction_flag": false,
+      "contradiction_with": []
+    },
+    {
+      "evidence_id": "EV-004",
+      "content": "Bearmill 10-K FY2024: Long-term debt $2.84B at 4.2x debt-to-equity. Credit facility covenants require maintaining EBITDA/interest coverage above 2.0x; current ratio is 1.4x and declining. A further quarter of losses risks covenant breach without waiver.",
+      "source": "BEAR 10-K FY2024 (filed February 2024)",
+      "source_type": "sec_filing",
+      "reliability": 0.95,
+      "direction": "bearish",
+      "category": "balance_sheet",
+      "date": "2024-02-28",
+      "source_url": null,
+      "quote": "Our credit agreement requires us to maintain a minimum interest coverage ratio of 2.0 to 1.0.",
+      "contradiction_flag": false,
+      "contradiction_with": []
+    },
+    {
+      "evidence_id": "EV-005",
+      "content": "Bearmill Q1 FY2025 earnings call: Q2 guidance of $680M, -15.2% below street consensus of $802M. Management withdrew full-year guidance, citing 'continued uncertainty in consumer traffic patterns.' CFO explicitly flagged liquidity as a near-term watch item.",
+      "source": "BEAR Q1 FY2025 Earnings Call (May 8, 2024)",
+      "source_type": "earnings_call",
+      "reliability": 0.85,
+      "direction": "bearish",
+      "category": "guidance",
+      "date": "2024-05-08",
+      "source_url": null,
+      "quote": "We are withdrawing our full-year guidance given continued uncertainty in consumer traffic patterns.",
+      "contradiction_flag": false,
+      "contradiction_with": []
+    },
+    {
+      "evidence_id": "EV-006",
+      "content": "CEO on Q1 FY2025 earnings call: 'The headwinds we face remain significant and we are not yet seeing the stabilization we expected from our transformation program.' Tone was distinctly more cautious than Q4 FY2024 language of 'early green shoots.'",
+      "source": "BEAR Q1 FY2025 Earnings Call",
+      "source_type": "earnings_call",
+      "reliability": 0.85,
+      "direction": "bearish",
+      "category": "management",
+      "date": "2024-05-08",
+      "source_url": null,
+      "quote": "The headwinds we face remain significant and we are not yet seeing the stabilization we expected.",
+      "contradiction_flag": false,
+      "contradiction_with": []
+    },
+    {
+      "evidence_id": "EV-007",
+      "content": "SEC Form 4 filings (January-April 2024): CEO Marcus Webb sold 40% of total direct holdings (580,000 shares at $14-18 per share, $9.2M proceeds). CFO Emily Choi sold 25% of holdings (148,000 shares, $2.5M proceeds). Sales were open-market, not pre-scheduled 10b5-1 plans.",
+      "source": "SEC Form 4 Filings, BEAR (April 2024)",
+      "source_type": "sec_filing",
+      "reliability": 0.95,
+      "direction": "bearish",
+      "category": "management",
+      "date": "2024-04-30",
+      "source_url": null,
+      "quote": null,
+      "contradiction_flag": false,
+      "contradiction_with": []
+    },
+    {
+      "evidence_id": "EV-008",
+      "content": "Reuters: Bearmill Retail announced closure of 185 store locations (26% of total fleet) effective through Q3 FY2025. Lease termination costs estimated at $240-280M. Closures concentrated in secondary markets where foot traffic declined 35%+ over two years.",
+      "source": "Reuters, March 2024",
+      "source_type": "news_tier1",
+      "reliability": 0.75,
+      "direction": "bearish",
+      "category": "competitive",
+      "date": "2024-03-18",
+      "source_url": null,
+      "quote": null,
+      "contradiction_flag": false,
+      "contradiction_with": []
+    },
+    {
+      "evidence_id": "EV-009",
+      "content": "Bernstein equity research: E-commerce market share in Bearmill's home goods category grew from 31% to 47% in 24 months. BEAR's online revenue is less than 12% of total, the lowest in the sector peer group. No credible digital transition strategy is evidenced in public disclosures.",
+      "source": "Bernstein Retail Sector Analysis (April 2024)",
+      "source_type": "analyst_report",
+      "reliability": 0.65,
+      "direction": "bearish",
+      "category": "competitive",
+      "date": "2024-04-10",
+      "source_url": null,
+      "quote": null,
+      "contradiction_flag": false,
+      "contradiction_with": []
+    },
+    {
+      "evidence_id": "EV-010",
+      "content": "Moody's Investors Service: Downgraded Bearmill Retail's senior secured debt from Ba3 to B3, four notches in six months. Cited deteriorating operating performance, negative FCF, and covenant pressure. Outlook: Negative. B3 is one notch above Caa1 (highly speculative/distressed).",
+      "source": "Moody's Investors Service Credit Rating Action (May 2024)",
+      "source_type": "news_tier1",
+      "reliability": 0.75,
+      "direction": "bearish",
+      "category": "balance_sheet",
+      "date": "2024-05-20",
+      "source_url": null,
+      "quote": "The downgrade reflects deteriorating operating performance and increasing liquidity pressure.",
+      "contradiction_flag": false,
+      "contradiction_with": []
+    },
+    {
+      "evidence_id": "EV-011",
+      "content": "Bearmill corporate press release: Announced Project Rebuild restructuring plan targeting $320M in annualized cost savings by FY2026. Plan includes closure of 185 stores, 3,400 headcount reduction, and supply chain rationalization. Timeline is 18-24 months; no interim milestones disclosed.",
+      "source": "Bearmill Retail Corp. Press Release (March 2024)",
+      "source_type": "company_ir",
+      "reliability": 0.40,
+      "direction": "bullish",
+      "category": "guidance",
+      "date": "2024-03-15",
+      "source_url": null,
+      "quote": "Project Rebuild targets $320 million in annualized cost savings by fiscal year 2026.",
+      "contradiction_flag": true,
+      "contradiction_with": ["EV-001"]
+    },
+    {
+      "evidence_id": "EV-012",
+      "content": "Piper Sandler analyst note: Maintained Buy rating on BEAR, citing 'trough valuation at 0.3x EV/Sales, historically a floor for specialty retail recoveries.' Analyst argued that store closures are value-unlocking through lease liability reduction. Price target $22.",
+      "source": "Piper Sandler Equity Research (May 2024)",
+      "source_type": "news_tier2",
+      "reliability": 0.50,
+      "direction": "bullish",
+      "category": "valuation",
+      "date": "2024-05-12",
+      "source_url": null,
+      "quote": null,
+      "contradiction_flag": false,
+      "contradiction_with": []
+    }
+  ],
+
+  "contradictions": [
+    {
+      "contradiction_id": "CON-001",
+      "bullish_evidence_id": "EV-011",
+      "bearish_evidence_id": "EV-001",
+      "description": "GUIDANCE conflict: Company press release (reliability 40%) projects $320M in cost savings restoring profitability — Q1 10-Q (reliability 95%) reports -24% revenue decline for second consecutive quarter with no guidance provided. The restructuring narrative conflicts with actual financial deterioration.",
+      "severity": "medium",
+      "resolution": "unresolved",
+      "resolution_notes": null
+    }
+  ],
+
+  "thesis_invalidation_conditions": [
+    {
+      "condition_id": "TIC-001",
+      "description": "Revenue declines more than 20% YoY for two consecutive quarters.",
+      "monitoring_trigger": "Two consecutive quarterly reports showing YoY revenue decline exceeding 20%.",
+      "severity": "fatal",
+      "current_status": "triggered"
+    },
+    {
+      "condition_id": "TIC-002",
+      "description": "Gross margin falls below 22% in any reported quarter, signaling terminal margin compression.",
+      "monitoring_trigger": "Any quarterly earnings report showing gross margin below 22%.",
+      "severity": "major",
+      "current_status": "not_triggered"
+    }
+  ],
+
+  "risk_factors": [
+    {
+      "risk_id": "RSK-001",
+      "category": "company",
+      "description": "E-commerce market share erosion is structural and accelerating; BEAR has no credible digital strategy to arrest share loss in its core home goods category.",
+      "probability": "high",
+      "impact": "high",
+      "mitigants": "Store closure program removes the highest-cost locations but does not address the root cause of channel shift to e-commerce."
+    },
+    {
+      "risk_id": "RSK-002",
+      "category": "company",
+      "description": "Debt covenant breach probable within 2-3 quarters at current FCF burn rate; breach would trigger accelerated repayment or forced restructuring.",
+      "probability": "high",
+      "impact": "high",
+      "mitigants": "Company may seek covenant waiver from lenders, but leverage for negotiation is limited given the operational deterioration."
+    }
+  ],
+
+  "summary": {
+    "bull_case": "Management has announced Project Rebuild targeting $320M in annualized cost savings by FY2026. If executed, gross margins could recover toward 32-34%. The Piper Sandler analyst cites 0.3x EV/Sales as a historical floor for specialty retail recoveries. Store closures reduce lease liability and could improve per-store economics for the surviving fleet.",
+    "bear_case": "The thesis is invalidated. TIC-001 has triggered: revenue has declined >20% YoY for two consecutive quarters. Gross margins compressed 1,110bps to 27%. FCF is negative for three quarters. Debt at 4.2x equity is approaching covenant limits. CEO and CFO sold 40% and 25% of their shares at $14-18 — ahead of further deterioration. The Moody's downgrade to B3 reflects the credit market's assessment of distress probability.",
+    "key_questions": [
+      "At what revenue run rate do debt covenants breach, and what is the realistic probability of a waiver given the pace of deterioration?",
+      "Is the $320M Project Rebuild savings target credible given that e-commerce share erosion is structural, not cost-reducible?",
+      "What does the B3 Moody's credit rating imply about default probability over the next 12 months, and what does the bond market currently price?"
+    ],
+    "evidence_count": {
+      "bullish": 2,
+      "bearish": 10,
+      "neutral": 0,
+      "binary": 0
+    }
+  },
+
+  "data_freshness": {
+    "price_data_as_of": "2024-06-01",
+    "last_filing_date": "2024-05-08",
+    "last_earnings_date": "2024-05-08",
+    "news_coverage_through": "2024-06-01",
+    "stale_fields": []
+  },
+
+  "metadata": {
+    "contradiction_summary": {
+      "total": 1,
+      "high": 0,
+      "medium": 1,
+      "low": 0,
+      "unresolved": 1
+    },
+    "evidence_item_count": 12,
+    "catalyst_count": 0,
+    "risk_factor_count": 2,
+    "tic_count": 2,
+    "sources_consulted": [
+      "SEC EDGAR (10-K FY2024, 10-Q Q1 FY2025, Form 4 filings)",
+      "BEAR Q1 FY2025 Earnings Call Transcript",
+      "Reuters",
+      "Moody's Investors Service",
+      "Bernstein Equity Research",
+      "Piper Sandler Equity Research",
+      "Bearmill Retail Corp. Press Release"
+    ],
+    "warnings": ["TIC-001 triggered — fatal invalidation condition met"]
+  }
+}

@@ -1,0 +1,359 @@
+{
+  "packet_id": "EP-BULL-20240601-1200-DRY1",
+  "ticker": "BULL",
+  "company_name": "Bullhorn Analytics Inc.",
+  "sector": "XLK",
+  "generated_at": "2024-06-01T12:00:00Z",
+  "screening_reference": "SCR-BULL-20240531-DEMO",
+  "screening_score": 82.0,
+  "screening_reason_codes": ["MOMENTUM", "RS_MARKET_LEADER", "MULTI_SIGNAL_CONFLUENCE", "VOLUME_BREAKOUT"],
+  "screening_flags": [],
+  "investment_archetype": "long_term_compounder",
+
+  "fundamentals": {
+    "revenue_ttm_m": 1252,
+    "revenue_growth_yoy_pct": 42.0,
+    "revenue_growth_qoq_pct": 8.5,
+    "revenue_trend": "accelerating",
+    "eps_ttm": 4.20,
+    "eps_growth_yoy_pct": 68.0,
+    "eps_surprise_last_pct": 6.8,
+    "eps_surprise_avg_4q_pct": 7.2,
+    "gross_margin_pct": 82.0,
+    "gross_margin_trend": "accelerating",
+    "operating_margin_pct": 28.0,
+    "operating_margin_trend": "accelerating",
+    "cash_m": 920,
+    "total_debt_m": 120,
+    "net_cash_m": 800,
+    "fcf_ttm_m": 280,
+    "fcf_yield_pct": 1.8,
+    "next_q_revenue_guide_m": 370,
+    "guidance_vs_consensus_pct": 8.1,
+    "management_tone": "confident"
+  },
+
+  "business_quality": {
+    "moat_assessment": "wide",
+    "moat_sources": ["switching_costs", "data_network_effects", "intangible_assets"],
+    "competitive_position": "gaining",
+    "customer_concentration_risk": "medium",
+    "management_signals": "strong",
+    "insider_activity": "buying"
+  },
+
+  "technical_state": {
+    "trend_structure": "uptrend",
+    "key_support_levels": [148, 132],
+    "key_resistance_levels": [195, 215],
+    "pattern": "flat_base",
+    "rs_line_trend": "new_high",
+    "weeks_in_base": 5,
+    "prior_uptrend_weeks": 22
+  },
+
+  "catalyst_map": [
+    {
+      "catalyst_id": "CAT-001",
+      "type": "earnings",
+      "description": "Q2 FY2025 earnings. Guidance of $370M is 8.1% above consensus. Company has beaten and raised for six consecutive quarters.",
+      "date": "2024-08-14",
+      "days_away": 74,
+      "expected_impact": "high",
+      "direction": "bullish",
+      "historical_pattern": "Beat and raised last 6 consecutive quarters. Avg revenue beat +5.2%.",
+      "probability": 0.80
+    }
+  ],
+
+  "evidence_items": [
+    {
+      "evidence_id": "EV-001",
+      "content": "Bullhorn Q1 FY2025 10-Q: Total revenue $302M (+42% YoY), fourth consecutive quarter of accelerating growth. ARR reached $1.28B, up 44% YoY. SaaS subscription revenue 94% of total.",
+      "source": "BULL 10-Q Q1 FY2025 (filed May 2024)",
+      "source_type": "sec_filing",
+      "reliability": 0.95,
+      "direction": "bullish",
+      "category": "revenue",
+      "date": "2024-05-10",
+      "source_url": null,
+      "quote": "Annual recurring revenue was $1.28 billion, up 44% from a year ago.",
+      "contradiction_flag": false,
+      "contradiction_with": []
+    },
+    {
+      "evidence_id": "EV-002",
+      "content": "Bullhorn Q1 FY2025 10-Q: GAAP gross margin 82.0%, up from 75.1% year-over-year. Operating margin expanded to 28.0% from 18.2%. Both at company all-time highs, demonstrating durable operating leverage as scale increases.",
+      "source": "BULL 10-Q Q1 FY2025",
+      "source_type": "sec_filing",
+      "reliability": 0.95,
+      "direction": "bullish",
+      "category": "margins",
+      "date": "2024-05-10",
+      "source_url": null,
+      "quote": "Non-GAAP gross margin was 82.0%, up from 75.1% in the prior year period.",
+      "contradiction_flag": false,
+      "contradiction_with": []
+    },
+    {
+      "evidence_id": "EV-003",
+      "content": "Bullhorn Q1 FY2025 10-Q: TTM free cash flow $280M (22.4% FCF margin). Net cash position $800M. Zero long-term debt. Company initiated $100M share buyback program in April 2024.",
+      "source": "BULL 10-Q Q1 FY2025",
+      "source_type": "sec_filing",
+      "reliability": 0.95,
+      "direction": "bullish",
+      "category": "balance_sheet",
+      "date": "2024-05-10",
+      "source_url": null,
+      "quote": null,
+      "contradiction_flag": false,
+      "contradiction_with": []
+    },
+    {
+      "evidence_id": "EV-004",
+      "content": "Bullhorn 10-K FY2024: Net Revenue Retention Rate of 125%, up from 118% in FY2023. Defined as expansion + upsell from existing customers net of churn. NRR above 120% means the installed base grows revenue faster than gross churn removes it.",
+      "source": "BULL 10-K FY2024 (filed February 2024)",
+      "source_type": "sec_filing",
+      "reliability": 0.95,
+      "direction": "bullish",
+      "category": "competitive",
+      "date": "2024-02-14",
+      "source_url": null,
+      "quote": "Net revenue retention rate was 125% for the fiscal year ended January 31, 2024.",
+      "contradiction_flag": false,
+      "contradiction_with": []
+    },
+    {
+      "evidence_id": "EV-005",
+      "content": "Bullhorn 10-Q Q1 FY2025: Net new logos +18% YoY. Total customer count 4,820, up from 4,085 a year ago. Average contract value increased 21% YoY to $265K, indicating upmarket motion is working.",
+      "source": "BULL 10-Q Q1 FY2025",
+      "source_type": "sec_filing",
+      "reliability": 0.95,
+      "direction": "bullish",
+      "category": "revenue",
+      "date": "2024-05-10",
+      "source_url": null,
+      "quote": null,
+      "contradiction_flag": false,
+      "contradiction_with": []
+    },
+    {
+      "evidence_id": "EV-006",
+      "content": "Bullhorn 10-Q Q1 FY2025: Operating margin expanded 980bps YoY to 28.0%. R&D as a percent of revenue declined from 22% to 18% as headcount leverage improves. S&M efficiency ratio (ARR per S&M dollar) improved 14% YoY.",
+      "source": "BULL 10-Q Q1 FY2025",
+      "source_type": "sec_filing",
+      "reliability": 0.95,
+      "direction": "bullish",
+      "category": "margins",
+      "date": "2024-05-10",
+      "source_url": null,
+      "quote": null,
+      "contradiction_flag": false,
+      "contradiction_with": []
+    },
+    {
+      "evidence_id": "EV-007",
+      "content": "SEC Form 4 filings (March-May 2024): CFO Sandra Keller purchased $2.1M in BULL common stock in open market transactions at $158-164 per share. CEO held all shares and exercised no options. No selling by any named executive in the prior 12 months.",
+      "source": "SEC Form 4 Filings, BULL (May 2024)",
+      "source_type": "sec_filing",
+      "reliability": 0.95,
+      "direction": "bullish",
+      "category": "management",
+      "date": "2024-05-02",
+      "source_url": null,
+      "quote": null,
+      "contradiction_flag": false,
+      "contradiction_with": []
+    },
+    {
+      "evidence_id": "EV-008",
+      "content": "CEO on Q1 FY2025 earnings call: 'Pipeline quality is the best I have seen in eight years. Enterprise deal velocity is accelerating. We are not seeing any pressure on deal cycles or pricing.' CFO confirmed no material change in churn trends.",
+      "source": "BULL Q1 FY2025 Earnings Call (May 10, 2024)",
+      "source_type": "earnings_call",
+      "reliability": 0.85,
+      "direction": "bullish",
+      "category": "guidance",
+      "date": "2024-05-10",
+      "source_url": null,
+      "quote": "Pipeline quality is the best I have seen in eight years.",
+      "contradiction_flag": false,
+      "contradiction_with": []
+    },
+    {
+      "evidence_id": "EV-009",
+      "content": "Q1 FY2025 earnings call: Q2 guidance of $370M (+/- 1.5%), 8.1% above street consensus of $342M at time of report. Guidance has exceeded consensus for six consecutive quarters. Management noted pipeline conversion rates are tracking above plan.",
+      "source": "BULL Q1 FY2025 Earnings Call",
+      "source_type": "earnings_call",
+      "reliability": 0.85,
+      "direction": "bullish",
+      "category": "guidance",
+      "date": "2024-05-10",
+      "source_url": null,
+      "quote": "For Q2 fiscal 2025, we expect revenue in the range of $365M to $375M.",
+      "contradiction_flag": false,
+      "contradiction_with": []
+    },
+    {
+      "evidence_id": "EV-010",
+      "content": "Bullhorn Apex product suite launch (Q1 FY2025 earnings call): Next-generation AI analytics layer built natively into the platform. Early access customers report 40% improvement in time-to-insight. Priced at 30% premium to base tier. Upsell motion beginning Q2.",
+      "source": "BULL Q1 FY2025 Earnings Call",
+      "source_type": "earnings_call",
+      "reliability": 0.85,
+      "direction": "bullish",
+      "category": "catalyst",
+      "date": "2024-05-10",
+      "source_url": null,
+      "quote": null,
+      "contradiction_flag": false,
+      "contradiction_with": []
+    },
+    {
+      "evidence_id": "EV-011",
+      "content": "Bloomberg Intelligence: Enterprise data analytics TAM growing at 28% CAGR through 2028, driven by AI-augmented decision workflows. Bullhorn holds estimated 8.4% market share, second only to Palantir in mid-market. Category is still early-stage with no dominant incumbent.",
+      "source": "Bloomberg Intelligence, Enterprise Analytics Market Report (May 2024)",
+      "source_type": "news_tier1",
+      "reliability": 0.75,
+      "direction": "bullish",
+      "category": "macro",
+      "date": "2024-05-20",
+      "source_url": null,
+      "quote": null,
+      "contradiction_flag": false,
+      "contradiction_with": []
+    },
+    {
+      "evidence_id": "EV-012",
+      "content": "Morgan Stanley survey of 140 Bullhorn enterprise customers: average estimated migration timeline to a competing platform is 18-24 months, driven by data schema lock-in and workflow re-training costs. Switching costs are structural, not contractual.",
+      "source": "Morgan Stanley BULL Channel Analysis (April 2024)",
+      "source_type": "analyst_report",
+      "reliability": 0.65,
+      "direction": "bullish",
+      "category": "competitive",
+      "date": "2024-04-22",
+      "source_url": null,
+      "quote": null,
+      "contradiction_flag": false,
+      "contradiction_with": []
+    },
+    {
+      "evidence_id": "EV-013",
+      "content": "Bernstein equity research: BULL trading at 18x NTM revenue vs. SaaS peer median of 11x. Premium requires 35%+ revenue growth sustained for 3+ years. Downgrade to market perform citing valuation risk if growth rate decelerates to peer median of 22%.",
+      "source": "Bernstein BULL Valuation Analysis (May 2024)",
+      "source_type": "analyst_report",
+      "reliability": 0.65,
+      "direction": "bearish",
+      "category": "valuation",
+      "date": "2024-05-28",
+      "source_url": null,
+      "quote": null,
+      "contradiction_flag": false,
+      "contradiction_with": []
+    },
+    {
+      "evidence_id": "EV-014",
+      "content": "Seeking Alpha analysis citing Microsoft product roadmap: Azure Synapse Analytics roadmap update indicates direct overlap with Bullhorn's mid-market segment planned for H2 2025. Microsoft pricing expected 35% below BULL's base tier. Threat is early-stage but real.",
+      "source": "Seeking Alpha, May 2024",
+      "source_type": "analyst_report",
+      "reliability": 0.65,
+      "direction": "bearish",
+      "category": "competitive",
+      "date": "2024-05-15",
+      "source_url": null,
+      "quote": null,
+      "contradiction_flag": false,
+      "contradiction_with": []
+    }
+  ],
+
+  "contradictions": [],
+
+  "thesis_invalidation_conditions": [
+    {
+      "condition_id": "TIC-001",
+      "description": "Revenue growth decelerates below 15% YoY for two consecutive quarters.",
+      "monitoring_trigger": "Two consecutive quarterly reports showing YoY revenue growth below 15%.",
+      "severity": "fatal",
+      "current_status": "not_triggered"
+    },
+    {
+      "condition_id": "TIC-002",
+      "description": "Gross margin falls below 70% in any reported quarter, signaling loss of pricing power.",
+      "monitoring_trigger": "Any quarterly earnings report showing gross margin below 70%.",
+      "severity": "major",
+      "current_status": "not_triggered"
+    },
+    {
+      "condition_id": "TIC-003",
+      "description": "Net Revenue Retention falls below 105% for two consecutive quarters, signaling competitive moat erosion.",
+      "monitoring_trigger": "Two consecutive quarterly NRR disclosures below 105%.",
+      "severity": "major",
+      "current_status": "not_triggered"
+    }
+  ],
+
+  "risk_factors": [
+    {
+      "risk_id": "RSK-001",
+      "category": "company",
+      "description": "Valuation at 18x NTM revenue provides no margin of safety if growth decelerates; a re-rating to 11x peer median implies a 39% drawdown.",
+      "probability": "medium",
+      "impact": "medium",
+      "mitigants": "Current growth trajectory (42% YoY accelerating) and high-quality NRR reduce deceleration risk near-term."
+    },
+    {
+      "risk_id": "RSK-002",
+      "category": "sector",
+      "description": "Microsoft Azure Synapse direct entry into mid-market analytics in H2 2025 could pressure pricing and net new logo growth over a 2-3 year horizon.",
+      "probability": "medium",
+      "impact": "medium",
+      "mitigants": "18-24 month customer switching costs and 125% NRR demonstrate that BULL's installed base is not at near-term risk."
+    }
+  ],
+
+  "summary": {
+    "bull_case": "Bullhorn Analytics is a textbook long-term compounder: 42% revenue growth accelerating, 82% gross margins expanding, NRR of 125%, and positive free cash flow — all simultaneously at scale. The moat is structural (data schema lock-in, 18-24 month migration costs) and is evidenced by NRR expansion, not just asserted. CFO open-market buying is a primary-source confidence signal. No binary events; all TICs well-buffered.",
+    "bear_case": "At 18x NTM revenue, BULL is priced for perfection. The Microsoft competitive threat is real and underappreciated — Azure Synapse pricing 35% below BULL's base tier targets exactly the segment driving new logo growth. If NRR compresses even modestly from 125% to 112%, the multiple will re-rate sharply. The Bernstein downgrade captures the asymmetric valuation risk correctly.",
+    "key_questions": [
+      "NRR of 125% is the thesis linchpin — what cohort-level data shows whether this is driven by upsell breadth or a few large enterprise expansions?",
+      "Microsoft Azure Synapse launches H2 2025 — what is the realistic market segment overlap, and does BULL's 18-24 month switching cost estimate hold against a 35% price discount?",
+      "Operating margin expanded 980bps YoY — is this from genuine leverage or one-time headcount controls that reverse as growth investment resumes?"
+    ],
+    "evidence_count": {
+      "bullish": 12,
+      "bearish": 2,
+      "neutral": 0,
+      "binary": 0
+    }
+  },
+
+  "data_freshness": {
+    "price_data_as_of": "2024-06-01",
+    "last_filing_date": "2024-05-10",
+    "last_earnings_date": "2024-05-10",
+    "news_coverage_through": "2024-06-01",
+    "stale_fields": []
+  },
+
+  "metadata": {
+    "contradiction_summary": {
+      "total": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 0,
+      "unresolved": 0
+    },
+    "evidence_item_count": 14,
+    "catalyst_count": 1,
+    "risk_factor_count": 2,
+    "tic_count": 3,
+    "sources_consulted": [
+      "SEC EDGAR (10-K FY2024, 10-Q Q1 FY2025, Form 4 filings)",
+      "BULL Q1 FY2025 Earnings Call Transcript",
+      "Bloomberg Intelligence",
+      "Morgan Stanley Equity Research",
+      "Bernstein Equity Research",
+      "Seeking Alpha"
+    ],
+    "warnings": []
+  }
+}
