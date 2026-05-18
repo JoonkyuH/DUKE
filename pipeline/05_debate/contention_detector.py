@@ -54,16 +54,18 @@ def detect_contentions(
 
     all_contested = bear_challenges_bull | bull_challenges_bear
 
-    # Group contested items by evidence category
+    # Group contested items by evidence category.
+    # Sort evidence IDs before grouping so within-category lists are stable.
     by_category: Dict[str, List[str]] = {}
-    for eid in all_contested:
+    for eid in sorted(all_contested):
         cat = ev_map.get(eid, {}).get("category", "unknown")
         by_category.setdefault(cat, []).append(eid)
 
     contentions: List[Contention] = []
     counter = 1
 
-    for category, eids in by_category.items():
+    # Iterate alphabetically over categories so CON-D-001, -002 … are deterministic.
+    for category, eids in sorted(by_category.items()):
         items    = [ev_map[eid] for eid in eids if eid in ev_map]
         severity = _compute_severity(items)
 
