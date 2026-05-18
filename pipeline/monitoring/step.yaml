@@ -1,0 +1,48 @@
+name: daily_monitor
+layer: monitoring
+description: >
+  Morning digest for open investment positions. Loads all DEC-*.json journal
+  records where action = "enter" and no matching POST-*.json postmortem exists,
+  then queries Perplexity for 24-hour news that materially affects each
+  position's monitoring priorities or thesis-change conditions. Prints a
+  terminal digest with HIGH PRIORITY flags and writes a JSON snapshot.
+
+inputs:
+  - "data/journal/DEC-*.json  — decision records where action = 'enter'"
+  - "data/journal/POST-*.json — used to exclude closed positions"
+
+outputs:
+  - "data/journal/monitoring/{YYYYMMDD}.json"
+
+digest_fields:
+  thesis_status:
+    intact:     No material developments in the last 24 hours.
+    developing: Noteworthy news worth tracking; no immediate action needed.
+    flag:       Material threat to thesis or exit condition triggered. Review immediately.
+  what_would_change_progress:
+    none:       No progress toward any stated thesis-change condition.
+    partial:    A what_would_change condition is developing toward being met.
+    met:        A what_would_change condition is now satisfied. Review immediately.
+
+alert_thresholds:
+  - thesis_status = flag          → HIGH PRIORITY (review before trading session)
+  - what_would_change_progress = met → HIGH PRIORITY (entry or exit condition triggered)
+
+dependencies:
+  env:
+    PERPLEXITY_API_KEY: "Perplexity API key with sonar model access (export PERPLEXITY_API_KEY=pplx-...)"
+  modules:
+    - common/llm_client.py         (Perplexity API wrapper)
+    - pipeline/07_output/journal.py (read_journal, JOURNAL_DIR)
+
+llm:
+  provider: Perplexity
+  model: sonar                     # real-time web access; change to sonar-pro for deeper reasoning
+  max_tokens: 1024
+  temperature: 0.0
+
+schedule:
+  description: Run each weekday morning before the market opens.
+  suggested_cron: "0 9 * * 1-5"   # 09:00 local time, Monday–Friday
+
+run: python3 pipeline/monitoring/daily_monitor.py
