@@ -98,10 +98,10 @@ def format_recommendation(
     lines.append(f"  Scores (final / debate-adjusted)")
     lines.append(f"    Evidence score   : {_fmt_score(ev)}  (debate: {_fmt_score(base_ev)})")
     if ev_note:
-        lines.append(f"    {_DIM}{ev_note}{_RESET}")
+        lines.append(f"      {_DIM}↳ {ev_note}{_RESET}")
     lines.append(f"    Confidence score : {_fmt_score(conf)}  (debate: {_fmt_score(base_conf)})")
     if conf_note:
-        lines.append(f"    {_DIM}{conf_note}{_RESET}")
+        lines.append(f"      {_DIM}↳ {conf_note}{_RESET}")
     lines.append("")
 
     # ── Philosophy fit ───────────────────────────────────────────────────────

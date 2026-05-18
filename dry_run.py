@@ -22,6 +22,32 @@ from pathlib import Path
 
 REPO = Path(__file__).parent
 
+# ── Investor profile — used to display position sizing as a percentage range ──
+_profile_path = REPO / "config" / "investor_profile.json"
+try:
+    with open(_profile_path) as _f:
+        _MAX_POS_PCT = float(json.load(_f).get("max_position_size_pct", 10.0))
+except (OSError, ValueError, KeyError):
+    _MAX_POS_PCT = 10.0
+
+_SIZING_FACTORS = {
+    "full":    1.00,
+    "half":    0.50,
+    "quarter": 0.25,
+    "pilot":   0.10,
+    "none":    0.00,
+}
+
+
+def _format_sizing(sizing_value: str) -> str:
+    """Convert PositionSizing enum value to a lo–hi% range string."""
+    factor = _SIZING_FACTORS.get(sizing_value.lower(), 0.0)
+    if factor == 0.0:
+        return "none"
+    hi = round(_MAX_POS_PCT * factor, 1)
+    lo = round(hi * 0.6, 1)
+    return f"{lo:.1f}–{hi:.1f}% of portfolio"
+
 # Add all stage directories to sys.path so relative imports inside each module resolve
 for _stage in ["04_scoring", "05_debate", "06_synthesis", "07_output"]:
     _p = str(REPO / "pipeline" / _stage)
@@ -321,7 +347,7 @@ def main():
     print()
     print(f"  Conviction       : {scoring.conviction.value.upper()}")
     print(f"  Recommendation   : {scoring.recommendation.value.upper()}")
-    print(f"  Position Sizing  : {scoring.position_sizing.value.upper()}")
+    print(f"  Position Sizing  : {_format_sizing(scoring.position_sizing.value)}")
     print()
     print(f"  Invalidation     : {inv.status.value.upper()}")
     if inv.monitoring_conditions:
