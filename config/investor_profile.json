@@ -1,0 +1,20 @@
+{
+  "profile_id": "INV-001",
+  "risk_tolerance": "moderate",
+  "time_horizon": "long",
+  "min_confidence_score": 65,
+  "max_risk_score": 65,
+  "max_position_size_pct": 9,
+  "max_sector_concentration_pct": 35,
+  "preferred_market_cap": ["mega", "large"],
+  "excluded_sectors": [],
+  "excluded_tickers": [],
+  "require_positive_fcf": false,
+  "require_profitable": false,
+  "current_portfolio": {
+    "total_value_usd": null,
+    "cash_pct": 10,
+    "holdings": [],
+    "sector_weights": {}
+  }
+}

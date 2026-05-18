@@ -8,7 +8,33 @@ Entry point: format_recommendation(chief_analyst_output, synthesis_output) -> st
 The returned string is ready for print() — no external dependencies.
 """
 
+import json
+from pathlib import Path
 from typing import Optional
+
+_PROFILE_PATH = Path(__file__).parent.parent.parent / "config" / "investor_profile.json"
+
+_REC_TO_TIER = {
+    "strong_conviction_enter":   "full",
+    "moderate_conviction_enter": "half",
+}
+
+def _load_max_position() -> float:
+    try:
+        with open(_PROFILE_PATH) as f:
+            return float(json.load(f).get("max_position_size_pct", 10.0))
+    except (OSError, ValueError, KeyError):
+        return 10.0
+
+def _sizing_range(recommendation: str) -> str:
+    """Return a human-readable size range string, or empty string if no position."""
+    tier = _REC_TO_TIER.get(recommendation)
+    if not tier:
+        return ""
+    max_pct = _load_max_position()
+    hi = max_pct if tier == "full" else max_pct * 0.5
+    lo = hi * 0.6
+    return f"{lo:.1f}–{hi:.1f}% suggested initial position"
 
 
 # ANSI codes kept minimal — just emphasis, no color library needed
@@ -49,12 +75,14 @@ def format_recommendation(
     ]
 
     # ── Recommendation banner ────────────────────────────────────────────────
-    rec = ca.get("recommendation", "—").upper().replace("_", " ")
-    lines += [
-        "",
-        f"{_BOLD}  RECOMMENDATION:  {rec}{_RESET}",
-        "",
-    ]
+    rec     = ca.get("recommendation", "—")
+    rec_label = rec.upper().replace("_", " ")
+    sizing  = _sizing_range(rec)
+
+    lines += ["", f"{_BOLD}  RECOMMENDATION:  {rec_label}{_RESET}"]
+    if sizing:
+        lines.append(f"  {sizing}")
+    lines.append("")
 
     # ── Scores ───────────────────────────────────────────────────────────────
     ev   = ca.get("final_evidence_score")
@@ -63,9 +91,17 @@ def format_recommendation(
     base_ev   = syn.get("debate_evidence_score")
     base_conf = syn.get("debate_confidence_score")
 
+    meta = syn.get("metadata", {})
+    ev_note   = meta.get("evidence_score_note", "")
+    conf_note = meta.get("confidence_score_note", "")
+
     lines.append(f"  Scores (final / debate-adjusted)")
     lines.append(f"    Evidence score   : {_fmt_score(ev)}  (debate: {_fmt_score(base_ev)})")
+    if ev_note:
+        lines.append(f"    {_DIM}{ev_note}{_RESET}")
     lines.append(f"    Confidence score : {_fmt_score(conf)}  (debate: {_fmt_score(base_conf)})")
+    if conf_note:
+        lines.append(f"    {_DIM}{conf_note}{_RESET}")
     lines.append("")
 
     # ── Philosophy fit ───────────────────────────────────────────────────────

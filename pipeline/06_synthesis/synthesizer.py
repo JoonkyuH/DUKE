@@ -60,6 +60,8 @@ def synthesize(debate_record: dict, risk_assessment: dict) -> SynthesisOutput:
             "critical_contentions": sum(1 for c in contentions if c.get("severity") == "critical"),
             "material_contentions": sum(1 for c in contentions if c.get("severity") == "material"),
             "raised_risks_count":   debate_record.get("metadata", {}).get("raised_risks_count", 0),
+            "evidence_score_note":  debate_record.get("metadata", {}).get("evidence_score_note", ""),
+            "confidence_score_note": debate_record.get("metadata", {}).get("confidence_score_note", ""),
         },
     )
 

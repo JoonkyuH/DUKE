@@ -15,6 +15,7 @@ Entry point: capture_decision(chief_analyst_output, synthesis_output) -> dict
 """
 
 import csv
+import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -25,7 +26,29 @@ import formatter
 import journal
 
 
-PORTFOLIO_PATH = Path(__file__).parent.parent.parent / "data" / "raw" / "portfolio" / "latest.csv"
+PORTFOLIO_PATH  = Path(__file__).parent.parent.parent / "data" / "raw" / "portfolio" / "latest.csv"
+_PROFILE_PATH   = Path(__file__).parent.parent.parent / "config" / "investor_profile.json"
+
+
+def _load_max_position() -> float:
+    try:
+        with open(_PROFILE_PATH) as f:
+            return float(json.load(f).get("max_position_size_pct", 10.0))
+    except (OSError, ValueError, KeyError):
+        return 10.0
+
+
+def _sizing_range(rec: str) -> tuple:
+    """Return (lo, hi) percentage range for a given recommendation tier, or (0, 0)."""
+    max_pct = _load_max_position()
+    tiers = {
+        "strong_conviction_enter":   max_pct,
+        "moderate_conviction_enter": max_pct * 0.5,
+    }
+    hi = tiers.get(rec, 0.0)
+    if hi == 0.0:
+        return (0.0, 0.0)
+    return (round(hi * 0.6, 1), round(hi, 1))
 
 
 # ─────────────────────────────────────────────
@@ -102,23 +125,14 @@ def capture_decision(
 # SIZING GUIDANCE
 # ─────────────────────────────────────────────
 
-# Map recommendation tier → suggested full-size range (% of portfolio)
-_SIZING_RANGES = {
-    "strong_conviction_enter":   (4.0, 7.0),
-    "moderate_conviction_enter": (2.0, 4.0),
-    "watch":                     (0.0, 0.0),
-    "pass":                      (0.0, 0.0),
-    "blocked":                   (0.0, 0.0),
-}
-
 def _print_sizing_guidance(ca: dict, syn: dict) -> None:
-    rec     = ca.get("recommendation", "")
-    fit     = ca.get("philosophy_fit", "")
-    risk    = syn.get("overall_risk_assessment", "adequate")
-    flags   = ca.get("risk_officer_flags", [])
+    rec      = ca.get("recommendation", "")
+    fit      = ca.get("philosophy_fit", "")
+    risk     = syn.get("overall_risk_assessment", "adequate")
+    flags    = ca.get("risk_officer_flags", [])
     blocking = ca.get("blocking_issues", [])
 
-    lo, hi = _SIZING_RANGES.get(rec, (0.0, 0.0))
+    lo, hi = _sizing_range(rec)
 
     print("  SIZING GUIDANCE")
     print("  " + "─" * 40)
@@ -130,25 +144,27 @@ def _print_sizing_guidance(ca: dict, syn: dict) -> None:
         print()
         return
 
-    if lo == 0 and hi == 0:
+    if hi == 0.0:
         print(f"  {rec.upper().replace('_', ' ')} — no position recommended.")
         print()
         return
 
-    # Downgrade for risk flags or weak philosophy fit
+    # Downgrade ceiling for risk flags or weak philosophy fit
     if risk == "needs_attention" or flags:
-        hi = max(lo, hi * 0.6)
-        print(f"  Base range: {lo:.1f}–{hi:.1f}% of portfolio")
-        print("  Reduced due to Risk Officer flags or needs-attention status.")
+        hi = round(hi * 0.6, 1)
+        lo = round(lo * 0.6, 1)
+        print(f"  {lo:.1f}–{hi:.1f}% of portfolio")
+        print("  Reduced from base — Risk Officer flags or needs-attention status.")
     elif fit in ("weak", "does_not_fit"):
-        hi = max(lo, hi * 0.5)
-        print(f"  Base range: {lo:.1f}–{hi:.1f}% of portfolio")
-        print("  Reduced due to weak philosophy fit.")
+        hi = round(hi * 0.5, 1)
+        lo = round(lo * 0.5, 1)
+        print(f"  {lo:.1f}–{hi:.1f}% of portfolio")
+        print("  Reduced from base — weak philosophy fit.")
     else:
-        print(f"  Suggested range: {lo:.1f}–{hi:.1f}% of portfolio")
+        print(f"  {lo:.1f}–{hi:.1f}% of portfolio")
 
     if rec == "moderate_conviction_enter":
-        print("  Half initial position — add on confirmation.")
+        print("  Add on confirmation before building to full size.")
     print()
 
 

@@ -134,6 +134,8 @@ def score_packet(packet: dict) -> ScoringOutput:
         primary_risks=primary_risks,
         screening_score=screening_score,
         screening_reason_codes=reason_codes,
+        evidence_score_note=_make_evidence_note(ev_breakdown),
+        confidence_score_note=_make_confidence_note(conf_breakdown),
         metadata={
             "evidence_item_count": len(evidence_items),
             "contradiction_count": len(contradictions),
@@ -262,6 +264,32 @@ def _extract_primary_risks(risk_factors: List[dict], n: int = 3) -> List[str]:
 # ─────────────────────────────────────────────
 # UTILITIES
 # ─────────────────────────────────────────────
+
+def _make_evidence_note(ev: "EvidenceScoreBreakdown") -> str:
+    return (
+        f"{ev.directional_count} directional items; "
+        f"bull weight {ev.bull_weight:.2f} vs bear {ev.bear_weight:.2f} "
+        f"→ net {ev.net_score:+.1f}"
+    )
+
+
+def _make_confidence_note(cf: "ConfidencePenaltyBreakdown") -> str:
+    parts = [f"base {cf.base_confidence:.1f}"]
+    if cf.total_penalty > 0:
+        penalty_detail = []
+        if cf.contradiction_penalty:
+            penalty_detail.append(f"contradiction −{cf.contradiction_penalty:.1f}")
+        if cf.binary_catalyst_penalty:
+            penalty_detail.append(f"binary catalyst −{cf.binary_catalyst_penalty:.1f}")
+        if cf.stale_data_penalty:
+            penalty_detail.append(f"stale data −{cf.stale_data_penalty:.1f}")
+        if cf.thin_evidence_penalty:
+            penalty_detail.append(f"thin evidence −{cf.thin_evidence_penalty:.1f}")
+        parts.append("penalties: " + ", ".join(penalty_detail))
+    if cf.bonuses > 0:
+        parts.append(f"bonuses +{cf.bonuses:.1f}")
+    return "  /  ".join(parts) + f"  →  {cf.final_confidence:.1f}"
+
 
 def _make_score_id(ticker: str) -> str:
     ts   = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M")

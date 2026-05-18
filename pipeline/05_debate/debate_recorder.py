@@ -103,6 +103,8 @@ def record_debate(
             "bull_contested":       len(bull.contested_items),
             "bear_contested":       len(bear.contested_items),
             "raised_risks_count":   len(bull.raised_risks) + len(bear.raised_risks),
+            "evidence_score_note":  scoring.get("evidence_score_note", ""),
+            "confidence_score_note": scoring.get("confidence_score_note", ""),
         },
     )
 

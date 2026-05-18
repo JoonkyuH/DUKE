@@ -103,6 +103,10 @@ class ScoringOutput:
     screening_score:       float
     screening_reason_codes: List[str]
 
+    # Plain-English explanation of what drove each score (displayed to investor)
+    evidence_score_note:   str = ""
+    confidence_score_note: str = ""
+
     metadata: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
