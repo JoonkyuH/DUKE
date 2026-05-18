@@ -201,14 +201,18 @@ def classify_regime(regime_indicators: dict) -> RegimeProfile:
 
     Returns a RegimeProfile with confidence set.
     """
-    vix         = regime_indicators.get("vix", 20.0)
-    spy_20d     = regime_indicators.get("spy_20d_return", 0.0)
-    spy_ma200   = regime_indicators.get("spy_vs_ma200", True)
-    hy_spread   = regime_indicators.get("hy_spread", 350)
-    ear_season  = regime_indicators.get("earnings_season", False)
-    fed_action  = regime_indicators.get("fed_action_recent", False)
-    dispersion  = regime_indicators.get("sector_dispersion", 10.0)
-    breadth     = regime_indicators.get("breadth_adv_decline", 1.0)
+    def _get(key, default):
+        v = regime_indicators.get(key)
+        return default if v is None else v
+
+    vix         = _get("vix", 20.0)
+    spy_20d     = _get("spy_20d_return", 0.0)
+    spy_ma200   = _get("spy_vs_ma200", True)
+    hy_spread   = _get("hy_spread", 350)
+    ear_season  = _get("earnings_season", False)
+    fed_action  = _get("fed_action_recent", False)
+    dispersion  = _get("sector_dispersion", 10.0)
+    breadth     = _get("breadth_adv_decline", 1.0)
 
     # ── Rule 1: Earnings Volatility
     # Active earnings season + elevated VIX = catalyst timing dominates
