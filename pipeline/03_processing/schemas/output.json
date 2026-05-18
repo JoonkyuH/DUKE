@@ -4,12 +4,17 @@
   "title": "Evidence Packet",
   "description": "Complete research output for a single ticker. The document Layer 3 scoring operates on. Every field used by the scoring, confidence, and risk layers must be present here.",
   "type": "object",
-  "required": ["packet_id", "ticker", "screening_reference", "evidence_items", "summary"],
+  "required": ["packet_id", "ticker", "screening_reference", "investment_archetype", "evidence_items", "summary"],
 
   "properties": {
 
     "packet_id":           { "type": "string", "description": "EP-{TICKER}-{YYYYMMDD}-{HHMM}-{RAND}" },
     "ticker":              { "type": "string" },
+    "investment_archetype": {
+      "type": "string",
+      "enum": ["long_term_compounder", "deep_value", "does_not_fit"],
+      "description": "Archetype classification set by the researcher in Step 0 before evidence gathering. Governs how analyst roles frame their cases."
+    },
     "company_name":        { "type": "string" },
     "sector":              { "type": "string", "description": "Sector ETF ticker (e.g. XLK)" },
     "generated_at":        { "type": "string", "format": "date-time" },
