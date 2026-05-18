@@ -329,21 +329,15 @@ def main():
     print(DASH)
 
     scoring = score_packet(packet)
-    ev  = scoring.evidence_breakdown
-    cf  = scoring.confidence_breakdown
     inv = scoring.invalidation_report
 
     print(f"  Evidence Score   : {scoring.evidence_score:+.1f}")
-    print(f"    bull={ev.bull_weight:.3f}  bear={ev.bear_weight:.3f}  "
-          f"directional={ev.directional_count}  high-rel={ev.high_reliability_count}")
+    if scoring.evidence_score_note:
+        print(f"    ↳ {scoring.evidence_score_note}")
     print()
     print(f"  Confidence Score : {scoring.confidence_score:.1f}")
-    print(f"    base={cf.base_confidence:.1f}  "
-          f"penalties=−{cf.total_penalty:.1f}  "
-          f"(contra=−{cf.contradiction_penalty:.1f}  "
-          f"binary=−{cf.binary_catalyst_penalty:.1f}  "
-          f"stale=−{cf.stale_data_penalty:.1f})  "
-          f"bonuses=+{cf.bonuses:.1f}")
+    if scoring.confidence_score_note:
+        print(f"    ↳ {scoring.confidence_score_note}")
     print()
     print(f"  Conviction       : {scoring.conviction.value.upper()}")
     print(f"  Recommendation   : {scoring.recommendation.value.upper()}")
@@ -419,7 +413,8 @@ def main():
     print(DASH)
     print("  (Chief Analyst output is synthetic — simulates AI analyst response)")
     print()
-    print(format_recommendation(CHIEF_ANALYST_OUTPUT, syn_dict))
+    print(format_recommendation(CHIEF_ANALYST_OUTPUT, syn_dict,
+                                technical_state=packet.get("technical_state", {})))
 
 
 if __name__ == "__main__":

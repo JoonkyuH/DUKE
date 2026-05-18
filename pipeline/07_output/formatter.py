@@ -47,6 +47,7 @@ _LINE  = "─" * 72
 def format_recommendation(
     chief_analyst_output: dict,
     synthesis_output: Optional[dict] = None,
+    technical_state: Optional[dict] = None,
 ) -> str:
     """
     Render the Chief Analyst output as a terminal-ready report string.
@@ -61,6 +62,7 @@ def format_recommendation(
     lines = []
     ca = chief_analyst_output
     syn = synthesis_output or {}
+    ts  = technical_state or {}
 
     ticker       = syn.get("ticker") or "—"
     company_name = syn.get("company_name") or ""
@@ -75,13 +77,24 @@ def format_recommendation(
     ]
 
     # ── Recommendation banner ────────────────────────────────────────────────
-    rec     = ca.get("recommendation", "—")
+    rec       = ca.get("recommendation", "—")
     rec_label = rec.upper().replace("_", " ")
-    sizing  = _sizing_range(rec)
+    sizing    = _sizing_range(rec)
 
     lines += ["", f"{_BOLD}  RECOMMENDATION:  {rec_label}{_RESET}"]
     if sizing:
         lines.append(f"  {sizing}")
+        # Nearest support as entry zone hint
+        supports = ts.get("key_support_levels", [])
+        if supports:
+            nearest = max(float(s) for s in supports)
+            lines.append(f"  Nearest support: ${nearest:,.2f}")
+    elif rec in ("watch", "pass"):
+        # Preview what position size would be if conditions were met (full conviction)
+        max_pct = _load_max_position()
+        hi = round(max_pct, 1)
+        lo = round(hi * 0.6, 1)
+        lines.append(f"  If conditions met → {lo:.1f}–{hi:.1f}% initial position")
     lines.append("")
 
     # ── Scores ───────────────────────────────────────────────────────────────
