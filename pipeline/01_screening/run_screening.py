@@ -41,7 +41,7 @@ def _conviction(score: float) -> str:
     return "LOW"
 
 
-def _score_record(record: dict, weights: dict) -> tuple:
+def _score_record(record: dict, weights: dict, sector_data: dict) -> tuple:
     """
     Compute composite score and per-signal scores for a raw record.
     Used for tickers that did not make the shortlist (screener only
@@ -51,12 +51,13 @@ def _score_record(record: dict, weights: dict) -> tuple:
     rs_d       = record.get("relative_strength", {})
     news_d     = record.get("news_data") or {}
     earnings_d = record.get("earnings_data", {})
+    sector_d   = sector_data.get(record.get("sector", ""), {})
 
     sigs = {
         "momentum":           score_momentum(price_d),
         "relative_strength":  score_relative_strength(rs_d),
         "volume_anomaly":     score_volume_anomaly(price_d),
-        "sector_leadership":  score_sector_leadership(rs_d, {}),
+        "sector_leadership":  score_sector_leadership(rs_d, sector_d),
         "news_velocity":      score_news_velocity(news_d),
         "earnings_proximity": score_earnings_proximity(earnings_d),
     }
@@ -85,9 +86,9 @@ def main():
     if not tickers:
         sys.exit("Usage: python3 run_screening.py TICKER [TICKER ...]")
 
-    # ── 1. Regime indicators ──────────────────────────────────────
+    # ── 1. Regime indicators + sector ETF RS data ────────────────
     print(f"Fetching regime indicators …")
-    regime_indicators = fetch_regime_indicators()
+    regime_indicators, sector_data = fetch_regime_indicators()
 
     # ── 2. Market data (parallel) ─────────────────────────────────
     print(f"Fetching market data: {', '.join(tickers)} …")
@@ -107,7 +108,7 @@ def main():
         sys.exit("No market data could be fetched.")
 
     # ── 3. Screen ─────────────────────────────────────────────────
-    result    = _screen(raw_records, regime_indicators)
+    result    = _screen(raw_records, regime_indicators, sector_data)
     out       = result.to_dict()
     threshold = out["threshold_applied"]
     weights   = out["metadata"]["regime_weights"]
@@ -131,7 +132,7 @@ def main():
                 "flags":        entry["flags"],
             })
         else:
-            comp, sigs = _score_record(rec, weights)
+            comp, sigs = _score_record(rec, weights, sector_data)
             rows.append({
                 "ticker":       t,
                 "composite":    comp,

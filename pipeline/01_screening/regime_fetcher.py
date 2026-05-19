@@ -44,29 +44,37 @@ def _is_earnings_season() -> bool:
     return week_of_month in _EARNINGS_WEEKS
 
 
-def _sector_metrics() -> Tuple[Optional[float], Optional[float]]:
+def _sector_metrics() -> Tuple[Optional[float], Optional[float], dict]:
     """
-    Compute sector_dispersion and breadth_adv_decline from the 11 SPDR sector ETFs.
+    Compute sector_dispersion, breadth_adv_decline, and per-ETF sector data
+    from the 11 SPDR sector ETFs.
 
     sector_dispersion:
-        Max-minus-min 20-day return across all sectors. Measures how far apart
-        the best and worst-performing sectors are — high dispersion signals
-        rotation or stress rather than broad-based moves.
+        Max-minus-min 20-day return across all sectors.
 
     breadth_adv_decline:
         Laplace-smoothed ratio: (sectors_up_14d + 1) / (sectors_down_14d + 1).
-        > 1.0  → more sectors advancing than declining (broad participation)
-        < 1.0  → more declining sectors (narrow or deteriorating breadth)
-        Uses +1 smoothing so all-up or all-down markets produce a finite ratio.
+
+    sector_etf_data:
+        Dict keyed by ETF ticker conforming to the screener's sector_data
+        parameter: {"XLK": {"sector_rs_vs_spy_20d": 8.6}, "XLF": {...}, ...}
+        SPY is included in the batch download to compute RS values in one call.
     """
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         data = yf.download(
-            SECTOR_ETFS, period="3mo", auto_adjust=True, progress=False
+            SECTOR_ETFS + ["SPY"], period="3mo", auto_adjust=True, progress=False
         )["Close"]
 
-    returns_20d = []
+    spy_col  = data["SPY"].dropna() if "SPY" in data.columns else None
+    spy_20d  = (
+        (float(spy_col.iloc[-1]) - float(spy_col.iloc[-21])) / float(spy_col.iloc[-21]) * 100
+        if spy_col is not None and len(spy_col) >= 21 else None
+    )
+
+    returns_20d    = {}
     pos_14d = neg_14d = 0
+    sector_etf_data = {}
 
     for etf in SECTOR_ETFS:
         if etf not in data.columns:
@@ -74,7 +82,9 @@ def _sector_metrics() -> Tuple[Optional[float], Optional[float]]:
         col = data[etf].dropna()
         if len(col) >= 21:
             r20 = (float(col.iloc[-1]) - float(col.iloc[-21])) / float(col.iloc[-21]) * 100
-            returns_20d.append(r20)
+            returns_20d[etf] = r20
+            if spy_20d is not None:
+                sector_etf_data[etf] = {"sector_rs_vs_spy_20d": round(r20 - spy_20d, 2)}
         if len(col) >= 15:
             r14 = (float(col.iloc[-1]) - float(col.iloc[-15])) / float(col.iloc[-15]) * 100
             if r14 > 0:
@@ -82,18 +92,28 @@ def _sector_metrics() -> Tuple[Optional[float], Optional[float]]:
             else:
                 neg_14d += 1
 
-    dispersion = round(max(returns_20d) - min(returns_20d), 2) if len(returns_20d) >= 2 else None
-    breadth    = round((pos_14d + 1) / (neg_14d + 1), 3)      if (pos_14d + neg_14d) > 0 else None
+    dispersion = (
+        round(max(returns_20d.values()) - min(returns_20d.values()), 2)
+        if len(returns_20d) >= 2 else None
+    )
+    breadth = round((pos_14d + 1) / (neg_14d + 1), 3) if (pos_14d + neg_14d) > 0 else None
 
-    return dispersion, breadth
+    return dispersion, breadth, sector_etf_data
 
 
-def fetch_regime_indicators() -> dict:
+def fetch_regime_indicators() -> Tuple[dict, dict]:
     """
     Fetch live market regime indicators for classify_regime().
 
+    Returns:
+        (regime_indicators, sector_etf_data)
+
+        regime_indicators — dict for classify_regime()
+        sector_etf_data   — dict for the screener's sector_data parameter:
+                            {"XLK": {"sector_rs_vs_spy_20d": 8.6}, ...}
+
     Makes three yfinance calls: SPY (1y history), ^VIX (5d history),
-    and a batch download of all 11 sector ETFs (3mo history).
+    and a batch download of all 11 sector ETFs + SPY (3mo history).
     """
     spy_hist       = yf.Ticker("SPY").history(period="1y")["Close"]
     spy_last       = float(spy_hist.iloc[-1])
@@ -103,12 +123,13 @@ def fetch_regime_indicators() -> dict:
     vix = round(float(yf.Ticker("^VIX").history(period="5d")["Close"].iloc[-1]), 2)
 
     sector_dispersion = breadth_adv_decline = None
+    sector_etf_data: dict = {}
     try:
-        sector_dispersion, breadth_adv_decline = _sector_metrics()
+        sector_dispersion, breadth_adv_decline, sector_etf_data = _sector_metrics()
     except Exception:
         pass
 
-    return {
+    regime_indicators = {
         "vix":                 vix,
         "spy_20d_return":      spy_20d_return,
         "spy_vs_ma200":        spy_vs_ma200,
@@ -118,6 +139,7 @@ def fetch_regime_indicators() -> dict:
         "sector_dispersion":   sector_dispersion,
         "breadth_adv_decline": breadth_adv_decline,
     }
+    return regime_indicators, sector_etf_data
 
 
 if __name__ == "__main__":
@@ -127,11 +149,15 @@ if __name__ == "__main__":
     from regime_classifier import classify_regime
 
     print("Fetching live regime indicators...")
-    indicators = fetch_regime_indicators()
+    indicators, sector_etf_data = fetch_regime_indicators()
 
     print("\nIndicators:")
     for k, v in indicators.items():
         print(f"  {k:<25} {v}")
+
+    print("\nSector ETF RS vs SPY (20d):")
+    for etf, d in sorted(sector_etf_data.items()):
+        print(f"  {etf:<6}  {d['sector_rs_vs_spy_20d']:+.2f}%")
 
     regime = classify_regime(indicators)
     print(f"\nRegime:        {regime.regime.value}")
