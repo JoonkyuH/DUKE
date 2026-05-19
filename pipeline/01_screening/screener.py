@@ -9,7 +9,7 @@ regime-adjusted weights, and outputs a ranked shortlist ready for Stage 02.
 Entry point: run_screening()
 
 Each record must include:
-  fundamental_data  — edgar_fetcher.fetch_financials() output
+  fundamental_data  — common.edgar_client.fetch_financials() output
   price_data        — from data_fetcher (for current_price)
   extended_data     — from data_fetcher (for market_cap, 52w high/low)
   earnings_data     — from data_fetcher (for binary event risk)
@@ -163,7 +163,7 @@ def run_screening(
         raw_records:
             List of dicts conforming to the Stage 01 raw record schema.
             Each must include:
-              fundamental_data  — edgar_fetcher output
+              fundamental_data  — common.edgar_client output
               price_data        — yfinance price metrics
               extended_data     — yfinance extended metrics (market_cap, 52w range)
               earnings_data     — earnings date data

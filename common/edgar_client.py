@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-edgar_fetcher.py
+edgar_client.py
 Fetches financial statement data from SEC EDGAR (data.sec.gov).
 No API key required. Respects EDGAR's 10-req/sec guideline.
 

@@ -11,12 +11,14 @@ Usage:
 import sys
 import concurrent.futures
 from datetime import datetime, timezone
+from pathlib import Path
 
 sys.path.insert(0, ".")
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from regime_fetcher import fetch_regime_indicators
 from data_fetcher import fetch_market_data
-from edgar_fetcher import fetch_financials
+from common.edgar_client import fetch_financials
 from screener import (
     run_screening as _screen,
     COMPOUNDER_WEIGHTS, QUALITY_COMPOUNDER_WEIGHTS, DEEP_VALUE_WEIGHTS,

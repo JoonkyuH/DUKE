@@ -17,7 +17,7 @@ VG signal variants per archetype:
   deep_value           → score_valuation_vs_growth()  (standard)
 
 Inputs:
-  fund_d     — edgar_fetcher.fetch_financials() output dict
+  fund_d     — common.edgar_client.fetch_financials() output dict
   market_d   — {"market_cap", "current_price", "week_52_high", "week_52_low"}
   earnings_d — data_fetcher earnings sub-dict (for binary_event_risk only)
 
@@ -88,11 +88,11 @@ def _yoy(curr: Optional[float], prev: Optional[float]) -> Optional[float]:
 
 def compute_fundamental_metrics(fund_d: dict, market_d: dict) -> dict:
     """
-    Derive all fundamental metrics from edgar_fetcher output and market price data.
+    Derive all fundamental metrics from common.edgar_client output and market price data.
     Called once per ticker; the result dict is passed to all six score functions
     and to build_mispricing_hypothesis().
 
-    fund_d   — edgar_fetcher.fetch_financials() output
+    fund_d   — common.edgar_client.fetch_financials() output
     market_d — {"market_cap": int, "current_price": float,
                  "week_52_high": float, "week_52_low": float}
     """
