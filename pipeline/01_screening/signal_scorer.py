@@ -2,13 +2,15 @@
 signal_scorer.py
 Six fundamental quality-and-value screening signals (0–100 each).
 
-Signal weights (regime-adjusted in regime_classifier.py):
-  1. business_quality      25% — revenue growth, gross margin, FCF generation, balance sheet
-  2. valuation_vs_growth   20% — PEG ratio, P/FCF, P/S vs revenue growth
-  3. historical_discount   15% — current multiples vs own recent peak; 52-week range position
-  4. earnings_quality      20% — FCF/net-income ratio, gross margin trend, revenue consistency
-  5. entry_vs_fundamentals 12% — price drawdown vs fundamental acceleration
-  6. binary_event_risk      8% — inverted earnings proximity (high = no near-term binary risk)
+Each ticker is scored under two archetype weight sets (defined in screener.py);
+the higher composite wins and determines the screening_archetype tag.
+
+  Compounder weights: BQ 30 / VG 25 / EQ 25 / EF 12 / HD  0 / BR 8
+  Deep value weights: BQ 25 / HD 25 / EQ 20 / VG 15 / EF 12 / BR 3
+
+In compounder mode, VG uses score_valuation_vs_growth_compounder() which
+rewards high absolute revenue growth (40 pts) over multiple discipline.
+In deep value mode, VG uses the standard score_valuation_vs_growth().
 
 Inputs:
   fund_d     — edgar_fetcher.fetch_financials() output dict
@@ -352,6 +354,66 @@ def score_valuation_vs_growth(metrics: dict) -> Optional[float]:
         # > 15: 0 pts
     else:
         score += 10   # Neutral
+
+    return min(100.0, max(0.0, score))
+
+
+# ─────────────────────────────────────────────
+# 2b. VALUATION VS GROWTH — COMPOUNDER MODE
+# ─────────────────────────────────────────────
+
+def score_valuation_vs_growth_compounder(metrics: dict) -> Optional[float]:
+    """
+    Compounder-mode VG signal. Rewards high ABSOLUTE REVENUE GROWTH even at
+    premium multiples. Revenue growth gets 40 of 100 points unconditionally;
+    PEG and P/FCF fill the remaining 60 points.
+
+    Sub-components:
+      Revenue growth tier (absolute)   0–40 pts  (growth is the primary signal)
+      PEG ratio                        0–30 pts
+      P/FCF                            0–30 pts
+    """
+    peg_ratio  = metrics.get("peg_ratio")
+    pfcf_ratio = metrics.get("pfcf_ratio")
+    rev_growth = metrics.get("rev_growth")
+
+    if all(v is None for v in [peg_ratio, pfcf_ratio, rev_growth]):
+        return None
+
+    score = 0.0
+
+    # Revenue growth tier (40 pts) — the dominant signal in compounder mode
+    if rev_growth is not None:
+        if rev_growth > 50:     score += 40
+        elif rev_growth > 30:   score += 30
+        elif rev_growth > 20:   score += 20
+        elif rev_growth > 10:   score += 10
+        # ≤ 10%: 0 pts — not a compounder growth rate
+    else:
+        score += 15   # Neutral
+
+    # PEG ratio (30 pts)
+    if peg_ratio is not None:
+        if peg_ratio < 0.5:     score += 30
+        elif peg_ratio < 1.0:   score += 26
+        elif peg_ratio < 1.5:   score += 20
+        elif peg_ratio < 2.0:   score += 14
+        elif peg_ratio < 3.0:   score += 7
+        # ≥ 3: 0 pts
+    else:
+        score += 15   # Neutral
+
+    # P/FCF (30 pts)
+    if pfcf_ratio is not None:
+        if pfcf_ratio < 15:     score += 30
+        elif pfcf_ratio < 20:   score += 26
+        elif pfcf_ratio < 30:   score += 20
+        elif pfcf_ratio < 40:   score += 14
+        elif pfcf_ratio < 60:   score += 7
+        elif pfcf_ratio < 80:   score += 3
+        # ≥ 80: 0 pts
+    else:
+        score += 15   # Neutral
 
     return min(100.0, max(0.0, score))
 

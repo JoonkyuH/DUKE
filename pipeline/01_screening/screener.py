@@ -26,6 +26,7 @@ from signal_scorer import (
     compute_fundamental_metrics,
     score_business_quality,
     score_valuation_vs_growth,
+    score_valuation_vs_growth_compounder,
     score_historical_discount,
     score_earnings_quality,
     score_entry_vs_fundamentals,
@@ -43,6 +44,27 @@ from reason_codes import assign_reason_codes
 FALLBACK_THRESHOLD  = 45.0    # Used if fewer than MIN_SHORTLIST_SIZE tickers pass
 MIN_SHORTLIST_SIZE  = 5       # If shortlist is smaller, lower the threshold
 
+# Archetype weight sets. Each ticker is scored under both; the higher wins.
+COMPOUNDER_WEIGHTS: dict = {
+    "business_quality":      0.30,
+    "valuation_vs_growth":   0.25,
+    "earnings_quality":      0.25,
+    "entry_vs_fundamentals": 0.12,
+    "historical_discount":   0.00,   # irrelevant for long-term compounders
+    "binary_event_risk":     0.08,
+}
+
+DEEP_VALUE_WEIGHTS: dict = {
+    "business_quality":      0.25,
+    "historical_discount":   0.25,
+    "earnings_quality":      0.20,
+    "valuation_vs_growth":   0.15,
+    "entry_vs_fundamentals": 0.12,
+    "binary_event_risk":     0.03,
+}
+
+_ARCHETYPE_TIE_BAND = 1.0    # scores within this band → "either"
+
 
 # ─────────────────────────────────────────────
 # OUTPUT DATA STRUCTURES
@@ -56,6 +78,7 @@ class ShortlistEntry:
     signal_scores:           dict
     signal_weights_applied:  dict
     regime_at_screening:     str
+    screening_archetype:     str         # "long_term_compounder" | "deep_value" | "either"
     reason_codes:            List[str]
     flags:                   List[str]
     mispricing_hypothesis:   str
@@ -151,8 +174,7 @@ def run_screening(
     start_ms = time.monotonic()
 
     # ── Step 1: Classify regime ──────────────
-    regime  = classify_regime(regime_indicators)
-    weights = regime.weights
+    regime   = classify_regime(regime_indicators)
     warnings: List[str] = []
 
     # ── Step 2: Score all tickers ────────────
@@ -174,16 +196,47 @@ def run_screening(
 
         metrics = compute_fundamental_metrics(fund_d, market_d) if fund_d else {}
 
-        scores = SignalScores(
-            business_quality=      score_business_quality(metrics),
-            valuation_vs_growth=   score_valuation_vs_growth(metrics),
-            historical_discount=   score_historical_discount(metrics),
-            earnings_quality=      score_earnings_quality(metrics),
-            entry_vs_fundamentals= score_entry_vs_fundamentals(metrics),
-            binary_event_risk=     score_binary_event_risk(earnings_d),
+        # ── Signals shared across both archetypes ──────────────────
+        bq = score_business_quality(metrics)
+        hd = score_historical_discount(metrics)
+        eq = score_earnings_quality(metrics)
+        ef = score_entry_vs_fundamentals(metrics)
+        br = score_binary_event_risk(earnings_d)
+
+        # ── Archetype-specific VG signal ───────────────────────────
+        vg_dv   = score_valuation_vs_growth(metrics)
+        vg_comp = score_valuation_vs_growth_compounder(metrics)
+
+        scores_dv = SignalScores(
+            business_quality=bq, valuation_vs_growth=vg_dv,
+            historical_discount=hd, earnings_quality=eq,
+            entry_vs_fundamentals=ef, binary_event_risk=br,
+        )
+        scores_comp = SignalScores(
+            business_quality=bq, valuation_vs_growth=vg_comp,
+            historical_discount=hd, earnings_quality=eq,
+            entry_vs_fundamentals=ef, binary_event_risk=br,
         )
 
-        composite = _compute_composite(scores, weights)
+        comp_dv   = _compute_composite(scores_dv,   DEEP_VALUE_WEIGHTS)
+        comp_comp = _compute_composite(scores_comp, COMPOUNDER_WEIGHTS)
+
+        # ── Select winning archetype ───────────────────────────────
+        if abs(comp_comp - comp_dv) <= _ARCHETYPE_TIE_BAND:
+            archetype      = "either"
+            scores         = scores_comp if comp_comp >= comp_dv else scores_dv
+            composite      = max(comp_comp, comp_dv)
+            winning_weights = COMPOUNDER_WEIGHTS if comp_comp >= comp_dv else DEEP_VALUE_WEIGHTS
+        elif comp_comp > comp_dv:
+            archetype      = "long_term_compounder"
+            scores         = scores_comp
+            composite      = comp_comp
+            winning_weights = COMPOUNDER_WEIGHTS
+        else:
+            archetype      = "deep_value"
+            scores         = scores_dv
+            composite      = comp_dv
+            winning_weights = DEEP_VALUE_WEIGHTS
 
         # Stash metrics on record for reason_codes.py access
         record["fundamental_metrics"] = metrics
@@ -208,8 +261,9 @@ def run_screening(
                 "entry_vs_fundamentals": _fmt(scores.entry_vs_fundamentals),
                 "binary_event_risk":     _fmt(scores.binary_event_risk),
             },
-            signal_weights_applied=dict(weights),
+            signal_weights_applied=dict(winning_weights),
             regime_at_screening=regime.regime.value,
+            screening_archetype=archetype,
             reason_codes=reason_codes,
             flags=flags,
             mispricing_hypothesis=hypothesis,
@@ -257,7 +311,8 @@ def run_screening(
         shortlist_count=len(shortlist),
         metadata={
             "regime_description":      regime.description,
-            "regime_weights":          weights,
+            "compounder_weights":      COMPOUNDER_WEIGHTS,
+            "deep_value_weights":      DEEP_VALUE_WEIGHTS,
             "fallback_threshold_used": fallback_used,
             "screening_duration_ms":   duration_ms,
             "warnings":                warnings,

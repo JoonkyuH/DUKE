@@ -17,11 +17,12 @@ sys.path.insert(0, ".")
 from regime_fetcher import fetch_regime_indicators
 from data_fetcher import fetch_market_data
 from edgar_fetcher import fetch_financials
-from screener import run_screening as _screen
+from screener import run_screening as _screen, COMPOUNDER_WEIGHTS, DEEP_VALUE_WEIGHTS
 from signal_scorer import (
     compute_fundamental_metrics,
     score_business_quality,
     score_valuation_vs_growth,
+    score_valuation_vs_growth_compounder,
     score_historical_discount,
     score_earnings_quality,
     score_entry_vs_fundamentals,
@@ -43,10 +44,10 @@ def _conviction(score: float) -> str:
     return "LOW"
 
 
-def _score_record(record: dict, weights: dict) -> tuple:
+def _score_record(record: dict) -> tuple:
     """
-    Compute composite score and per-signal scores for a raw record.
-    Used for tickers that did not make the shortlist.
+    Compute composite score, per-signal scores, and archetype for a raw record.
+    Runs both compounder and deep value passes; returns the higher composite.
     """
     fund_d     = record.get("fundamental_data", {})
     price_d    = record.get("price_data", {})
@@ -62,24 +63,43 @@ def _score_record(record: dict, weights: dict) -> tuple:
 
     metrics = compute_fundamental_metrics(fund_d, market_d) if fund_d else {}
 
-    sigs = {
-        "business_quality":      score_business_quality(metrics),
-        "valuation_vs_growth":   score_valuation_vs_growth(metrics),
-        "historical_discount":   score_historical_discount(metrics),
-        "earnings_quality":      score_earnings_quality(metrics),
-        "entry_vs_fundamentals": score_entry_vs_fundamentals(metrics),
-        "binary_event_risk":     score_binary_event_risk(earnings_d),
+    bq = score_business_quality(metrics)
+    hd = score_historical_discount(metrics)
+    eq = score_earnings_quality(metrics)
+    ef = score_entry_vs_fundamentals(metrics)
+    br = score_binary_event_risk(earnings_d)
+
+    vg_dv   = score_valuation_vs_growth(metrics)
+    vg_comp = score_valuation_vs_growth_compounder(metrics)
+
+    def _composite(sigs: dict, weights: dict) -> float:
+        valid   = {k: v for k, v in sigs.items() if v is not None}
+        total_w = sum(weights[k] for k in valid)
+        return sum(valid[k] * (weights[k] / total_w) for k in valid) if total_w > 0 else 0.0
+
+    sigs_dv = {
+        "business_quality": bq, "valuation_vs_growth": vg_dv,
+        "historical_discount": hd, "earnings_quality": eq,
+        "entry_vs_fundamentals": ef, "binary_event_risk": br,
+    }
+    sigs_comp = {
+        "business_quality": bq, "valuation_vs_growth": vg_comp,
+        "historical_discount": hd, "earnings_quality": eq,
+        "entry_vs_fundamentals": ef, "binary_event_risk": br,
     }
 
-    valid   = {k: v for k, v in sigs.items() if v is not None}
-    total_w = sum(weights[k] for k in valid)
-    comp    = (
-        sum(valid[k] * (weights[k] / total_w) for k in valid)
-        if total_w > 0 else 0.0
-    )
+    comp_dv   = _composite(sigs_dv,   DEEP_VALUE_WEIGHTS)
+    comp_comp = _composite(sigs_comp, COMPOUNDER_WEIGHTS)
+
+    if abs(comp_comp - comp_dv) <= 1.0:
+        archetype, sigs, comp = "either", sigs_comp if comp_comp >= comp_dv else sigs_dv, max(comp_comp, comp_dv)
+    elif comp_comp > comp_dv:
+        archetype, sigs, comp = "long_term_compounder", sigs_comp, comp_comp
+    else:
+        archetype, sigs, comp = "deep_value", sigs_dv, comp_dv
 
     display = {k: (round(v, 1) if v is not None else None) for k, v in sigs.items()}
-    return round(comp, 1), display
+    return round(comp, 1), display, archetype
 
 
 def _cell(v) -> str:
@@ -150,7 +170,6 @@ def main():
     result    = _screen(raw_records, regime_indicators, sector_data)
     out       = result.to_dict()
     threshold = out["threshold_applied"]
-    weights   = out["metadata"]["regime_weights"]
     shortlist = {e["ticker"]: e for e in out["shortlist"]}
 
     # ── 5. Build display rows for ALL tickers ─────────────────────
@@ -167,18 +186,20 @@ def main():
                 "sigs":         sigs,
                 "passed":       True,
                 "priority":     entry["priority"],
+                "archetype":    entry["screening_archetype"],
                 "reason_codes": entry["reason_codes"],
                 "flags":        entry["flags"],
                 "hypothesis":   entry["mispricing_hypothesis"],
             })
         else:
-            comp, sigs = _score_record(rec, weights)
+            comp, sigs, archetype = _score_record(rec)
             rows.append({
                 "ticker":       t,
                 "composite":    comp,
                 "sigs":         sigs,
                 "passed":       False,
                 "priority":     None,
+                "archetype":    archetype,
                 "reason_codes": [],
                 "flags":        [],
                 "hypothesis":   "",
@@ -207,16 +228,23 @@ def main():
         print("  ⚠  Fallback threshold — universe too small for regime minimum")
     print("═" * W)
 
+    _ARCH_ABBREV = {
+        "long_term_compounder": "COMPOUNDER",
+        "deep_value":           "DEEP VALUE",
+        "either":               "EITHER",
+    }
+
     # Summary table
     print()
-    hdr = f"  {'TICKER':<8}  {'SCORE':>5}  {'CONVICTION':<10}  {'RESULT':<10}  RANK"
+    hdr = f"  {'TICKER':<8}  {'SCORE':>5}  {'CONVICTION':<10}  {'RESULT':<10}  {'RANK':<6}  ARCHETYPE"
     print(hdr)
-    print(f"  {'──────':<8}  {'─────':>5}  {'──────────':<10}  {'──────':<10}  ────")
+    print(f"  {'──────':<8}  {'─────':>5}  {'──────────':<10}  {'──────':<10}  {'────':<6}  ─────────")
     for r in rows:
-        rank = f"#{r['priority']}" if r["passed"] else ""
-        rslt = "✓ PASS" if r["passed"] else "✗ FAIL"
-        conv = _conviction(r["composite"]) if r["passed"] else "—"
-        print(f"  {r['ticker']:<8}  {r['composite']:>5.1f}  {conv:<10}  {rslt:<10}  {rank}")
+        rank  = f"#{r['priority']}" if r["passed"] else ""
+        rslt  = "✓ PASS" if r["passed"] else "✗ FAIL"
+        conv  = _conviction(r["composite"]) if r["passed"] else "—"
+        arch  = _ARCH_ABBREV.get(r["archetype"], r["archetype"]) if r["passed"] else ""
+        print(f"  {r['ticker']:<8}  {r['composite']:>5.1f}  {conv:<10}  {rslt:<10}  {rank:<6}  {arch}")
 
     # Signal breakdown
     print()
