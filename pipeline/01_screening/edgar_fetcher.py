@@ -29,6 +29,7 @@ _FACTS_URL      = "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json"
 _HEADERS        = {"User-Agent": "DUKE-research contact@duke-research.ai"}
 
 _ticker_cache: dict = {}   # ticker → zero-padded CIK str, populated on first call
+_MIN_RECENT_END = "2020-01-01"  # concepts with no entry this recent are considered absent
 
 
 # ─────────────────────────────────────────────
@@ -85,11 +86,16 @@ def _is_standalone(entry: dict) -> bool:
 # ─────────────────────────────────────────────
 
 def _entries(facts: dict, *concepts: str, unit: str = "USD") -> list:
-    """Return the first non-empty entry list matching one of the concept names."""
+    """
+    Return the first concept's full entry list that has at least one recent filing
+    (end >= _MIN_RECENT_END). This prevents stale fallback concepts — e.g. 'Revenues'
+    having only 2016-2018 data for companies that switched to the longer GAAP tag —
+    from blocking the correct current concept from being selected.
+    """
     us_gaap = facts.get("facts", {}).get("us-gaap", {})
     for name in concepts:
         vals = us_gaap.get(name, {}).get("units", {}).get(unit, [])
-        if vals:
+        if any(e.get("end", "") >= _MIN_RECENT_END for e in vals):
             return vals
     return []
 
@@ -230,6 +236,28 @@ def _fcf(cf: dict, capex: dict) -> dict:
 
 
 # ─────────────────────────────────────────────
+# DERIVED METRICS
+# ─────────────────────────────────────────────
+
+def _gross_profit_from_cogs(revenue: dict, cogs: dict) -> dict:
+    """GrossProfit = Revenue − COGS, matched by period label."""
+    result = {}
+    for window in ("annual", "quarterly"):
+        rev_map  = {e["period"]: e for e in revenue.get(window, [])}
+        cogs_map = {e["period"]: e for e in cogs.get(window, [])}
+        entries  = []
+        for period, rev_e in rev_map.items():
+            if period in cogs_map:
+                entries.append({
+                    "period": period,
+                    "end":    rev_e["end"],
+                    "val":    rev_e["val"] - cogs_map[period]["val"],
+                })
+        result[window] = sorted(entries, key=lambda x: x["end"], reverse=True)
+    return result
+
+
+# ─────────────────────────────────────────────
 # PUBLIC ENTRY POINT
 # ─────────────────────────────────────────────
 
@@ -256,7 +284,21 @@ def fetch_financials(ticker: str) -> dict:
         "RevenueFromContractWithCustomerExcludingAssessedTax",
         "SalesRevenueNet",
     ))
-    gross_profit     = _extract(usd("GrossProfit"))
+    _gp_raw = usd("GrossProfit")
+    if _gp_raw:
+        gross_profit = _extract(_gp_raw)
+    else:
+        # Companies (e.g. AMZN) that stopped tagging GrossProfit as a concept:
+        # derive it as Revenue − COGS.
+        cogs_entries = usd(
+            "CostOfGoodsAndServicesSold",
+            "CostOfRevenue",
+            "CostOfGoodsSold",
+        )
+        gross_profit = (
+            _gross_profit_from_cogs(revenue, _extract(cogs_entries))
+            if cogs_entries else {"annual": [], "quarterly": []}
+        )
     operating_income = _extract(usd("OperatingIncomeLoss"))
     net_income       = _extract(usd("NetIncomeLoss", "NetIncomeLossAvailableToCommonStockholdersBasic"))
 
