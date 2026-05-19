@@ -5,12 +5,16 @@ Six fundamental quality-and-value screening signals (0–100 each).
 Each ticker is scored under two archetype weight sets (defined in screener.py);
 the higher composite wins and determines the screening_archetype tag.
 
-  Compounder weights: BQ 30 / VG 25 / EQ 25 / EF 12 / HD  0 / BR 8
-  Deep value weights: BQ 25 / HD 25 / EQ 20 / VG 15 / EF 12 / BR 3
+  long_term_compounder:  BQ 30 / VG 25 / EQ 25 / EF 12 / HD  0 / BR 8
+  quality_compounder:    BQ 35 / EQ 25 / VG 20 / EF 12 / HD  5 / BR 3
+  deep_value:            BQ 25 / HD 25 / EQ 20 / VG 15 / EF 12 / BR 3
 
-In compounder mode, VG uses score_valuation_vs_growth_compounder() which
-rewards high absolute revenue growth (40 pts) over multiple discipline.
-In deep value mode, VG uses the standard score_valuation_vs_growth().
+VG signal variants per archetype:
+  long_term_compounder → score_valuation_vs_growth_compounder()
+      rewards high absolute revenue growth (40 pts) over multiple discipline
+  quality_compounder   → score_valuation_vs_growth_quality_compounder()
+      relaxed P/FCF thresholds; rewards steady 5–15% growth + high gross margin
+  deep_value           → score_valuation_vs_growth()  (standard)
 
 Inputs:
   fund_d     — edgar_fetcher.fetch_financials() output dict
@@ -414,6 +418,70 @@ def score_valuation_vs_growth_compounder(metrics: dict) -> Optional[float]:
         # ≥ 80: 0 pts
     else:
         score += 15   # Neutral
+
+    return min(100.0, max(0.0, score))
+
+
+# ─────────────────────────────────────────────
+# 2c. VALUATION VS GROWTH — QUALITY COMPOUNDER MODE
+# ─────────────────────────────────────────────
+
+def score_valuation_vs_growth_quality_compounder(metrics: dict) -> Optional[float]:
+    """
+    Quality compounder VG signal. Rewards multiples that are reasonable for
+    a mature, high-moat business. Does NOT penalize premium multiples when
+    gross margin > 40%, FCF margin > 15%, and revenue growth is in the
+    steady 5–15% quality compounder range.
+
+    Sub-components:
+      P/FCF quality-adjusted     0–60 pts  (relaxed thresholds vs standard VG)
+      Revenue growth quality     0–25 pts  (5–15% sweet spot; penalises extremes)
+      Gross margin quality gate  0–15 pts  (fingerprint of a durable moat)
+    """
+    pfcf_ratio = metrics.get("pfcf_ratio")
+    rev_growth = metrics.get("rev_growth")
+    gm_ann     = metrics.get("gm_ann")
+
+    if all(v is None for v in [pfcf_ratio, rev_growth, gm_ann]):
+        return None
+
+    score = 0.0
+
+    # P/FCF quality-adjusted (60 pts)
+    # Premium multiples are acceptable for mature businesses with durable moats;
+    # thresholds are deliberately more lenient than the standard VG signal.
+    if pfcf_ratio is not None:
+        if pfcf_ratio < 20:     score += 60   # Cheap even for quality
+        elif pfcf_ratio < 30:   score += 52   # Good for a quality compounder
+        elif pfcf_ratio < 40:   score += 42   # Fair
+        elif pfcf_ratio < 50:   score += 30   # Stretched but acceptable
+        elif pfcf_ratio < 60:   score += 18   # Expensive
+        else:                   score += 8    # Too expensive — not 0, quality can sustain
+    else:
+        score += 30   # Neutral: negative FCF or capex cycle (not unusual for quality)
+
+    # Revenue growth in the quality range (25 pts)
+    # Rewards steady, durable growth — too fast signals long_term_compounder,
+    # too slow signals stagnation.
+    if rev_growth is not None:
+        if 10 <= rev_growth < 15:   score += 25   # Ideal quality compounder cadence
+        elif 5 <= rev_growth < 10:  score += 20   # Steady
+        elif 15 <= rev_growth < 20: score += 18   # Slightly above quality range
+        elif 3 <= rev_growth < 5:   score += 12   # Mature, still growing
+        elif 20 <= rev_growth < 30: score += 10   # More of a long_term_compounder
+        elif 0 < rev_growth < 3:    score += 5    # Flat
+        elif rev_growth >= 30:      score += 5    # Fast grower — wrong archetype
+        # ≤ 0: 0 pts — declining revenue disqualifies quality compounder thesis
+    else:
+        score += 12   # Neutral
+
+    # Gross margin quality gate (15 pts)
+    # High gross margins are the clearest fingerprint of a durable economic moat.
+    if gm_ann is not None:
+        if gm_ann > 60:     score += 15   # Exceptional (software, payments, luxury)
+        elif gm_ann > 40:   score += 10   # Strong quality business
+        elif gm_ann > 25:   score += 5    # Acceptable
+        # ≤ 25%: 0 pts — commodity economics
 
     return min(100.0, max(0.0, score))
 

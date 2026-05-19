@@ -27,6 +27,7 @@ from signal_scorer import (
     score_business_quality,
     score_valuation_vs_growth,
     score_valuation_vs_growth_compounder,
+    score_valuation_vs_growth_quality_compounder,
     score_historical_discount,
     score_earnings_quality,
     score_entry_vs_fundamentals,
@@ -63,7 +64,16 @@ DEEP_VALUE_WEIGHTS: dict = {
     "binary_event_risk":     0.03,
 }
 
-_ARCHETYPE_TIE_BAND = 1.0    # scores within this band → "either"
+QUALITY_COMPOUNDER_WEIGHTS: dict = {
+    "business_quality":      0.35,   # quality is the whole thesis
+    "earnings_quality":      0.25,   # is the moat showing up in earnings?
+    "valuation_vs_growth":   0.20,   # is the multiple reasonable for a mature compounder?
+    "entry_vs_fundamentals": 0.12,
+    "historical_discount":   0.05,   # light — quality compounders rarely get deep discounts
+    "binary_event_risk":     0.03,
+}
+
+_ARCHETYPE_TIE_BAND = 1.0    # top two scores within this band → "either"
 
 
 # ─────────────────────────────────────────────
@@ -196,16 +206,17 @@ def run_screening(
 
         metrics = compute_fundamental_metrics(fund_d, market_d) if fund_d else {}
 
-        # ── Signals shared across both archetypes ──────────────────
+        # ── Signals shared across all three archetypes ─────────────
         bq = score_business_quality(metrics)
         hd = score_historical_discount(metrics)
         eq = score_earnings_quality(metrics)
         ef = score_entry_vs_fundamentals(metrics)
         br = score_binary_event_risk(earnings_d)
 
-        # ── Archetype-specific VG signal ───────────────────────────
-        vg_dv   = score_valuation_vs_growth(metrics)
-        vg_comp = score_valuation_vs_growth_compounder(metrics)
+        # ── Archetype-specific VG signals ──────────────────────────
+        vg_dv    = score_valuation_vs_growth(metrics)
+        vg_comp  = score_valuation_vs_growth_compounder(metrics)
+        vg_qcomp = score_valuation_vs_growth_quality_compounder(metrics)
 
         scores_dv = SignalScores(
             business_quality=bq, valuation_vs_growth=vg_dv,
@@ -217,26 +228,31 @@ def run_screening(
             historical_discount=hd, earnings_quality=eq,
             entry_vs_fundamentals=ef, binary_event_risk=br,
         )
+        scores_qcomp = SignalScores(
+            business_quality=bq, valuation_vs_growth=vg_qcomp,
+            historical_discount=hd, earnings_quality=eq,
+            entry_vs_fundamentals=ef, binary_event_risk=br,
+        )
 
-        comp_dv   = _compute_composite(scores_dv,   DEEP_VALUE_WEIGHTS)
-        comp_comp = _compute_composite(scores_comp, COMPOUNDER_WEIGHTS)
+        comp_dv    = _compute_composite(scores_dv,    DEEP_VALUE_WEIGHTS)
+        comp_comp  = _compute_composite(scores_comp,  COMPOUNDER_WEIGHTS)
+        comp_qcomp = _compute_composite(scores_qcomp, QUALITY_COMPOUNDER_WEIGHTS)
 
         # ── Select winning archetype ───────────────────────────────
-        if abs(comp_comp - comp_dv) <= _ARCHETYPE_TIE_BAND:
-            archetype      = "either"
-            scores         = scores_comp if comp_comp >= comp_dv else scores_dv
-            composite      = max(comp_comp, comp_dv)
-            winning_weights = COMPOUNDER_WEIGHTS if comp_comp >= comp_dv else DEEP_VALUE_WEIGHTS
-        elif comp_comp > comp_dv:
-            archetype      = "long_term_compounder"
-            scores         = scores_comp
-            composite      = comp_comp
-            winning_weights = COMPOUNDER_WEIGHTS
-        else:
-            archetype      = "deep_value"
-            scores         = scores_dv
-            composite      = comp_dv
-            winning_weights = DEEP_VALUE_WEIGHTS
+        # Sort all three descending; if top two are within the tie band → "either".
+        _candidates = sorted([
+            (comp_comp,  "long_term_compounder", scores_comp,  COMPOUNDER_WEIGHTS),
+            (comp_qcomp, "quality_compounder",   scores_qcomp, QUALITY_COMPOUNDER_WEIGHTS),
+            (comp_dv,    "deep_value",           scores_dv,    DEEP_VALUE_WEIGHTS),
+        ], key=lambda x: x[0], reverse=True)
+
+        top_score, top_arch, top_scores, top_weights = _candidates[0]
+        second_score = _candidates[1][0]
+
+        archetype       = "either" if (top_score - second_score) <= _ARCHETYPE_TIE_BAND else top_arch
+        scores          = top_scores
+        composite       = top_score
+        winning_weights = top_weights
 
         # Stash metrics on record for reason_codes.py access
         record["fundamental_metrics"] = metrics
@@ -310,12 +326,13 @@ def run_screening(
         shortlist=shortlist,
         shortlist_count=len(shortlist),
         metadata={
-            "regime_description":      regime.description,
-            "compounder_weights":      COMPOUNDER_WEIGHTS,
-            "deep_value_weights":      DEEP_VALUE_WEIGHTS,
-            "fallback_threshold_used": fallback_used,
-            "screening_duration_ms":   duration_ms,
-            "warnings":                warnings,
+            "regime_description":          regime.description,
+            "compounder_weights":          COMPOUNDER_WEIGHTS,
+            "quality_compounder_weights":  QUALITY_COMPOUNDER_WEIGHTS,
+            "deep_value_weights":          DEEP_VALUE_WEIGHTS,
+            "fallback_threshold_used":     fallback_used,
+            "screening_duration_ms":       duration_ms,
+            "warnings":                    warnings,
         }
     )
 

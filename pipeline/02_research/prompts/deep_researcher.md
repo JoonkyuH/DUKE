@@ -34,24 +34,28 @@ the designated JSON fields — not outside the JSON object.
 ## Research Protocol — Execute In This Order
 
 ### Step 0: Classify the Investment Archetype
-Before gathering any evidence, classify this company into one of three archetypes:
+Before gathering any evidence, classify this company into one of four archetypes:
 
 **`long_term_compounder`** — A growing company in a growing ecosystem. Revenue and earnings are expanding materially. The market is rewarding growth with a premium multiple, and that premium is justified by durable structural tailwinds. The investment case does not depend on a valuation rerating — compounding at current growth rates is sufficient. Characteristics: revenue growth meaningfully above market (typically 15%+), expanding or stable margins, strong FCF generation, ecosystem that is structurally growing (not cyclically).
 
+**`quality_compounder`** — A growing company in a mature ecosystem where the competitive moat is the investment case rather than ecosystem expansion. Revenue growth is steady but moderate (typically 5–15%). The premium multiple is justified by business quality, pricing power, and switching costs rather than growth rate. The investment case rests on the durability of the moat and the company's ability to sustain above-average returns on capital for many years. Characteristics: revenue growth steady but below hypergrowth, exceptional gross margins (typically >40%), strong FCF generation, high customer switching costs or network effects, proven ability to raise prices over time. Examples of this archetype: mature payments networks, dominant software platforms, essential business services.
+
 **`deep_value`** — A high-quality business trading at a material discount to intrinsic value. The discount is the investment case, not the growth. A margin of safety exists such that the investor does not need the business to reaccelerate to earn a return. Characteristics: revenue growth flat to moderate, established profitability, identifiable reason for the discount (temporary headwind, sector rotation, sentiment), plausible path to realization without requiring a specific catalyst.
 
-**`does_not_fit`** — The company does not fit either archetype. Assign this if the investment case depends on a management turnaround, a binary regulatory event, a specific M&A outcome, or requires a cyclical rebound that is genuinely uncertain. Any thesis that requires a catalyst to work — rather than simply waiting — is `does_not_fit`.
+**`does_not_fit`** — The company does not fit any of the above archetypes. Assign this if the investment case depends on a management turnaround, a binary regulatory event, a specific M&A outcome, or requires a cyclical rebound that is genuinely uncertain. Any thesis that requires a catalyst to work — rather than simply waiting — is `does_not_fit`.
 
 **Classification criteria — apply in this order:**
 1. What is the revenue growth rate, and is the ecosystem itself growing structurally?
-2. Does the valuation premium match the growth rate, or is there a material discount to intrinsic value?
-3. Is a margin of safety present (for deep value) or is it unnecessary because compounding covers it (for compounder)?
-4. Does the thesis work without any specific catalyst, or does it require an event to trigger value realization?
+2. Is the moat durable and established (quality compounder) or still being built out (long_term_compounder)?
+3. Does the valuation reflect a premium for quality/growth, or is there a material discount to intrinsic value?
+4. Is a margin of safety present (for deep value) or is it unnecessary because compounding or moat durability covers it?
+5. Does the thesis work without any specific catalyst, or does it require an event to trigger value realization?
 
-If criteria 4 is yes (requires a catalyst), classify `does_not_fit` regardless of growth or discount.
-If criteria 1–3 point to structural growth at a justified premium, classify `long_term_compounder`.
-If criteria 1–3 point to quality at a discount with margin of safety, classify `deep_value`.
-When genuinely ambiguous between compounder and deep value, prefer `deep_value` — it is the more conservative classification.
+If criteria 5 is yes (requires a catalyst), classify `does_not_fit` regardless of growth or discount.
+If criteria 1–2 point to structural growth in a new or expanding market (15%+ growth), classify `long_term_compounder`.
+If criteria 1–2 point to steady growth (5–15%) in a mature market with an established moat, classify `quality_compounder`.
+If criteria 3–4 point to quality at a discount with margin of safety, classify `deep_value`.
+When genuinely ambiguous between quality_compounder and deep_value, prefer `deep_value` — it is the more conservative classification.
 
 Record the result in the `investment_archetype` field of the evidence packet. This classification governs how the Bull and Bear analysts frame their cases and how the Chief Analyst applies the philosophy filter.
 
@@ -307,7 +311,7 @@ insufficiently researched, not that it doesn't exist.
   "screening_score": 0.0,
   "screening_reason_codes": [...],
   "screening_flags": [...],
-  "investment_archetype": "long_term_compounder | deep_value | does_not_fit",
+  "investment_archetype": "long_term_compounder | quality_compounder | deep_value | does_not_fit",
 
   "fundamentals": {
     "revenue_ttm_m": null,

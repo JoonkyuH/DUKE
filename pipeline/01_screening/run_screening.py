@@ -17,12 +17,16 @@ sys.path.insert(0, ".")
 from regime_fetcher import fetch_regime_indicators
 from data_fetcher import fetch_market_data
 from edgar_fetcher import fetch_financials
-from screener import run_screening as _screen, COMPOUNDER_WEIGHTS, DEEP_VALUE_WEIGHTS
+from screener import (
+    run_screening as _screen,
+    COMPOUNDER_WEIGHTS, QUALITY_COMPOUNDER_WEIGHTS, DEEP_VALUE_WEIGHTS,
+)
 from signal_scorer import (
     compute_fundamental_metrics,
     score_business_quality,
     score_valuation_vs_growth,
     score_valuation_vs_growth_compounder,
+    score_valuation_vs_growth_quality_compounder,
     score_historical_discount,
     score_earnings_quality,
     score_entry_vs_fundamentals,
@@ -69,37 +73,37 @@ def _score_record(record: dict) -> tuple:
     ef = score_entry_vs_fundamentals(metrics)
     br = score_binary_event_risk(earnings_d)
 
-    vg_dv   = score_valuation_vs_growth(metrics)
-    vg_comp = score_valuation_vs_growth_compounder(metrics)
+    vg_dv    = score_valuation_vs_growth(metrics)
+    vg_comp  = score_valuation_vs_growth_compounder(metrics)
+    vg_qcomp = score_valuation_vs_growth_quality_compounder(metrics)
 
     def _composite(sigs: dict, weights: dict) -> float:
         valid   = {k: v for k, v in sigs.items() if v is not None}
         total_w = sum(weights[k] for k in valid)
         return sum(valid[k] * (weights[k] / total_w) for k in valid) if total_w > 0 else 0.0
 
-    sigs_dv = {
-        "business_quality": bq, "valuation_vs_growth": vg_dv,
-        "historical_discount": hd, "earnings_quality": eq,
-        "entry_vs_fundamentals": ef, "binary_event_risk": br,
-    }
-    sigs_comp = {
-        "business_quality": bq, "valuation_vs_growth": vg_comp,
-        "historical_discount": hd, "earnings_quality": eq,
-        "entry_vs_fundamentals": ef, "binary_event_risk": br,
-    }
+    def _sigs(vg):
+        return {
+            "business_quality": bq, "valuation_vs_growth": vg,
+            "historical_discount": hd, "earnings_quality": eq,
+            "entry_vs_fundamentals": ef, "binary_event_risk": br,
+        }
 
-    comp_dv   = _composite(sigs_dv,   DEEP_VALUE_WEIGHTS)
-    comp_comp = _composite(sigs_comp, COMPOUNDER_WEIGHTS)
+    sigs_dv    = _sigs(vg_dv)
+    sigs_comp  = _sigs(vg_comp)
+    sigs_qcomp = _sigs(vg_qcomp)
 
-    if abs(comp_comp - comp_dv) <= 1.0:
-        archetype, sigs, comp = "either", sigs_comp if comp_comp >= comp_dv else sigs_dv, max(comp_comp, comp_dv)
-    elif comp_comp > comp_dv:
-        archetype, sigs, comp = "long_term_compounder", sigs_comp, comp_comp
-    else:
-        archetype, sigs, comp = "deep_value", sigs_dv, comp_dv
+    candidates = sorted([
+        (_composite(sigs_comp,  COMPOUNDER_WEIGHTS),          "long_term_compounder", sigs_comp),
+        (_composite(sigs_qcomp, QUALITY_COMPOUNDER_WEIGHTS),  "quality_compounder",   sigs_qcomp),
+        (_composite(sigs_dv,    DEEP_VALUE_WEIGHTS),          "deep_value",           sigs_dv),
+    ], key=lambda x: x[0], reverse=True)
 
-    display = {k: (round(v, 1) if v is not None else None) for k, v in sigs.items()}
-    return round(comp, 1), display, archetype
+    top_score, top_arch, top_sigs = candidates[0]
+    archetype = "either" if (top_score - candidates[1][0]) <= 1.0 else top_arch
+
+    display = {k: (round(v, 1) if v is not None else None) for k, v in top_sigs.items()}
+    return round(top_score, 1), display, archetype
 
 
 def _cell(v) -> str:
@@ -229,7 +233,8 @@ def main():
     print("═" * W)
 
     _ARCH_ABBREV = {
-        "long_term_compounder": "COMPOUNDER",
+        "long_term_compounder": "LT COMPOUNDER",
+        "quality_compounder":   "QUALITY COMP",
         "deep_value":           "DEEP VALUE",
         "either":               "EITHER",
     }
