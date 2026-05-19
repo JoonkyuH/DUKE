@@ -136,11 +136,11 @@ def main():
     routed       = len(quotes) - passed
     print(f"    passed: {passed}   routed to review queue: {routed}")
 
-    # ── 7. Bearish discovery (Perplexity) ─────────────────────────────
-    print("\n[7] Bearish discovery (Perplexity) …")
-    from perplexity_discovery import discover_bearish
-    bearish_candidates = discover_bearish(ticker, company_name)
-    print(f"    candidates: {len(bearish_candidates)}")
+    # ── 7. Evidence discovery (Perplexity) ───────────────────────────
+    print("\n[7] Evidence discovery (Perplexity) …")
+    from perplexity_discovery import discover_evidence
+    perplexity_candidates = discover_evidence(ticker, company_name)
+    print(f"    candidates: {len(perplexity_candidates)}")
 
     # ── 8. News discovery (NewsAPI) ───────────────────────────────────
     print("\n[8] News discovery (NewsAPI) …")
@@ -150,21 +150,21 @@ def main():
 
     # ── 9. Assemble evidence packet ───────────────────────────────────
     print("\n[9] Assembling evidence packet …")
-    discovery_candidates = bearish_candidates + news_candidates
+    discovery_candidates = perplexity_candidates + news_candidates
 
     packet = {
-        "ticker":             ticker,
+        "ticker":              ticker,
         "screening_archetype": archetype,
-        "generated_at":       datetime.now(timezone.utc).isoformat(),
-        "fiscal_year":        transcript["fiscal_year"],
-        "fiscal_quarter":     transcript["fiscal_quarter"],
-        "calendar_period":    transcript["calendar_period"],
+        "generated_at":        datetime.now(timezone.utc).isoformat(),
+        "fiscal_year":         transcript["fiscal_year"],
+        "fiscal_quarter":      transcript["fiscal_quarter"],
+        "calendar_period":     transcript["calendar_period"],
         "transcript": {
-            "source_type":     transcript["source_type"],
+            "source_type":      transcript["source_type"],
             "document_subtype": transcript["document_subtype"],
-            "source_url":      transcript["source_url"],
-            "reliability":     transcript["reliability"],
-            "discovered_by":   transcript["discovered_by"],
+            "source_url":       transcript["source_url"],
+            "reliability":      transcript["reliability"],
+            "discovered_by":    transcript["discovered_by"],
         },
         "evidence_items":          validated,
         "contradictions":          contradictions,
@@ -174,7 +174,7 @@ def main():
             "duplicates_removed":        removed,
             "quotes_passed_validation":  passed,
             "quotes_routed_to_review":   routed,
-            "perplexity_candidates":     len(bearish_candidates),
+            "perplexity_candidates":     len(perplexity_candidates),
             "news_candidates":           len(news_candidates),
             "company_name":              company_name,
             "ir_url":                    ir_url,
@@ -205,8 +205,22 @@ def main():
         print("    (none — ANTHROPIC_API_KEY required for extraction)")
     print()
     print(f"  Contradictions:    {len(contradictions)}")
-    print(f"  Discovery candidates: {len(discovery_candidates)}"
-          f"  (Perplexity: {len(bearish_candidates)}  News: {len(news_candidates)})")
+    print()
+    _QT_ORDER = [
+        "bear_case", "bull_case",
+        "competitive_risk", "competitive_advantage",
+        "sector_risk", "sector_opportunity",
+    ]
+    pplx_by_qt: dict = {}
+    for c in perplexity_candidates:
+        qt = c.get("query_type", "unknown")
+        pplx_by_qt[qt] = pplx_by_qt.get(qt, 0) + 1
+    print(f"  Discovery candidates ({len(perplexity_candidates)} Perplexity"
+          f"  +  {len(news_candidates)} news):")
+    for qt in _QT_ORDER:
+        print(f"    {qt:<26} {pplx_by_qt.get(qt, 0)}")
+    if news_candidates:
+        print(f"    {'news_discovery':<26} {len(news_candidates)}")
     print()
     print(f"  Output: {out_path.relative_to(_REPO_ROOT)}")
     print("═" * W)

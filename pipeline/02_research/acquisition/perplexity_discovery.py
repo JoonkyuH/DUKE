@@ -7,9 +7,10 @@ Entry points:
         General-purpose search. Parses search_results array only.
         Returns list of {url, title, date, snippet}.
 
-    discover_bearish(ticker: str, company_name: str) -> list[dict]
-        Runs three bearish-evidence queries, caches results in
-        discovery_cache, and returns discovery candidates.
+    discover_evidence(ticker: str, company_name: str) -> list[dict]
+        Runs six symmetric queries (bull + bear on case, competitive,
+        and sector dimensions), caches results in discovery_cache, and
+        returns discovery candidates tagged with query_type.
 """
 
 import hashlib
@@ -20,17 +21,38 @@ import sqlite3
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
 
 log = logging.getLogger("perplexity_discovery")
 
 _PERPLEXITY_URL = "https://api.perplexity.ai/chat/completions"
 _DB_PATH        = Path(__file__).resolve().parent / "cache" / "duke_cache.db"
 
-_BEARISH_QUERIES = [
-    "bearish arguments against {ticker} {company_name} last 60 days",
-    "analyst downgrade price target cut {ticker} last 30 days",
-    "competitive threat {company_name} recent news",
+# Six symmetric evidence queries: (query_type_label, query_template)
+_EVIDENCE_QUERIES = [
+    (
+        "bear_case",
+        "bearish arguments concerns risks against {ticker} {company_name} last 60 days",
+    ),
+    (
+        "bull_case",
+        "bull thesis positive developments upgrades for {ticker} {company_name} last 60 days",
+    ),
+    (
+        "competitive_risk",
+        "competitive threat competitor challenge {company_name} recent news",
+    ),
+    (
+        "competitive_advantage",
+        "competitive moat differentiation advantage {company_name}",
+    ),
+    (
+        "sector_risk",
+        "industry headwinds regulation demand weakness {company_name} industry 2026",
+    ),
+    (
+        "sector_opportunity",
+        "industry tailwinds growth opportunity {company_name} industry 2026",
+    ),
 ]
 
 
@@ -44,10 +66,19 @@ def _db() -> sqlite3.Connection:
     return con
 
 
+def _ensure_schema() -> None:
+    """Add query_type column to discovery_cache if it does not already exist."""
+    with _db() as con:
+        try:
+            con.execute("ALTER TABLE discovery_cache ADD COLUMN query_type TEXT")
+        except sqlite3.OperationalError:
+            pass  # column already present
+
+
 def _cache_write(ticker: str, query_type: str, result: dict) -> None:
-    url   = result.get("url", "")
-    key   = hashlib.sha256(f"{ticker}:{query_type}:{url}".encode()).hexdigest()[:16]
-    now   = datetime.now(timezone.utc).isoformat()
+    url = result.get("url", "")
+    key = hashlib.sha256(f"{ticker}:{query_type}:{url}".encode()).hexdigest()[:16]
+    now = datetime.now(timezone.utc).isoformat()
     with _db() as con:
         con.execute(
             """INSERT OR REPLACE INTO discovery_cache
@@ -67,7 +98,7 @@ def _call_perplexity(query: str) -> list:
     """
     POST one query to Perplexity Sonar.
     Returns the raw search_results list, or [] on any failure.
-    Choices.message.content is intentionally ignored.
+    choices.message.content is intentionally ignored.
     """
     api_key = os.environ.get("PERPLEXITY_API_KEY", "").strip()
     if not api_key:
@@ -132,9 +163,10 @@ def perplexity_search(query: str) -> list:
     return parsed
 
 
-def discover_bearish(ticker: str, company_name: str) -> list:
+def discover_evidence(ticker: str, company_name: str) -> list:
     """
-    Run three bearish-evidence queries against Perplexity Sonar.
+    Run six symmetric evidence queries (bull/bear across case, competitive,
+    and sector dimensions) against Perplexity Sonar.
     Cache each result row in discovery_cache.
 
     Args:
@@ -142,37 +174,44 @@ def discover_bearish(ticker: str, company_name: str) -> list:
         company_name: Full company name (e.g. "Nvidia Corp").
 
     Returns:
-        List of discovery candidate dicts with source_type and reliability.
-        Empty list if PERPLEXITY_API_KEY is not set.
+        List of discovery candidate dicts with query_type, source_type, and
+        reliability. Empty list if PERPLEXITY_API_KEY is not set.
     """
     if not os.environ.get("PERPLEXITY_API_KEY", "").strip():
-        log.info("PERPLEXITY_API_KEY not set — skipping bearish discovery for %s", ticker)
+        log.info("PERPLEXITY_API_KEY not set — skipping evidence discovery for %s", ticker)
         return []
 
-    candidates = []
-    for tmpl in _BEARISH_QUERIES:
-        query      = tmpl.format(ticker=ticker.upper(), company_name=company_name)
-        query_type = tmpl.split()[0][:20]   # short label for the cache row
-        log.info("%s: bearish discovery query: %r", ticker, query[:80])
+    _ensure_schema()
 
-        for raw in _call_perplexity(query):
+    candidates  = []
+    seen_urls   = set()
+
+    for query_type, tmpl in _EVIDENCE_QUERIES:
+        query = tmpl.format(ticker=ticker.upper(), company_name=company_name)
+        log.info("%s: [%s] query: %r", ticker, query_type, query[:80])
+
+        raw_results = _call_perplexity(query)
+        count = 0
+        for raw in raw_results:
             if not raw.get("url"):
                 continue
             result = _parse_result(raw)
             _cache_write(ticker, query_type, result)
-            candidates.append({
+
+            url = result["url"]
+            candidate = {
                 **result,
+                "query_type":  query_type,
                 "source_type": "discovery_candidate",
                 "reliability": 0.55,
-            })
+            }
+            # Keep duplicates across queries but tag them all; dedup by URL within run
+            if url not in seen_urls:
+                seen_urls.add(url)
+                candidates.append(candidate)
+                count += 1
 
-    seen_urls = set()
-    deduped   = []
-    for c in candidates:
-        if c["url"] not in seen_urls:
-            seen_urls.add(c["url"])
-            deduped.append(c)
+        log.info("%s: [%s] → %d unique candidates", ticker, query_type, count)
 
-    log.info("%s: bearish discovery → %d candidates (%d unique)",
-             ticker, len(candidates), len(deduped))
-    return deduped
+    log.info("%s: evidence discovery complete — %d total unique candidates", ticker, len(candidates))
+    return candidates
