@@ -7,9 +7,7 @@ Entry points:
     get_company_name(ticker: str) -> str
 """
 
-import json
 import logging
-import os
 import re
 import sqlite3
 import urllib.error
@@ -23,7 +21,6 @@ log = logging.getLogger("ir_discovery")
 
 _DB_PATH = Path(__file__).resolve().parent / "cache" / "duke_cache.db"
 
-_PERPLEXITY_URL = "https://api.perplexity.ai/chat/completions"
 _EDGAR_SEARCH   = (
     "https://efts.sec.gov/LATEST/search-index?q={ticker}"
     "&dateRange=custom&startdt=2020-01-01&forms=10-K"
@@ -200,7 +197,7 @@ def _validate_url(url: str, ticker: str, company_name: str) -> bool:
 
 def _score_candidate(result: dict, ticker: str, company_name: str) -> int:
     url     = (result.get("url") or "").lower()
-    title   = (result.get("name") or result.get("title") or "").lower()
+    title   = (result.get("title") or "").lower()
     snippet = (result.get("snippet") or "").lower()
     score   = 0
 
@@ -224,49 +221,20 @@ def _score_candidate(result: dict, ticker: str, company_name: str) -> int:
 
 
 def _discover_via_perplexity(ticker: str, company_name: str) -> Optional[str]:
-    api_key = os.environ.get("PERPLEXITY_API_KEY")
-    if not api_key:
-        log.warning("PERPLEXITY_API_KEY not set — skipping discovery for %s", ticker)
-        return None
+    from perplexity_discovery import perplexity_search
 
     query = (
         f"official investor relations quarterly results page for "
         f"{company_name} {ticker} earnings transcripts"
     )
-    payload = json.dumps({
-        "model":    "sonar",
-        "messages": [{"role": "user", "content": query}],
-    }).encode()
-
-    req = urllib.request.Request(
-        _PERPLEXITY_URL,
-        data=payload,
-        headers={
-            "Content-Type":  "application/json",
-            "Authorization": f"Bearer {api_key}",
-        },
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=30) as r:
-            data = json.loads(r.read())
-    except Exception as exc:
-        log.error("Perplexity request failed for %s: %s", ticker, exc)
+    results = perplexity_search(query)
+    if not results:
+        log.warning("No search_results from Perplexity for %s", ticker)
         return None
 
-    # Parse search_results only — ignore choices.message.content entirely
-    search_results = data.get("search_results") or []
-    if not search_results:
-        log.warning("No search_results in Perplexity response for %s", ticker)
-        return None
-
-    scored = sorted(
-        search_results,
-        key=lambda r: _score_candidate(r, ticker, company_name),
-        reverse=True,
-    )
-    best = scored[0]
-    url  = best.get("url") or ""
+    scored = sorted(results, key=lambda r: _score_candidate(r, ticker, company_name), reverse=True)
+    best   = scored[0]
+    url    = best.get("url") or ""
     log.info("Perplexity top candidate for %s: %s (score=%d)",
              ticker, url, _score_candidate(best, ticker, company_name))
     return url or None
