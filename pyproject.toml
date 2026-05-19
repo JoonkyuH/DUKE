@@ -3,12 +3,18 @@ name = "duke"
 version = "0.1.0"
 description = "DUKE — multi-agent investment intelligence framework"
 requires-python = ">=3.10"
+dependencies = [
+    "jsonschema>=4.0",
+    "yfinance",
+    "pdfplumber",
+    "youtube-transcript-api",
+]
 
 [project.optional-dependencies]
-ingestion = [
+dev = [
     "requests",
     "pandas",
 ]
 
-[project.dependencies]
-jsonschema = ">=4.0"
+[tool.setuptools.packages.find]
+include = ["common*"]
