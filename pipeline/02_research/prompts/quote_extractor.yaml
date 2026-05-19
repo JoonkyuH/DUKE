@@ -1,0 +1,39 @@
+name: quote_extractor
+version: "1.0.0"
+description: >
+  Extracts structured, attributed executive quotes from earnings documents.
+  Returns a JSON array of quote objects with category, direction, and significance.
+prompt: |
+  You are an expert financial analyst extracting executive quotes from an earnings document.
+
+  Document type: {document_subtype}
+  Company: {company}
+  Period: {period}
+
+  Extract all significant executive statements. Focus on these categories:
+    - guidance: forward-looking statements about revenue, margins, or growth
+    - competitive_positioning: market position, competitors, moat, product differentiation
+    - margin_commentary: gross margin, operating margin, cost structure, leverage
+    - demand_commentary: demand trends, customer activity, pipeline, bookings, inventory
+    - risk_factors: headwinds, uncertainties, macro concerns, regulatory risk
+    - tone_shift: language that signals a change in posture from prior quarters
+
+  For each quote return a JSON object with exactly these fields:
+    - quote_text: the exact verbatim quote (no paraphrasing, no ellipsis)
+    - quote_type: always "direct"
+    - speaker: the speaker's name or role (e.g. "Jensen Huang", "CFO", "Management")
+    - speaker_confidence: 0.95 if explicit name given, 0.75 if role only, 0.50 if press release with no attribution, 0.30 if inferred
+    - category: one of [guidance, competitive_positioning, margin_commentary, demand_commentary, risk_factors, tone_shift]
+    - direction: BULLISH, BEARISH, or NEUTRAL
+    - significance: HIGH, MEDIUM, or LOW
+
+  Rules:
+    - Only extract quotes with material investment relevance
+    - quote_type must always be "direct" — never summarize or paraphrase
+    - If this is a press release (document_subtype = earnings_press_release), set speaker to "Management" and speaker_confidence to 0.50
+    - Include at most 20 quotes; prefer HIGH significance items
+
+  TEXT:
+  {text}
+
+  Return a JSON array of quote objects. No preamble, no explanation, no markdown fences.

@@ -1,0 +1,41 @@
+name: contradiction_detector
+version: "1.0.0"
+description: >
+  Identifies tone shifts and contradictions between current and prior quarter earnings documents.
+  Returns a JSON array of change objects with change_type, quotes, and explanation.
+prompt: |
+  You are an expert financial analyst identifying meaningful shifts between two earnings documents.
+
+  Company: {company}
+  Current period: {current_period}
+  Prior period: {prior_period}
+
+  Compare the two documents below and identify material changes in:
+    - weaker_guidance: guidance that was stronger last quarter is now softer or hedged
+    - stronger_guidance: guidance that was weaker or absent last quarter is now more positive
+    - new_risk: a risk factor mentioned in the current document that was absent before
+    - resolved_risk: a risk previously mentioned that is now described as resolved or no longer flagged
+    - new_opportunity: a growth opportunity cited now that was absent in the prior document
+
+  For each shift return a JSON object with exactly these fields:
+    - change_type: one of [weaker_guidance, stronger_guidance, new_risk, resolved_risk, new_opportunity]
+    - current_quote: the relevant verbatim quote from the current document
+    - prior_quote: the relevant verbatim quote from the prior document, or null for new_risk/new_opportunity
+    - category: topic area (e.g. "revenue guidance", "margin outlook", "demand", "supply chain")
+    - direction: BULLISH, BEARISH, or NEUTRAL
+    - significance: HIGH, MEDIUM, or LOW
+    - explanation: one sentence explaining why this constitutes a material shift
+
+  Rules:
+    - Only include shifts with clear investment relevance
+    - Do not flag routine quarter-to-quarter variation as contradictions
+    - Return an empty array [] if no material shifts are found
+    - At most 15 items; prioritize HIGH significance
+
+  CURRENT QUARTER DOCUMENT ({current_period}):
+  {current_text}
+
+  PRIOR QUARTER DOCUMENT ({prior_period}):
+  {prior_text}
+
+  Return a JSON array of change objects. No preamble, no explanation, no markdown fences.

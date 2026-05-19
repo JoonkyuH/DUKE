@@ -1,0 +1,18 @@
+[
+  {
+    "ticker": "NVDA",
+    "category": "demand_commentary",
+    "content": "This sentence will definitely not appear in the transcript text xyzzy",
+    "reason": "verbatim_not_found",
+    "item": {
+      "quote_text": "This sentence will definitely not appear in the transcript text xyzzy",
+      "category": "demand_commentary",
+      "direction": "NEUTRAL",
+      "significance": "LOW",
+      "speaker": "CFO",
+      "speaker_confidence": 0.75,
+      "prompt_name": "quote_extractor",
+      "prompt_version": "1.0.0"
+    }
+  }
+]

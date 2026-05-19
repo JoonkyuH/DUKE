@@ -801,6 +801,16 @@ def _source_reliability(source_type: str) -> float:
     }.get(source_type, 0.75)
 
 
+def _document_subtype(source_type: str) -> str:
+    if source_type in ("sec_8k_exhibit", "sec_8k_exhibit_press_release", "ir_press_release"):
+        return "earnings_press_release"
+    if source_type in ("ir_transcript_pdf", "fmp_transcript"):
+        return "earnings_transcript"
+    if source_type == "youtube_transcript":
+        return "youtube_transcript"
+    return ""
+
+
 # ─────────────────────────────────────────────
 # PUBLIC ENTRY POINT
 # ─────────────────────────────────────────────
@@ -820,17 +830,19 @@ def fetch_transcript(ticker: str) -> Optional[dict]:
     cached = _cache_get(ticker, fiscal_year, fiscal_quarter)
     if cached:
         log.info("%s: transcript cache hit (%s %s)", ticker, fiscal_year, fiscal_quarter)
+        st = cached["source_type"]
         return {
-            "ticker":          cached["ticker"],
-            "source_type":     cached["source_type"],
-            "source_url":      cached["source_url"],
-            "raw_text":        cached["raw_text"],
-            "fiscal_year":     cached["fiscal_year"],
-            "fiscal_quarter":  cached["fiscal_quarter"],
-            "calendar_period": cached["calendar_period"],
-            "reported_date":   cached["reported_date"],
-            "reliability":     _source_reliability(cached["source_type"]),
-            "discovered_by":   "cache",
+            "ticker":           cached["ticker"],
+            "source_type":      st,
+            "source_url":       cached["source_url"],
+            "raw_text":         cached["raw_text"],
+            "fiscal_year":      cached["fiscal_year"],
+            "fiscal_quarter":   cached["fiscal_quarter"],
+            "calendar_period":  cached["calendar_period"],
+            "reported_date":    cached["reported_date"],
+            "reliability":      _source_reliability(st),
+            "discovered_by":    "cache",
+            "document_subtype": _document_subtype(st),
         }
 
     ir_url       = get_ir_url(ticker)
@@ -917,14 +929,15 @@ def fetch_transcript(ticker: str) -> Optional[dict]:
     )
 
     return {
-        "ticker":          ticker,
-        "source_type":     source_type,
-        "source_url":      source_url,
-        "raw_text":        result_text,
-        "fiscal_year":     fiscal_year,
-        "fiscal_quarter":  fiscal_quarter,
-        "calendar_period": cal_period,
-        "reported_date":   reported_date,
-        "reliability":     reliability,
-        "discovered_by":   discovered_by,
+        "ticker":           ticker,
+        "source_type":      source_type,
+        "source_url":       source_url,
+        "raw_text":         result_text,
+        "fiscal_year":      fiscal_year,
+        "fiscal_quarter":   fiscal_quarter,
+        "calendar_period":  cal_period,
+        "reported_date":    reported_date,
+        "reliability":      reliability,
+        "discovered_by":    discovered_by,
+        "document_subtype": _document_subtype(source_type),
     }
