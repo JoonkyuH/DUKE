@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 run_screening.py
-Stage 01 entry point. Fetches live regime indicators and market data,
-runs the screener, and prints a summary table.
+Stage 01 entry point. Fetches live regime indicators, market data, and
+EDGAR fundamental data, runs the fundamental screener, and prints results.
 
 Usage:
     python3 run_screening.py NVDA AAPL MSFT
@@ -16,14 +16,16 @@ sys.path.insert(0, ".")
 
 from regime_fetcher import fetch_regime_indicators
 from data_fetcher import fetch_market_data
+from edgar_fetcher import fetch_financials
 from screener import run_screening as _screen
 from signal_scorer import (
-    score_momentum,
-    score_relative_strength,
-    score_volume_anomaly,
-    score_sector_leadership,
-    score_news_velocity,
-    score_earnings_proximity,
+    compute_fundamental_metrics,
+    score_business_quality,
+    score_valuation_vs_growth,
+    score_historical_discount,
+    score_earnings_quality,
+    score_entry_vs_fundamentals,
+    score_binary_event_risk,
 )
 
 
@@ -41,25 +43,32 @@ def _conviction(score: float) -> str:
     return "LOW"
 
 
-def _score_record(record: dict, weights: dict, sector_data: dict) -> tuple:
+def _score_record(record: dict, weights: dict) -> tuple:
     """
     Compute composite score and per-signal scores for a raw record.
-    Used for tickers that did not make the shortlist (screener only
-    returns passing entries, so we re-score failing ones for display).
+    Used for tickers that did not make the shortlist.
     """
+    fund_d     = record.get("fundamental_data", {})
     price_d    = record.get("price_data", {})
-    rs_d       = record.get("relative_strength", {})
-    news_d     = record.get("news_data") or {}
+    ext_d      = record.get("extended_data", {})
     earnings_d = record.get("earnings_data", {})
-    sector_d   = sector_data.get(record.get("sector", ""), {})
+
+    market_d = {
+        "market_cap":    ext_d.get("market_cap"),
+        "current_price": price_d.get("current_price"),
+        "week_52_high":  ext_d.get("week_52_high"),
+        "week_52_low":   ext_d.get("week_52_low"),
+    }
+
+    metrics = compute_fundamental_metrics(fund_d, market_d) if fund_d else {}
 
     sigs = {
-        "momentum":           score_momentum(price_d),
-        "relative_strength":  score_relative_strength(rs_d),
-        "volume_anomaly":     score_volume_anomaly(price_d),
-        "sector_leadership":  score_sector_leadership(rs_d, sector_d),
-        "news_velocity":      score_news_velocity(news_d),
-        "earnings_proximity": score_earnings_proximity(earnings_d),
+        "business_quality":      score_business_quality(metrics),
+        "valuation_vs_growth":   score_valuation_vs_growth(metrics),
+        "historical_discount":   score_historical_discount(metrics),
+        "earnings_quality":      score_earnings_quality(metrics),
+        "entry_vs_fundamentals": score_entry_vs_fundamentals(metrics),
+        "binary_event_risk":     score_binary_event_risk(earnings_d),
     }
 
     valid   = {k: v for k, v in sigs.items() if v is not None}
@@ -77,6 +86,14 @@ def _cell(v) -> str:
     return f"{v:5.1f}" if v is not None else "    —"
 
 
+def _fetch_fundamental(ticker: str) -> tuple:
+    """Fetch EDGAR data for one ticker. Returns (ticker, data_or_None, error_or_None)."""
+    try:
+        return ticker, fetch_financials(ticker), None
+    except Exception as exc:
+        return ticker, None, str(exc)
+
+
 # ─────────────────────────────────────────────
 # MAIN
 # ─────────────────────────────────────────────
@@ -87,10 +104,10 @@ def main():
         sys.exit("Usage: python3 run_screening.py TICKER [TICKER ...]")
 
     # ── 1. Regime indicators + sector ETF RS data ────────────────
-    print(f"Fetching regime indicators …")
+    print("Fetching regime indicators …")
     regime_indicators, sector_data = fetch_regime_indicators()
 
-    # ── 2. Market data (parallel) ─────────────────────────────────
+    # ── 2. Market data (parallel, up to 8 workers) ───────────────
     print(f"Fetching market data: {', '.join(tickers)} …")
     raw_records = []
     fetch_errors = {}
@@ -102,26 +119,48 @@ def main():
             try:
                 raw_records.append(fut.result())
             except Exception as exc:
-                fetch_errors[ticker] = str(exc)
+                fetch_errors[ticker] = f"market data: {exc}"
 
     if not raw_records:
         sys.exit("No market data could be fetched.")
 
-    # ── 3. Screen ─────────────────────────────────────────────────
+    # ── 3. EDGAR fundamental data (parallel, capped at 5 workers) ─
+    # EDGAR allows 10 req/sec; each call sleeps 0.15s plus network latency.
+    # 5 concurrent workers keeps us comfortably under the rate limit.
+    print("Fetching EDGAR fundamentals …")
+    fundamental_map = {}
+    edgar_errors = {}
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as ex:
+        futures = {ex.submit(_fetch_fundamental, r["ticker"]): r["ticker"]
+                   for r in raw_records}
+        for fut in concurrent.futures.as_completed(futures):
+            ticker, data, err = fut.result()
+            if err:
+                edgar_errors[ticker] = f"EDGAR: {err}"
+            else:
+                fundamental_map[ticker] = data
+
+    # Merge fundamental data into records
+    for record in raw_records:
+        t = record["ticker"]
+        record["fundamental_data"] = fundamental_map.get(t, {})
+
+    # ── 4. Screen ─────────────────────────────────────────────────
     result    = _screen(raw_records, regime_indicators, sector_data)
     out       = result.to_dict()
     threshold = out["threshold_applied"]
     weights   = out["metadata"]["regime_weights"]
     shortlist = {e["ticker"]: e for e in out["shortlist"]}
 
-    # ── 4. Build display rows for ALL tickers ─────────────────────
+    # ── 5. Build display rows for ALL tickers ─────────────────────
     rows = []
     for rec in raw_records:
         t = rec["ticker"]
         if t in shortlist:
             entry = shortlist[t]
             comp  = entry["composite_score"]
-            sigs  = entry["signal_scores"]      # already rounded by screener
+            sigs  = entry["signal_scores"]
             rows.append({
                 "ticker":       t,
                 "composite":    comp,
@@ -130,9 +169,10 @@ def main():
                 "priority":     entry["priority"],
                 "reason_codes": entry["reason_codes"],
                 "flags":        entry["flags"],
+                "hypothesis":   entry["mispricing_hypothesis"],
             })
         else:
-            comp, sigs = _score_record(rec, weights, sector_data)
+            comp, sigs = _score_record(rec, weights)
             rows.append({
                 "ticker":       t,
                 "composite":    comp,
@@ -141,23 +181,24 @@ def main():
                 "priority":     None,
                 "reason_codes": [],
                 "flags":        [],
+                "hypothesis":   "",
             })
 
     # Sort: passing tickers by priority, then failing by composite desc
     rows.sort(key=lambda r: (0 if r["passed"] else 1, r["priority"] or 999, -r["composite"]))
 
-    # ── 5. Print ──────────────────────────────────────────────────
-    now     = datetime.now(timezone.utc).strftime("%Y-%m-%d  %H:%M UTC")
-    W       = 70
-    n_pass  = sum(1 for r in rows if r["passed"])
-    n_fail  = len(rows) - n_pass
-    regime  = out["market_regime"]
-    conf    = f"{out['regime_confidence']:.0%}"
+    # ── 6. Print ──────────────────────────────────────────────────
+    now      = datetime.now(timezone.utc).strftime("%Y-%m-%d  %H:%M UTC")
+    W        = 72
+    n_pass   = sum(1 for r in rows if r["passed"])
+    n_fail   = len(rows) - n_pass
+    regime   = out["market_regime"]
+    conf     = f"{out['regime_confidence']:.0%}"
     fallback = out["metadata"].get("fallback_threshold_used", False)
 
     print()
     print("═" * W)
-    print(f"  DUKE  Stage 01 — Screening               {now}")
+    print(f"  DUKE  Stage 01 — Fundamental Screening       {now}")
     print("═" * W)
     print(f"  Regime:    {regime:<26}  Confidence: {conf}")
     print(f"  Threshold: {threshold:<6}  "
@@ -179,19 +220,21 @@ def main():
 
     # Signal breakdown
     print()
-    print(f"  {'TICKER':<8}  {'MOM':>5}  {'RS':>5}  {'VOL':>5}  {'SEC':>5}  {'NEWS':>5}  {'EARN':>5}")
-    print(f"  {'──────':<8}  {'───':>5}  {'──':>5}  {'───':>5}  {'───':>5}  {'────':>5}  {'────':>5}")
+    print(f"  {'TICKER':<8}  {'BQ':>5}  {'VG':>5}  {'HD':>5}  {'EQ':>5}  {'EF':>5}  {'BR':>5}")
+    print(f"  {'──────':<8}  {'──':>5}  {'──':>5}  {'──':>5}  {'──':>5}  {'──':>5}  {'──':>5}")
     for r in rows:
         s = r["sigs"]
         print(
             f"  {r['ticker']:<8}"
-            f"  {_cell(s.get('momentum'))}"
-            f"  {_cell(s.get('relative_strength'))}"
-            f"  {_cell(s.get('volume_anomaly'))}"
-            f"  {_cell(s.get('sector_leadership'))}"
-            f"  {_cell(s.get('news_velocity'))}"
-            f"  {_cell(s.get('earnings_proximity'))}"
+            f"  {_cell(s.get('business_quality'))}"
+            f"  {_cell(s.get('valuation_vs_growth'))}"
+            f"  {_cell(s.get('historical_discount'))}"
+            f"  {_cell(s.get('earnings_quality'))}"
+            f"  {_cell(s.get('entry_vs_fundamentals'))}"
+            f"  {_cell(s.get('binary_event_risk'))}"
         )
+    print("  (BQ=Business Quality  VG=Valuation vs Growth  HD=Historical Discount")
+    print("   EQ=Earnings Quality  EF=Entry vs Fundamentals  BR=Binary Event Risk)")
 
     # Reason codes (passing only)
     if n_pass:
@@ -203,7 +246,7 @@ def main():
             codes = ", ".join(r["reason_codes"]) if r["reason_codes"] else "(none)"
             print(f"    {r['ticker']:<8}  {codes}")
 
-    # Flags (passing only, if any exist)
+    # Flags (passing only, if any)
     flagged = [r for r in rows if r["passed"] and r["flags"]]
     if flagged:
         print()
@@ -211,11 +254,32 @@ def main():
         for r in flagged:
             print(f"    {r['ticker']:<8}  {', '.join(r['flags'])}")
 
-    # Fetch errors (if any)
-    if fetch_errors:
+    # Mispricing hypotheses (passing tickers, for Stage 02 research brief)
+    if n_pass:
+        print()
+        print("  Mispricing Hypotheses (Stage 02 Research Brief):")
+        for r in rows:
+            if not r["passed"] or not r["hypothesis"]:
+                continue
+            print(f"\n    [{r['ticker']}]")
+            # Word-wrap at ~70 chars
+            words = r["hypothesis"].split()
+            line = "    "
+            for word in words:
+                if len(line) + len(word) + 1 > 74:
+                    print(line)
+                    line = "      " + word
+                else:
+                    line += (" " if line.strip() else "") + word
+            if line.strip():
+                print(line)
+
+    # Fetch errors
+    all_errors = {**fetch_errors, **edgar_errors}
+    if all_errors:
         print()
         print("  Fetch Errors:")
-        for t, err in fetch_errors.items():
+        for t, err in all_errors.items():
             print(f"    {t:<8}  {err}")
 
     print()

@@ -1,12 +1,18 @@
 """
 screener.py
-Main orchestrator for the initial screening layer.
+Main orchestrator for the fundamental screening layer (Stage 01).
 
 Takes a list of raw signal records, classifies the market regime,
-scores all six signals for each ticker, applies regime-adjusted weights,
-and outputs a ranked ticker shortlist ready for Layer 2 deep research.
+computes fundamental quality-and-value scores for each ticker, applies
+regime-adjusted weights, and outputs a ranked shortlist ready for Stage 02.
 
 Entry point: run_screening()
+
+Each record must include:
+  fundamental_data  — edgar_fetcher.fetch_financials() output
+  price_data        — from data_fetcher (for current_price)
+  extended_data     — from data_fetcher (for market_cap, 52w high/low)
+  earnings_data     — from data_fetcher (for binary event risk)
 """
 
 import time
@@ -17,15 +23,17 @@ from typing import List, Optional, Tuple
 
 from signal_scorer import (
     SignalScores,
-    score_momentum,
-    score_relative_strength,
-    score_volume_anomaly,
-    score_sector_leadership,
-    score_news_velocity,
-    score_earnings_proximity,
+    compute_fundamental_metrics,
+    score_business_quality,
+    score_valuation_vs_growth,
+    score_historical_discount,
+    score_earnings_quality,
+    score_entry_vs_fundamentals,
+    score_binary_event_risk,
+    build_mispricing_hypothesis,
 )
 from regime_classifier import RegimeProfile, MarketRegime, classify_regime
-from reason_codes import assign_reason_codes, FLAG_WEAK_SECTOR
+from reason_codes import assign_reason_codes
 
 
 # ─────────────────────────────────────────────
@@ -50,6 +58,7 @@ class ShortlistEntry:
     regime_at_screening:     str
     reason_codes:            List[str]
     flags:                   List[str]
+    mispricing_hypothesis:   str
     priority:                int         # 1 = highest score
 
 
@@ -80,25 +89,20 @@ def _compute_composite(scores: SignalScores, weights: dict) -> float:
     """
     Weighted composite score. Handles None signal scores by redistributing
     their weight proportionally across the remaining valid signals.
-
-    This prevents a missing data field from unfairly suppressing the composite.
     """
     signal_map = {
-        "momentum":           scores.momentum,
-        "relative_strength":  scores.relative_strength,
-        "volume_anomaly":     scores.volume_anomaly,
-        "sector_leadership":  scores.sector_leadership,
-        "news_velocity":      scores.news_velocity,
-        "earnings_proximity": scores.earnings_proximity,
+        "business_quality":      scores.business_quality,
+        "valuation_vs_growth":   scores.valuation_vs_growth,
+        "historical_discount":   scores.historical_discount,
+        "earnings_quality":      scores.earnings_quality,
+        "entry_vs_fundamentals": scores.entry_vs_fundamentals,
+        "binary_event_risk":     scores.binary_event_risk,
     }
 
-    valid   = {k: v for k, v in signal_map.items() if v is not None}
-    missing = {k for k, v in signal_map.items() if v is None}
-
+    valid = {k: v for k, v in signal_map.items() if v is not None}
     if not valid:
         return 0.0
 
-    # Sum weights of valid signals, then normalize to 1.0
     valid_weight_total = sum(weights[k] for k in valid)
     if valid_weight_total == 0:
         return 0.0
@@ -124,23 +128,22 @@ def run_screening(
 
     Args:
         raw_records:
-            List of dicts, each conforming to raw_signal_record.json schema.
-            Invalid or incomplete records are scored with available data.
+            List of dicts conforming to the Stage 01 raw record schema.
+            Each must include:
+              fundamental_data  — edgar_fetcher output
+              price_data        — yfinance price metrics
+              extended_data     — yfinance extended metrics (market_cap, 52w range)
+              earnings_data     — earnings date data
 
         regime_indicators:
-            Market-level inputs for regime classification:
-              vix               (float)  — VIX spot level
-              spy_20d_return    (float)  — SPY 20-day return %
-              spy_vs_ma200      (bool)   — SPY above 200-day MA
-              hy_spread         (float)  — HY credit spread bps (optional)
-              earnings_season   (bool)   — Peak earnings week
-              fed_action_recent (bool)   — Recent Fed action/speech
-              sector_dispersion (float)  — Top-minus-bottom sector spread %
-              breadth_adv_decline(float) — Advance/decline ratio 14-day
+            Market-level inputs for classify_regime():
+              vix, spy_20d_return, spy_vs_ma200, hy_spread,
+              earnings_season, fed_action_recent,
+              sector_dispersion, breadth_adv_decline
 
         sector_data:
-            Optional dict keyed by sector ETF ticker (e.g. "XLK") containing:
-              sector_rs_vs_spy_20d (float) — sector outperformance vs SPY
+            Not used by the fundamental screener (retained for API compatibility
+            with run_screening.py which passes it through).
 
     Returns:
         ScreeningOutput with ranked shortlist and regime metadata.
@@ -148,62 +151,69 @@ def run_screening(
     start_ms = time.monotonic()
 
     # ── Step 1: Classify regime ──────────────
-    regime = classify_regime(regime_indicators)
+    regime  = classify_regime(regime_indicators)
     weights = regime.weights
-    sector_data = sector_data or {}
     warnings: List[str] = []
 
     # ── Step 2: Score all tickers ────────────
     scored: List[Tuple[float, ShortlistEntry]] = []
 
     for record in raw_records:
-        ticker = record.get("ticker", "UNKNOWN")
-
+        ticker     = record.get("ticker", "UNKNOWN")
+        fund_d     = record.get("fundamental_data", {})
         price_d    = record.get("price_data", {})
-        rs_d       = record.get("relative_strength", {})
-        news_d     = record.get("news_data", {})
+        ext_d      = record.get("extended_data", {})
         earnings_d = record.get("earnings_data", {})
-        sector_key = record.get("sector", "")
-        sector_d   = sector_data.get(sector_key, {})
 
-        # Score each signal
+        market_d = {
+            "market_cap":    ext_d.get("market_cap"),
+            "current_price": price_d.get("current_price"),
+            "week_52_high":  ext_d.get("week_52_high"),
+            "week_52_low":   ext_d.get("week_52_low"),
+        }
+
+        metrics = compute_fundamental_metrics(fund_d, market_d) if fund_d else {}
+
         scores = SignalScores(
-            momentum=           score_momentum(price_d),
-            relative_strength=  score_relative_strength(rs_d),
-            volume_anomaly=     score_volume_anomaly(price_d),
-            sector_leadership=  score_sector_leadership(rs_d, sector_d),
-            news_velocity=      score_news_velocity(news_d),
-            earnings_proximity= score_earnings_proximity(earnings_d),
+            business_quality=      score_business_quality(metrics),
+            valuation_vs_growth=   score_valuation_vs_growth(metrics),
+            historical_discount=   score_historical_discount(metrics),
+            earnings_quality=      score_earnings_quality(metrics),
+            entry_vs_fundamentals= score_entry_vs_fundamentals(metrics),
+            binary_event_risk=     score_binary_event_risk(earnings_d),
         )
 
         composite = _compute_composite(scores, weights)
 
-        # Annotate record with weak-sector flag for reason_codes
-        sector_rs = sector_d.get("sector_rs_vs_spy_20d")
-        record["_sector_rs_negative"] = (sector_rs is not None and sector_rs < 0)
+        # Stash metrics on record for reason_codes.py access
+        record["fundamental_metrics"] = metrics
 
         reason_codes, flags = assign_reason_codes(scores, record)
+        hypothesis = build_mispricing_hypothesis(
+            ticker, scores, metrics, earnings_d, composite=composite
+        )
 
-        # Clean up internal annotation
-        record.pop("_sector_rs_negative", None)
+        # Clean up internal stash
+        record.pop("fundamental_metrics", None)
 
         entry = ShortlistEntry(
             ticker=ticker,
             composite_score=composite,
-            regime_adjusted_score=composite,   # V2: add regime bias adjustment
+            regime_adjusted_score=composite,
             signal_scores={
-                "momentum":           _fmt(scores.momentum),
-                "relative_strength":  _fmt(scores.relative_strength),
-                "volume_anomaly":     _fmt(scores.volume_anomaly),
-                "sector_leadership":  _fmt(scores.sector_leadership),
-                "news_velocity":      _fmt(scores.news_velocity),
-                "earnings_proximity": _fmt(scores.earnings_proximity),
+                "business_quality":      _fmt(scores.business_quality),
+                "valuation_vs_growth":   _fmt(scores.valuation_vs_growth),
+                "historical_discount":   _fmt(scores.historical_discount),
+                "earnings_quality":      _fmt(scores.earnings_quality),
+                "entry_vs_fundamentals": _fmt(scores.entry_vs_fundamentals),
+                "binary_event_risk":     _fmt(scores.binary_event_risk),
             },
             signal_weights_applied=dict(weights),
             regime_at_screening=regime.regime.value,
             reason_codes=reason_codes,
             flags=flags,
-            priority=0,     # assigned below after sorting
+            mispricing_hypothesis=hypothesis,
+            priority=0,
         )
         scored.append((composite, entry))
 
@@ -212,10 +222,10 @@ def run_screening(
     all_entries = [e for _, e in scored]
 
     # ── Step 4: Apply threshold ───────────────
-    threshold = regime.min_score_threshold
-    passing   = [e for e in all_entries if e.regime_adjusted_score >= threshold]
-
+    threshold    = regime.min_score_threshold
+    passing      = [e for e in all_entries if e.regime_adjusted_score >= threshold]
     fallback_used = False
+
     if len(passing) < MIN_SHORTLIST_SIZE:
         threshold     = FALLBACK_THRESHOLD
         fallback_used = True

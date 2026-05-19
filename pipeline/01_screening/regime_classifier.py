@@ -53,18 +53,18 @@ _BASE_PROFILES: Dict[MarketRegime, RegimeProfile] = {
         regime=MarketRegime.RISK_ON_MOMENTUM,
         confidence=0.0,
         weights={
-            "momentum":           0.25,
-            "relative_strength":  0.25,
-            "volume_anomaly":     0.15,
-            "sector_leadership":  0.15,
-            "news_velocity":      0.10,
-            "earnings_proximity": 0.10,
+            "business_quality":      0.25,
+            "valuation_vs_growth":   0.25,  # GARP: growth at a reasonable price
+            "historical_discount":   0.10,
+            "earnings_quality":      0.20,
+            "entry_vs_fundamentals": 0.12,
+            "binary_event_risk":     0.08,
         },
         min_score_threshold=52.0,
         max_shortlist_size=20,
         description=(
-            "Growth and momentum rewarded. Liquidity is supportive. "
-            "Cast a wide net — quality setups are plentiful."
+            "Growth and quality rewarded. Liquidity is supportive. "
+            "Cast a wide net — quality fundamental setups are plentiful."
         )
     ),
 
@@ -72,18 +72,18 @@ _BASE_PROFILES: Dict[MarketRegime, RegimeProfile] = {
         regime=MarketRegime.RISK_OFF_DEFENSIVE,
         confidence=0.0,
         weights={
-            "momentum":           0.10,
-            "relative_strength":  0.20,
-            "volume_anomaly":     0.20,
-            "sector_leadership":  0.25,
-            "news_velocity":      0.15,
-            "earnings_proximity": 0.10,
+            "business_quality":      0.35,  # Quality matters most in risk-off
+            "valuation_vs_growth":   0.10,
+            "historical_discount":   0.20,  # Only buy at a clear discount
+            "earnings_quality":      0.25,  # FCF quality is the safety anchor
+            "entry_vs_fundamentals": 0.07,
+            "binary_event_risk":     0.03,
         },
         min_score_threshold=65.0,   # Significantly raised bar
         max_shortlist_size=10,
         description=(
             "Defensive posture. Elevated volatility and weak breadth. "
-            "Only the highest-conviction setups pass. Favor relative leaders."
+            "Only the highest-quality businesses at clear discounts pass."
         )
     ),
 
@@ -91,18 +91,18 @@ _BASE_PROFILES: Dict[MarketRegime, RegimeProfile] = {
         regime=MarketRegime.LIQUIDITY_EXPANSION,
         confidence=0.0,
         weights={
-            "momentum":           0.22,
-            "relative_strength":  0.22,
-            "volume_anomaly":     0.18,
-            "sector_leadership":  0.18,
-            "news_velocity":      0.10,
-            "earnings_proximity": 0.10,
+            "business_quality":      0.20,
+            "valuation_vs_growth":   0.30,  # Growth rewarded more in easy money
+            "historical_discount":   0.10,
+            "earnings_quality":      0.20,
+            "entry_vs_fundamentals": 0.15,  # Entry timing matters more
+            "binary_event_risk":     0.05,
         },
-        min_score_threshold=50.0,   # Lower threshold — rising tide
+        min_score_threshold=50.0,   # Lower threshold — rising tide lifts quality boats
         max_shortlist_size=20,
         description=(
             "Easing financial conditions. Speculative appetite rising. "
-            "Volume and sector rotation are strong signals. Cast wider net."
+            "Growth and valuation vs growth are primary signals."
         )
     ),
 
@@ -110,18 +110,18 @@ _BASE_PROFILES: Dict[MarketRegime, RegimeProfile] = {
         regime=MarketRegime.LIQUIDITY_CONTRACTION,
         confidence=0.0,
         weights={
-            "momentum":           0.15,
-            "relative_strength":  0.25,
-            "volume_anomaly":     0.20,
-            "sector_leadership":  0.20,
-            "news_velocity":      0.10,
-            "earnings_proximity": 0.10,
+            "business_quality":      0.30,
+            "valuation_vs_growth":   0.10,
+            "historical_discount":   0.30,  # Only buy at significant discount
+            "earnings_quality":      0.20,
+            "entry_vs_fundamentals": 0.05,
+            "binary_event_risk":     0.05,
         },
         min_score_threshold=68.0,   # Very high bar — multiple compression environment
         max_shortlist_size=8,
         description=(
             "Tightening financial conditions. Multiple compression in effect. "
-            "Only clear leaders with strong fundamentals and RS pass."
+            "Only quality businesses trading at clear historical discounts pass."
         )
     ),
 
@@ -129,18 +129,18 @@ _BASE_PROFILES: Dict[MarketRegime, RegimeProfile] = {
         regime=MarketRegime.EARNINGS_VOLATILITY,
         confidence=0.0,
         weights={
-            "momentum":           0.15,
-            "relative_strength":  0.15,
-            "volume_anomaly":     0.20,
-            "sector_leadership":  0.10,
-            "news_velocity":      0.15,
-            "earnings_proximity": 0.25,  # Catalyst timing dominates
+            "business_quality":      0.20,
+            "valuation_vs_growth":   0.15,
+            "historical_discount":   0.10,
+            "earnings_quality":      0.30,  # Quality of earnings matters pre-report
+            "entry_vs_fundamentals": 0.10,
+            "binary_event_risk":     0.15,  # Binary risk elevated during earnings season
         },
         min_score_threshold=55.0,
         max_shortlist_size=15,
         description=(
             "Peak earnings season with elevated single-stock volatility. "
-            "Catalyst timing is the primary filter. Volume and news confirm."
+            "Earnings quality and binary risk are the primary filters."
         )
     ),
 
@@ -148,18 +148,18 @@ _BASE_PROFILES: Dict[MarketRegime, RegimeProfile] = {
         regime=MarketRegime.MACRO_UNCERTAINTY,
         confidence=0.0,
         weights={
-            "momentum":           0.15,
-            "relative_strength":  0.20,
-            "volume_anomaly":     0.20,
-            "sector_leadership":  0.20,
-            "news_velocity":      0.15,
-            "earnings_proximity": 0.10,
+            "business_quality":      0.30,
+            "valuation_vs_growth":   0.10,
+            "historical_discount":   0.25,  # Discount matters in uncertain environments
+            "earnings_quality":      0.25,
+            "entry_vs_fundamentals": 0.07,
+            "binary_event_risk":     0.03,
         },
         min_score_threshold=65.0,
         max_shortlist_size=10,
         description=(
             "High policy sensitivity and elevated macro correlation. "
-            "Only clear leaders with defensible positions and strong RS pass."
+            "Only high-quality businesses at historical discounts pass."
         )
     ),
 }
