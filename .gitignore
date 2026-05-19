@@ -3,3 +3,4 @@ __pycache__/
 .DS_Store
 pipeline/02_research/validation/review_queue/*.json
 data/raw/*.json
+*.egg-info/
