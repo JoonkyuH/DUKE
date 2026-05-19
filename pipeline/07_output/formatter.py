@@ -117,6 +117,43 @@ def format_recommendation(
         lines.append(f"      {_DIM}↳ {conf_note}{_RESET}")
     lines.append("")
 
+    # ── Technical Context ────────────────────────────────────────────────────
+    brief    = syn.get("chief_analyst_brief", {})
+    tech_ctx = brief.get("market_technical_context", {})
+    if tech_ctx:
+        posture      = tech_ctx.get("technical_posture", "—")
+        vs_ma200     = tech_ctx.get("price_vs_ma200_pct")
+        vs_ma50      = tech_ctx.get("price_vs_ma50_pct")
+        rsi          = tech_ctx.get("rsi_14")
+        vol_ratio    = tech_ctx.get("volume_ratio")
+        pct_hi       = tech_ctx.get("pct_from_52w_high")
+        pct_lo       = tech_ctx.get("pct_from_52w_low")
+        dis_note     = brief.get("risk_assessment", {}).get("market_disagreement_note", "")
+
+        def _pct_str(v) -> str:
+            return f"{v:+.1f}%" if v is not None else "—"
+
+        def _ratio_str(v) -> str:
+            return f"{v:.2f}x" if v is not None else "—"
+
+        def _rsi_str(v) -> str:
+            return f"{v:.0f}" if v is not None else "—"
+
+        lines.append(f"  Technical Context: {posture.upper().replace('_', ' ')}")
+        lines.append(
+            f"    vs 200MA: {_pct_str(vs_ma200)}   "
+            f"vs 50MA: {_pct_str(vs_ma50)}   "
+            f"RSI: {_rsi_str(rsi)}   "
+            f"Vol ratio: {_ratio_str(vol_ratio)}"
+        )
+        lines.append(
+            f"    From 52w high: {_pct_str(pct_hi)}   "
+            f"From 52w low: {_pct_str(pct_lo)}"
+        )
+        if dis_note:
+            lines.append(f"  {_DIM}{dis_note}{_RESET}")
+        lines.append("")
+
     # ── Philosophy fit ───────────────────────────────────────────────────────
     archetype = ca.get("investment_archetype_confirmed", "—")
     fit       = ca.get("philosophy_fit", "—")
