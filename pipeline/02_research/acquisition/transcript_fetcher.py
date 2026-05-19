@@ -351,14 +351,32 @@ def _8k_source_type(text: str) -> Optional[str]:
 # PRIORITY 1A: Perplexity transcript discovery
 # ─────────────────────────────────────────────
 
+def _is_index_page(url: str, ir_url: Optional[str]) -> bool:
+    """Return True if the URL is the known IR quarterly results landing/index page."""
+    if not ir_url:
+        return False
+    # Normalise trailing slashes for comparison
+    return url.rstrip("/") == ir_url.rstrip("/")
+
+
 def _try_perplexity_transcript(
     ir_url: Optional[str],
     ticker: str,
     company_name: str,
 ) -> Optional[tuple]:
     """
-    Query Perplexity Sonar for a direct transcript URL.
-    Returns (raw_text, source_url) or None.
+    Query Perplexity Sonar for a direct transcript or earnings release URL.
+    Returns (raw_text, source_url, source_type) or None.
+
+    source_type is one of:
+      "ir_transcript_pdf"  — PDF that passes earnings content validation (>=2 000 chars)
+      "ir_press_release"   — HTML article that passes earnings content validation (>=2 000 chars)
+
+    Rejection reasons logged:
+      rejected_landing_page           — URL matches known IR index/quarterly-results page
+      rejected_too_short              — stripped text < 2 000 chars
+      rejected_not_pdf_for_transcript — URL claims PDF but extraction failed or too short
+      rejected_failed_earnings_validation — text does not pass _is_earnings_content()
     """
     api_key = os.environ.get("PERPLEXITY_API_KEY")
     if not api_key:
@@ -417,6 +435,11 @@ def _try_perplexity_transcript(
             log.debug("1A: skipping off-domain URL %s", url)
             continue
 
+        # Reject the known IR quarterly results landing/index page immediately
+        if _is_index_page(url, ir_url):
+            log.info("1A: rejected_landing_page — URL is IR index page: %s", url)
+            continue
+
         # Fetch
         try:
             req2 = urllib.request.Request(url, headers=_HEADERS)
@@ -428,22 +451,39 @@ def _try_perplexity_transcript(
             log.debug("1A: URL unreachable (%s): %s", url, exc)
             continue
 
-        # PDF path
+        # ── PDF path ──────────────────────────────────────────────────
         if _PDF_RE.search(url_lower):
             text = _extract_pdf_text(raw)
-            if text and _is_allowed_domain(url, ir_url, title, snippet, text):
-                log.info("1A: Perplexity PDF hit for %s → %s", ticker, url)
-                return text, url
-            continue
+            if not text or len(text) < _MIN_LEN_PRESS_RELEASE:
+                log.info("1A: rejected_not_pdf_for_transcript — extraction failed or too short: %s", url)
+                continue
+            if not _is_earnings_content(text):
+                log.info("1A: rejected_failed_earnings_validation (PDF): %s", url)
+                continue
+            if not _is_allowed_domain(url, ir_url, title, snippet, text):
+                log.debug("1A: domain not allowed (PDF): %s", url)
+                continue
+            log.info("1A: accepted ir_transcript_pdf for %s → %s", ticker, url)
+            return text, url, "ir_transcript_pdf"
 
-        # HTML path
+        # ── HTML path — only accepted as press release, never as transcript ──
         html = raw.decode("utf-8", errors="replace")
         text = _strip_html(html)
-        if (len(text) >= 500
-                and re.search(r"revenue|earnings|quarter|operator", text, re.I)
-                and _is_allowed_domain(url, ir_url, title, snippet, text)):
-            log.info("1A: Perplexity HTML hit for %s → %s", ticker, url)
-            return text, url
+
+        if len(text) < _MIN_LEN_PRESS_RELEASE:
+            log.info("1A: rejected_too_short (%d chars) for %s: %s", len(text), ticker, url)
+            continue
+
+        if not _is_earnings_content(text):
+            log.info("1A: rejected_failed_earnings_validation (HTML) for %s: %s", ticker, url)
+            continue
+
+        if not _is_allowed_domain(url, ir_url, title, snippet, text):
+            log.debug("1A: domain not allowed (HTML): %s", url)
+            continue
+
+        log.info("1A: accepted ir_press_release for %s → %s", ticker, url)
+        return text, url, "ir_press_release"
 
     log.debug("1A: no valid transcript URL found via Perplexity for %s", ticker)
     return None
@@ -857,8 +897,7 @@ def fetch_transcript(ticker: str) -> Optional[dict]:
     log.info("%s: [1A] Perplexity transcript discovery …", ticker)
     out = _try_perplexity_transcript(ir_url, ticker, company_name)
     if out:
-        result_text, source_url = out
-        source_type   = "ir_transcript_pdf"
+        result_text, source_url, source_type = out
         discovered_by = "perplexity"
 
     # 1B — Static IR page HTML scraping
