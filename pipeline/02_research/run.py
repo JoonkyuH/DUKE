@@ -213,8 +213,10 @@ def main():
     ]
     pplx_by_qt: dict = {}
     for c in perplexity_candidates:
-        qt = c.get("query_type", "unknown")
-        pplx_by_qt[qt] = pplx_by_qt.get(qt, 0) + 1
+        # query_types (list) is the current schema; query_type (str) is legacy
+        qts = c.get("query_types") or [c.get("query_type", "unknown")]
+        for qt in qts:
+            pplx_by_qt[qt] = pplx_by_qt.get(qt, 0) + 1
     print(f"  Discovery candidates ({len(perplexity_candidates)} Perplexity"
           f"  +  {len(news_candidates)} news):")
     for qt in _QT_ORDER:

@@ -183,35 +183,50 @@ def discover_evidence(ticker: str, company_name: str) -> list:
 
     _ensure_schema()
 
-    candidates  = []
-    seen_urls   = set()
+    # Keyed by URL so duplicate URLs across queries accumulate query_types
+    by_url: dict = {}
 
     for query_type, tmpl in _EVIDENCE_QUERIES:
         query = tmpl.format(ticker=ticker.upper(), company_name=company_name)
         log.info("%s: [%s] query: %r", ticker, query_type, query[:80])
 
         raw_results = _call_perplexity(query)
-        count = 0
+        new_count = 0
+        merged_count = 0
+
         for raw in raw_results:
             if not raw.get("url"):
                 continue
             result = _parse_result(raw)
+            url    = result["url"]
             _cache_write(ticker, query_type, result)
 
-            url = result["url"]
-            candidate = {
-                **result,
-                "query_type":  query_type,
-                "source_type": "discovery_candidate",
-                "reliability": 0.55,
-            }
-            # Keep duplicates across queries but tag them all; dedup by URL within run
-            if url not in seen_urls:
-                seen_urls.add(url)
-                candidates.append(candidate)
-                count += 1
+            if url not in by_url:
+                by_url[url] = {
+                    **result,
+                    "query_types": [query_type],
+                    "source_type": "discovery_candidate",
+                    "reliability": 0.55,
+                }
+                new_count += 1
+            else:
+                if query_type not in by_url[url]["query_types"]:
+                    by_url[url]["query_types"].append(query_type)
+                    log.debug("%s: merged %s into existing candidate %s", ticker, query_type, url)
+                merged_count += 1
 
-        log.info("%s: [%s] → %d unique candidates", ticker, query_type, count)
+        log.info("%s: [%s] → %d new, %d merged into existing", ticker, query_type, new_count, merged_count)
 
-    log.info("%s: evidence discovery complete — %d total unique candidates", ticker, len(candidates))
+    candidates = list(by_url.values())
+
+    # Update cache rows with the full comma-separated query_types for each URL
+    with _db() as con:
+        for c in candidates:
+            if len(c["query_types"]) > 1:
+                con.execute(
+                    "UPDATE discovery_cache SET query_type=? WHERE ticker=? AND url=?",
+                    (",".join(c["query_types"]), ticker.upper(), c["url"]),
+                )
+
+    log.info("%s: evidence discovery complete — %d unique candidates", ticker, len(candidates))
     return candidates
