@@ -28,10 +28,9 @@ prompt: |
     - significance: HIGH, MEDIUM, or LOW
 
   Rules:
-    - Only extract quotes with material investment relevance
+    - Extract all materially meaningful quotes. Do not force categories if no direct quote exists. Do not invent quotes to meet any count.
     - quote_type must always be "direct" — never summarize or paraphrase
     - If this is a press release (document_subtype = earnings_press_release), set speaker to "Management" and speaker_confidence to 0.50
-    - Include at most 20 quotes; prefer HIGH significance items
 
   TEXT:
   {text}

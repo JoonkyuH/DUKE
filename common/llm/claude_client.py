@@ -70,4 +70,13 @@ class ClaudeClient(LLMClient):
         response = re.sub(r"^```[^\n]*\n?", "", response)
         response = re.sub(r"\n?```$", "", response.rstrip())
 
-        return json.loads(response)
+        data = json.loads(response)
+
+        if schema is not None:
+            import jsonschema
+            try:
+                jsonschema.validate(data, schema)
+            except jsonschema.ValidationError as exc:
+                raise ValueError(f"LLM response failed schema validation: {exc.message}") from exc
+
+        return data

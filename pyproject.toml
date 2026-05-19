@@ -1,0 +1,14 @@
+[project]
+name = "duke"
+version = "0.1.0"
+description = "DUKE — multi-agent investment intelligence framework"
+requires-python = ">=3.10"
+
+[project.optional-dependencies]
+ingestion = [
+    "requests",
+    "pandas",
+]
+
+[project.dependencies]
+jsonschema = ">=4.0"
