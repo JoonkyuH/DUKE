@@ -195,11 +195,21 @@ def _validate_url(url: str, ticker: str, company_name: str) -> bool:
 # PERPLEXITY DISCOVERY
 # ─────────────────────────────────────────────
 
+_AGGREGATOR_DOMAINS = {
+    "alphaspread.com", "stocktitan.net", "public.com",
+    "macrotrends.net", "wisesheets.io", "stockanalysis.com",
+    "simplywall.st", "finance.yahoo.com",
+}
+
+
 def _score_candidate(result: dict, ticker: str, company_name: str) -> int:
     url     = (result.get("url") or "").lower()
     title   = (result.get("title") or "").lower()
     snippet = (result.get("snippet") or "").lower()
     score   = 0
+
+    if any(d in url for d in _AGGREGATOR_DOMAINS):
+        score -= 10
 
     tk = ticker.lower()
     words = re.sub(r"\b(inc|corp|corporation|ltd|co|the|technologies|technology)\b", "",
@@ -224,8 +234,9 @@ def _discover_via_perplexity(ticker: str, company_name: str) -> Optional[str]:
     from perplexity_discovery import perplexity_search
 
     query = (
-        f"official investor relations quarterly results page for "
-        f"{company_name} {ticker} earnings transcripts"
+        f"{company_name} ({ticker}) official investor relations page on the company's own "
+        f"corporate website where quarterly earnings results are published. "
+        f"Not third-party financial data sites."
     )
     results = perplexity_search(query)
     if not results:
