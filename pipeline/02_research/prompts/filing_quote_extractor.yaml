@@ -22,8 +22,8 @@ prompt: |
   For each statement return a JSON object with exactly these fields:
     - quote_text: the exact verbatim text (no paraphrasing, no ellipsis)
     - quote_type: always "direct"
-    - speaker: always "Management" (SEC filings do not attribute individual speakers)
-    - speaker_confidence: always 0.50 for filing quotes
+    - speaker: always "SEC Filing" (formal regulatory disclosure, not an individual speaker)
+    - speaker_confidence: always 1.0 (authorship is known with certainty)
     - category: one of [guidance, competitive_positioning, margin_commentary, demand_commentary, risk_factors, tone_shift]
     - direction: BULLISH, BEARISH, or NEUTRAL
     - significance: HIGH, MEDIUM, or LOW

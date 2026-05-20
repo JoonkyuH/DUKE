@@ -86,18 +86,34 @@ def _ensure_table() -> None:
     with _db() as con:
         con.execute("""
             CREATE TABLE IF NOT EXISTS filings_cache (
-                ticker       TEXT NOT NULL,
-                accession    TEXT NOT NULL,
-                section      TEXT NOT NULL,
-                passage_idx  INTEGER NOT NULL,
-                passage_text TEXT,
-                filing_type  TEXT,
-                filing_date  TEXT,
-                doc_url      TEXT,
-                fetched_at   TEXT,
+                ticker                   TEXT NOT NULL,
+                accession                TEXT NOT NULL,
+                section                  TEXT NOT NULL,
+                passage_idx              INTEGER NOT NULL,
+                passage_text             TEXT,
+                filing_type              TEXT,
+                filing_date              TEXT,
+                doc_url                  TEXT,
+                chunk_index              INTEGER,
+                total_chunks             INTEGER,
+                original_section_length  INTEGER,
+                chunk_start_char         INTEGER,
+                chunk_end_char           INTEGER,
+                fetched_at               TEXT,
                 PRIMARY KEY (ticker, accession, section, passage_idx)
             )
         """)
+        # Add new columns to existing tables that predate this schema version
+        existing = {row[1] for row in con.execute("PRAGMA table_info(filings_cache)")}
+        for col, defn in [
+            ("chunk_index",             "INTEGER"),
+            ("total_chunks",            "INTEGER"),
+            ("original_section_length", "INTEGER"),
+            ("chunk_start_char",        "INTEGER"),
+            ("chunk_end_char",          "INTEGER"),
+        ]:
+            if col not in existing:
+                con.execute(f"ALTER TABLE filings_cache ADD COLUMN {col} {defn}")
 
 
 def _cache_get_filing(ticker: str, accession: str) -> list:
@@ -118,12 +134,17 @@ def _cache_write_passages(ticker: str, accession: str, passages: list) -> None:
             con.execute(
                 """INSERT OR IGNORE INTO filings_cache
                    (ticker, accession, section, passage_idx, passage_text,
-                    filing_type, filing_date, doc_url, fetched_at)
-                   VALUES (?,?,?,?,?,?,?,?,?)""",
+                    filing_type, filing_date, doc_url,
+                    chunk_index, total_chunks, original_section_length,
+                    chunk_start_char, chunk_end_char, fetched_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     t, accession, p["section"], p["passage_idx"], p["passage_text"],
                     p.get("filing_type", ""), p.get("filing_date", ""),
-                    p.get("doc_url", ""), now,
+                    p.get("doc_url", ""),
+                    p.get("chunk_index"),        p.get("total_chunks"),
+                    p.get("original_section_length"), p.get("chunk_start_char"),
+                    p.get("chunk_end_char"),     now,
                 ),
             )
 
@@ -203,39 +224,66 @@ def _split_passages(
 ) -> list:
     """
     Split section text into passages of 1K–8K chars at paragraph boundaries.
+    Each passage carries full chunk metadata so Stage 03 can reason about
+    position and coverage without re-reading the source document.
     """
-    paragraphs = re.split(r"\n\n+", text.strip())
-    passages   = []
-    current    = []
-    current_len = 0
+    original_length = len(text)
 
-    def _flush():
-        chunk = "\n\n".join(current).strip()
-        if len(chunk) >= _MIN_PASSAGE:
-            passages.append({
-                "section":      section,
-                "passage_idx":  len(passages),
-                "passage_text": chunk,
-                "filing_type":  filing_type,
-                "filing_date":  filing_date,
-                "accession":    accession,
-                "doc_url":      doc_url,
-            })
-
-    for para in paragraphs:
-        para = para.strip()
-        if not para:
+    # Parse paragraphs and record their start/end positions in the original text
+    para_records: list = []  # list of (stripped_text, start_in_original, end_in_original)
+    search_pos = 0
+    for raw_para in re.split(r"\n\n+", text):
+        stripped = raw_para.strip()
+        if not stripped:
             continue
-        if current_len + len(para) > _MAX_PASSAGE and current:
-            _flush()
-            current     = [para]
-            current_len = len(para)
-        else:
-            current.append(para)
-            current_len += len(para)
+        found = text.find(stripped, search_pos)
+        if found == -1:
+            found = search_pos
+        para_records.append((stripped, found, found + len(stripped)))
+        search_pos = found + len(stripped)
 
-    if current:
-        _flush()
+    # Assemble paragraphs into chunks of 1K–8K chars
+    raw_chunks: list = []   # list of (text, start_in_original, end_in_original)
+    current_paras:   list = []
+    current_len      = 0
+
+    def _flush_chunk():
+        if not current_paras:
+            return
+        chunk_text  = "\n\n".join(p for p, _, _ in current_paras).strip()
+        chunk_start = current_paras[0][1]
+        chunk_end   = current_paras[-1][2]
+        if len(chunk_text) >= _MIN_PASSAGE:
+            raw_chunks.append((chunk_text, chunk_start, chunk_end))
+
+    for para_text, p_start, p_end in para_records:
+        if current_len + len(para_text) > _MAX_PASSAGE and current_paras:
+            _flush_chunk()
+            current_paras = [(para_text, p_start, p_end)]
+            current_len   = len(para_text)
+        else:
+            current_paras.append((para_text, p_start, p_end))
+            current_len += len(para_text)
+
+    _flush_chunk()
+
+    total_chunks = len(raw_chunks)
+    passages     = []
+    for i, (chunk_text, c_start, c_end) in enumerate(raw_chunks):
+        passages.append({
+            "section":                  section,
+            "passage_idx":              i,
+            "passage_text":             chunk_text,
+            "filing_type":              filing_type,
+            "filing_date":              filing_date,
+            "accession":                accession,
+            "doc_url":                  doc_url,
+            "chunk_index":              i,
+            "total_chunks":             total_chunks,
+            "original_section_length":  original_length,
+            "chunk_start_char":         c_start,
+            "chunk_end_char":           c_end,
+        })
 
     return passages
 
@@ -428,18 +476,23 @@ def fetch_filings(ticker: str) -> tuple:
         source_type = "sec_10k" if form_type == "10-K" else "sec_10q"
         enriched    = [
             {
-                "ticker":          t,
-                "filing_type":     form_type,
-                "filing_date":     p.get("filing_date") or filing_info["filing_date"],
-                "accession":       acc,
-                "section":         p.get("section", ""),
-                "passage_idx":     p.get("passage_idx", 0),
-                "passage_text":    p.get("passage_text", ""),
-                "doc_url":         p.get("doc_url", ""),
-                "source_type":     source_type,
-                "source_priority": "primary_sec",
-                "item_class":      "filing_quote",
-                "reliability":     _RELIABILITY[source_type],
+                "ticker":                   t,
+                "filing_type":              form_type,
+                "filing_date":              p.get("filing_date") or filing_info["filing_date"],
+                "accession":                acc,
+                "section":                  p.get("section", ""),
+                "passage_idx":              p.get("passage_idx", 0),
+                "passage_text":             p.get("passage_text", ""),
+                "doc_url":                  p.get("doc_url", ""),
+                "source_type":              source_type,
+                "source_priority":          "primary_sec",
+                "item_class":               "filing_quote",
+                "reliability":              _RELIABILITY[source_type],
+                "chunk_index":              p.get("chunk_index"),
+                "total_chunks":             p.get("total_chunks"),
+                "original_section_length":  p.get("original_section_length"),
+                "chunk_start_char":         p.get("chunk_start_char"),
+                "chunk_end_char":           p.get("chunk_end_char"),
             }
             for p in raw_passages
         ]
@@ -470,18 +523,23 @@ def fetch_filings(ticker: str) -> tuple:
 
         enriched = [
             {
-                "ticker":          t,
-                "filing_type":     "8-K",
-                "filing_date":     p.get("filing_date") or filing_info["filing_date"],
-                "accession":       acc,
-                "section":         p.get("section", ""),
-                "passage_idx":     p.get("passage_idx", 0),
-                "passage_text":    p.get("passage_text", ""),
-                "doc_url":         p.get("doc_url", ""),
-                "source_type":     "sec_8k",
-                "source_priority": "primary_sec",
-                "item_class":      "filing_quote",
-                "reliability":     _RELIABILITY["sec_8k"],
+                "ticker":                   t,
+                "filing_type":              "8-K",
+                "filing_date":              p.get("filing_date") or filing_info["filing_date"],
+                "accession":                acc,
+                "section":                  p.get("section", ""),
+                "passage_idx":              p.get("passage_idx", 0),
+                "passage_text":             p.get("passage_text", ""),
+                "doc_url":                  p.get("doc_url", ""),
+                "source_type":              "sec_8k",
+                "source_priority":          "primary_sec",
+                "item_class":               "filing_quote",
+                "reliability":              _RELIABILITY["sec_8k"],
+                "chunk_index":              p.get("chunk_index"),
+                "total_chunks":             p.get("total_chunks"),
+                "original_section_length":  p.get("original_section_length"),
+                "chunk_start_char":         p.get("chunk_start_char"),
+                "chunk_end_char":           p.get("chunk_end_char"),
             }
             for p in raw_passages
         ]

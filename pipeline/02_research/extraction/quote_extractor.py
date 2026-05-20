@@ -165,6 +165,10 @@ def extract_filing_quotes(passages: list, ticker: str) -> tuple:
     """
     Extract structured quotes from SEC filing passages (10-K, 10-Q, 8-K).
 
+    Passages are batched by (filing_type, section, filing_date) — one LLM
+    call per logical section. All chunk metadata from the group is preserved
+    on each resulting evidence item so Stage 03 can use it for compression.
+
     Args:
         passages: list of passage dicts from fetch_filings().
         ticker:   stock ticker for logging.
@@ -172,7 +176,7 @@ def extract_filing_quotes(passages: list, ticker: str) -> tuple:
     Returns:
         (items, stats) where:
             items: list of evidence item dicts with item_class="filing_quote"
-            stats: {filing_type: passage_count_processed}
+            stats: {filing_type: passage_count, "extraction_calls_made": int}
     """
     from common.llm import get_client
 
@@ -186,26 +190,48 @@ def extract_filing_quotes(passages: list, ticker: str) -> tuple:
         log.error("%s: LLM client unavailable: %s", ticker, exc)
         return [], {}
 
-    all_items: list = []
-    stats:     dict = {}
-
-    for passage in passages:
-        passage_text = passage.get("passage_text", "").strip()
-        if not passage_text:
+    # Group passages by (filing_type, section, filing_date) — order preserved
+    groups: dict = {}
+    for p in passages:
+        if not p.get("passage_text", "").strip():
             continue
+        key = (p.get("filing_type", ""), p.get("section", ""), p.get("filing_date", ""))
+        if key not in groups:
+            groups[key] = []
+        groups[key].append(p)
 
-        filing_type = passage.get("filing_type", "")
-        section     = passage.get("section", "")
-        filing_date = passage.get("filing_date", "")
-        doc_url     = passage.get("doc_url", "")
-        reliability = passage.get("reliability", 0.95)
+    all_items:        list = []
+    stats:            dict = {}
+    extraction_calls        = 0
+
+    for (filing_type, section, filing_date), group in groups.items():
+        first       = group[0]
+        last        = group[-1]
+        doc_url     = first.get("doc_url", "")
+        accession   = first.get("accession", "")
+        reliability = first.get("reliability", 0.95)
+        source_type = first.get("source_type", "")
+
+        # Aggregate chunk metadata across the group
+        total_chunks            = first.get("total_chunks", len(group))
+        original_section_length = first.get("original_section_length", 0)
+        group_start_char        = first.get("chunk_start_char", 0)
+        group_end_char          = last.get("chunk_end_char", 0)
+
+        combined_text = "\n\n---\n\n".join(p["passage_text"] for p in group)
+        total_chars   = len(combined_text)
+
+        log.info(
+            "%s: %s / %s / %s → %d chunks → 1 call (%d chars)",
+            ticker, filing_type, section, filing_date, len(group), total_chars,
+        )
 
         filled = prompt_def["prompt"].format(
             filing_type=filing_type,
             section=section,
             company=ticker,
             period=filing_date,
-            text=passage_text[:8_000],
+            text=combined_text[:40_000],
         )
 
         try:
@@ -217,11 +243,11 @@ def extract_filing_quotes(passages: list, ticker: str) -> tuple:
                 ),
             )
         except Exception as exc:
-            log.warning(
-                "%s: LLM call failed for %s %s passage %d: %s",
-                ticker, filing_type, section, passage.get("passage_idx", 0), exc,
-            )
+            log.warning("%s: LLM call failed for %s %s: %s", ticker, filing_type, section, exc)
             continue
+
+        extraction_calls += 1
+        stats[filing_type] = stats.get(filing_type, 0) + len(group)
 
         raw_quotes = _unwrap(raw_response, ticker, ("quotes", "items", "results", "data"))
         if not raw_quotes:
@@ -234,32 +260,35 @@ def extract_filing_quotes(passages: list, ticker: str) -> tuple:
             if not quote_text:
                 continue
             all_items.append({
-                "quote_text":          quote_text,
-                "quote_type":          "direct",
-                "speaker":             "Management",
-                "speaker_confidence":  0.50,
-                "category":            q.get("category", ""),
-                "direction":           q.get("direction", "NEUTRAL"),
-                "significance":        q.get("significance", "MEDIUM"),
-                "source_type":         passage.get("source_type", ""),
-                "source_url":          doc_url,
-                "filing_type":         filing_type,
-                "filing_section":      section,
-                "filing_date":         filing_date,
-                "accession":           passage.get("accession", ""),
-                "reliability":         reliability,
-                "prompt_name":         prompt_def["name"],
-                "prompt_version":      prompt_def["version"],
-                "ticker":              ticker.upper(),
-                "item_class":          "filing_quote",
-                "source_priority":     "primary_sec",
+                "quote_text":               quote_text,
+                "quote_type":               "direct",
+                "speaker":                  "SEC Filing",
+                "speaker_confidence":       1.0,
+                "category":                 q.get("category", ""),
+                "direction":                q.get("direction", "NEUTRAL"),
+                "significance":             q.get("significance", "MEDIUM"),
+                "source_type":              source_type,
+                "source_url":               doc_url,
+                "filing_type":              filing_type,
+                "filing_section":           section,
+                "filing_date":              filing_date,
+                "accession":                accession,
+                "reliability":              reliability,
+                "prompt_name":              prompt_def["name"],
+                "prompt_version":           prompt_def["version"],
+                "ticker":                   ticker.upper(),
+                "item_class":               "filing_quote",
+                "source_priority":          "primary_sec",
+                "chunk_index":              -1,
+                "total_chunks":             total_chunks,
+                "original_section_length":  original_section_length,
+                "chunk_start_char":         group_start_char,
+                "chunk_end_char":           group_end_char,
             })
 
-        stats[filing_type] = stats.get(filing_type, 0) + 1
-
+    stats["extraction_calls_made"] = extraction_calls
     log.info(
-        "%s: extract_filing_quotes — %d items from %d passages (%s)",
-        ticker, len(all_items), len(passages),
-        ", ".join(f"{k}:{v}" for k, v in stats.items()),
+        "%s: extract_filing_quotes — %d items from %d calls (%d passages)",
+        ticker, len(all_items), extraction_calls, len(passages),
     )
     return all_items, stats

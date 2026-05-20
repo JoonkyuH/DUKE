@@ -130,9 +130,10 @@ def main():
     # ── 3B. Filing quote extraction ────────────────────────────────────
     print("\n[3B] Filing quote extraction …")
     filing_quotes, filing_stats = extract_filing_quotes(filing_passages, ticker)
-    print(f"    extracted: {len(filing_quotes)} filing quotes")
+    n_batches = filing_stats.pop("extraction_calls_made", 0)
+    print(f"    extracted: {len(filing_quotes)} filing quotes  ({n_batches} batches)")
     for ft, cnt in sorted(filing_stats.items()):
-        print(f"      {ft}: {cnt} passages processed")
+        print(f"      {ft}: {cnt} passages")
 
     # ── 3C. Merge raw quotes ───────────────────────────────────────────
     print("\n[3C] Merging quotes …")
@@ -253,6 +254,12 @@ def main():
     else:
         print(f"    10-Q:  (not found)")
     print(f"    8-K:   {n_8k_filings} post-10-Q earnings filings  ({n_8k_p} passages)")
+    print()
+
+    print("  Filing extraction:")
+    print(f"    Filing passages:    {len(filing_passages)}")
+    print(f"    Extraction batches: {n_batches}")
+    print(f"    Filing quotes:      {len(filing_quotes)}")
     print()
 
     print("  Quote counts by item_class:")
