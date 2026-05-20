@@ -25,6 +25,7 @@ prompt: |
     - speaker: always "SEC Filing" (formal regulatory disclosure, not an individual speaker)
     - speaker_confidence: always 1.0 (authorship is known with certainty)
     - category: one of [guidance, competitive_positioning, margin_commentary, demand_commentary, risk_factors, tone_shift]
+    - category_confidence: float 0.0–1.0 — how confident are you that this quote belongs in the assigned category versus another category? 1.0 = certain, 0.5 = ambiguous
     - direction: BULLISH, BEARISH, or NEUTRAL
     - significance: HIGH, MEDIUM, or LOW
 

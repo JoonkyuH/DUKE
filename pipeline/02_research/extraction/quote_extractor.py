@@ -25,6 +25,20 @@ log = logging.getLogger("quote_extractor")
 _REPO_ROOT   = Path(__file__).resolve().parent.parent.parent.parent
 _PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
 
+_FILING_SECTION_LABELS: dict = {
+    "item_1_business":      "Business",
+    "item_1a_risk_factors": "Risk Factors",
+    "item_7_mda":           "MD&A",
+    "item_7a_market_risk":  "Market Risk",
+    "item_2_mda":           "MD&A",
+    "item_3_market_risk":   "Market Risk",
+    "full_document":        "Earnings Release",
+}
+
+
+def _filing_section_label(section: str) -> str:
+    return _FILING_SECTION_LABELS.get(section, section)
+
 sys.path.insert(0, str(_REPO_ROOT))
 
 
@@ -141,6 +155,8 @@ def extract_quotes(transcript: dict) -> list:
             "ticker":              ticker,
             "item_class":          "management_quote",
             "source_priority":     "official_company_material",
+            "category_confidence": float(q.get("category_confidence", 0.75)),
+            "category_source":     "llm_assigned",
         })
 
     log.info("%s: extracted %d quotes", ticker, len(items))
@@ -279,6 +295,9 @@ def extract_filing_quotes(passages: list, ticker: str) -> tuple:
                 "ticker":                   ticker.upper(),
                 "item_class":               "filing_quote",
                 "source_priority":          "primary_sec",
+                "category_confidence":      float(q.get("category_confidence", 0.75)),
+                "category_source":          "llm_assigned",
+                "filing_section_label":     _filing_section_label(section),
                 "chunk_index":              -1,
                 "total_chunks":             total_chunks,
                 "original_section_length":  original_section_length,

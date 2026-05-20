@@ -24,6 +24,7 @@ prompt: |
     - speaker: the speaker's name or role (e.g. "Jensen Huang", "CFO", "Management")
     - speaker_confidence: 0.95 if explicit name given, 0.75 if role only, 0.50 if press release with no attribution, 0.30 if inferred
     - category: one of [guidance, competitive_positioning, margin_commentary, demand_commentary, risk_factors, tone_shift]
+    - category_confidence: float 0.0–1.0 — how confident are you that this quote belongs in the assigned category versus another category? 1.0 = certain, 0.5 = ambiguous
     - direction: BULLISH, BEARISH, or NEUTRAL
     - significance: HIGH, MEDIUM, or LOW
 
