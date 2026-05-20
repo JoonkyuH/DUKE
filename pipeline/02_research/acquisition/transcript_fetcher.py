@@ -883,6 +883,7 @@ def fetch_transcript(ticker: str) -> Optional[dict]:
             "reliability":      _source_reliability(st),
             "discovered_by":    "cache",
             "document_subtype": _document_subtype(st),
+            "source_priority":  "official_company_material",
         }
 
     ir_url       = get_ir_url(ticker)
@@ -979,4 +980,5 @@ def fetch_transcript(ticker: str) -> Optional[dict]:
         "reliability":      reliability,
         "discovered_by":    discovered_by,
         "document_subtype": _document_subtype(source_type),
+        "source_priority":  "official_company_material",
     }

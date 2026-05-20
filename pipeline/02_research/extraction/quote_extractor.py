@@ -1,16 +1,18 @@
 """
 quote_extractor.py
-Extracts attributed executive quotes from earnings documents.
+Extracts attributed executive quotes from earnings documents and SEC filings.
 
-Entry point:
+Entry points:
     extract_quotes(transcript: dict) -> list[dict]
+        Extracts quotes from a transcript/press release.
+        Each item includes item_class="management_quote",
+        source_priority="official_company_material".
 
-Each evidence item includes:
-    quote_text, quote_type, speaker, speaker_confidence,
-    category, direction, significance,
-    source_type, source_url, document_subtype,
-    fiscal_year, fiscal_quarter, reliability,
-    prompt_name, prompt_version, ticker
+    extract_filing_quotes(passages: list[dict], ticker: str) -> tuple[list[dict], dict]
+        Extracts quotes from SEC filing passages (10-K, 10-Q, 8-K).
+        Returns (items, stats) where stats = {filing_type: count}.
+        Each item includes item_class="filing_quote",
+        source_priority="primary_sec".
 """
 
 import logging
@@ -137,6 +139,8 @@ def extract_quotes(transcript: dict) -> list:
             "prompt_version":      prompt_def["version"],
             "document_subtype":    document_subtype,
             "ticker":              ticker,
+            "item_class":          "management_quote",
+            "source_priority":     "official_company_material",
         })
 
     log.info("%s: extracted %d quotes", ticker, len(items))
@@ -155,3 +159,107 @@ def _unwrap(response, ticker: str, envelope_keys: tuple):
         return None
     log.warning("%s: non-list/dict LLM response", ticker)
     return None
+
+
+def extract_filing_quotes(passages: list, ticker: str) -> tuple:
+    """
+    Extract structured quotes from SEC filing passages (10-K, 10-Q, 8-K).
+
+    Args:
+        passages: list of passage dicts from fetch_filings().
+        ticker:   stock ticker for logging.
+
+    Returns:
+        (items, stats) where:
+            items: list of evidence item dicts with item_class="filing_quote"
+            stats: {filing_type: passage_count_processed}
+    """
+    from common.llm import get_client
+
+    if not passages:
+        return [], {}
+
+    prompt_def = _load_prompt("filing_quote_extractor")
+    try:
+        client = get_client("extraction")
+    except Exception as exc:
+        log.error("%s: LLM client unavailable: %s", ticker, exc)
+        return [], {}
+
+    all_items: list = []
+    stats:     dict = {}
+
+    for passage in passages:
+        passage_text = passage.get("passage_text", "").strip()
+        if not passage_text:
+            continue
+
+        filing_type = passage.get("filing_type", "")
+        section     = passage.get("section", "")
+        filing_date = passage.get("filing_date", "")
+        doc_url     = passage.get("doc_url", "")
+        reliability = passage.get("reliability", 0.95)
+
+        filled = prompt_def["prompt"].format(
+            filing_type=filing_type,
+            section=section,
+            company=ticker,
+            period=filing_date,
+            text=passage_text[:8_000],
+        )
+
+        try:
+            raw_response = client.structured_generate(
+                prompt=filled,
+                system=(
+                    "You are a financial analyst extracting verbatim statements from SEC filings. "
+                    "Return a JSON array and nothing else."
+                ),
+            )
+        except Exception as exc:
+            log.warning(
+                "%s: LLM call failed for %s %s passage %d: %s",
+                ticker, filing_type, section, passage.get("passage_idx", 0), exc,
+            )
+            continue
+
+        raw_quotes = _unwrap(raw_response, ticker, ("quotes", "items", "results", "data"))
+        if not raw_quotes:
+            continue
+
+        for q in raw_quotes:
+            if not isinstance(q, dict):
+                continue
+            quote_text = (q.get("quote_text") or "").strip()
+            if not quote_text:
+                continue
+            all_items.append({
+                "quote_text":          quote_text,
+                "quote_type":          "direct",
+                "speaker":             "Management",
+                "speaker_confidence":  0.50,
+                "category":            q.get("category", ""),
+                "direction":           q.get("direction", "NEUTRAL"),
+                "significance":        q.get("significance", "MEDIUM"),
+                "source_type":         passage.get("source_type", ""),
+                "source_url":          doc_url,
+                "filing_type":         filing_type,
+                "filing_section":      section,
+                "filing_date":         filing_date,
+                "accession":           passage.get("accession", ""),
+                "reliability":         reliability,
+                "prompt_name":         prompt_def["name"],
+                "prompt_version":      prompt_def["version"],
+                "ticker":              ticker.upper(),
+                "item_class":          "filing_quote",
+                "source_priority":     "primary_sec",
+            })
+
+        stats[filing_type] = stats.get(filing_type, 0) + 1
+
+    log.info(
+        "%s: extract_filing_quotes — %d items from %d passages (%s)",
+        ticker, len(all_items), len(passages),
+        ", ".join(f"{k}:{v}" for k, v in stats.items()),
+    )
+    return all_items, stats

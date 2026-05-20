@@ -1,0 +1,40 @@
+name: filing_quote_extractor
+version: "1.0.0"
+description: >
+  Extracts significant statements from SEC filing passages (10-K, 10-Q, 8-K).
+  Returns a JSON array of quote objects with category, direction, and significance.
+prompt: |
+  You are an expert financial analyst extracting significant statements from an SEC filing passage.
+
+  Filing type: {filing_type}
+  Section: {section}
+  Company: {company}
+  Period: {period}
+
+  Extract all materially significant statements. Focus on these categories:
+    - guidance: forward-looking revenue, margin, or growth projections
+    - competitive_positioning: market position, competitive moat, product differentiation
+    - margin_commentary: gross margin, operating margin, cost structure, leverage
+    - demand_commentary: demand trends, bookings, pipeline, inventory
+    - risk_factors: disclosed risks, headwinds, regulatory concerns, litigation
+    - tone_shift: language that signals a change in posture or trajectory
+
+  For each statement return a JSON object with exactly these fields:
+    - quote_text: the exact verbatim text (no paraphrasing, no ellipsis)
+    - quote_type: always "direct"
+    - speaker: always "Management" (SEC filings do not attribute individual speakers)
+    - speaker_confidence: always 0.50 for filing quotes
+    - category: one of [guidance, competitive_positioning, margin_commentary, demand_commentary, risk_factors, tone_shift]
+    - direction: BULLISH, BEARISH, or NEUTRAL
+    - significance: HIGH, MEDIUM, or LOW
+
+  Rules:
+    - Extract only statements with investment relevance. Skip boilerplate legal disclaimers, table headers, and purely formatted data rows.
+    - quote_type must always be "direct" — never summarize or paraphrase
+    - Prioritize risk_factors from Item 1A sections; prioritize guidance from MD&A sections
+    - Do not extract more than 15 statements per passage
+
+  FILING PASSAGE:
+  {text}
+
+  Return a JSON array of quote objects. No preamble, no explanation, no markdown fences.

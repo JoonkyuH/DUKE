@@ -9,16 +9,19 @@ Usage:
     SCREENING_ARCHETYPE: long_term_compounder | quality_compounder | deep_value
 
 Orchestrates the full Stage 02 pipeline:
-    1. IR discovery
-    2. Transcript acquisition
-    3. Quote extraction
-    4. Contradiction extraction (vs prior quarter if available)
-    5. Deduplication
-    6. Evidence validation
-    7. Bearish discovery (Perplexity)
-    8. News discovery (NewsAPI)
-    9. Assemble evidence packet
-   10. Write to data/raw/{ticker}_evidence_{YYYYMMDD}.json
+    1.  IR discovery
+    2.  Transcript acquisition
+    2.5 SEC filings acquisition (10-K, 10-Q, 8-Ks)
+    3A. Transcript quote extraction
+    3B. Filing quote extraction
+    3C. Merge raw quotes
+    4.  Contradiction extraction (vs prior quarter if available)
+    5.  Deduplication
+    6.  Evidence validation (against combined transcript + filing text)
+    7.  Evidence discovery (Perplexity)
+    8.  News discovery (NewsAPI)
+    9.  Assemble evidence packet
+   10.  Write to data/raw/{ticker}_evidence_{YYYYMMDD}.json
 """
 
 import json
@@ -54,15 +57,12 @@ def _count_by_category(items: list) -> dict:
     return dict(sorted(counts.items()))
 
 
-def _safe_import(module_path: str, fn_name: str):
-    """Import a function from a dotted module path, returning None on failure."""
-    import importlib
-    try:
-        mod = importlib.import_module(module_path)
-        return getattr(mod, fn_name)
-    except Exception as exc:
-        log.warning("Could not import %s.%s: %s", module_path, fn_name, exc)
-        return None
+def _count_by_class(items: list) -> dict:
+    counts: dict = {}
+    for item in items:
+        cls = item.get("item_class", "unknown")
+        counts[cls] = counts.get(cls, 0) + 1
+    return counts
 
 
 # ─────────────────────────────────────────────
@@ -106,12 +106,38 @@ def main():
     print(f"    fiscal:          {transcript['fiscal_year']} {transcript['fiscal_quarter']}")
     print(f"    text length:     {len(transcript['raw_text'])} chars")
 
-    # ── 3. Quote extraction ───────────────────────────────────────────
-    print("\n[3] Quote extraction …")
+    # ── 2.5 SEC filings acquisition ───────────────────────────────────
+    print("\n[2.5] SEC filings acquisition …")
+    sys.path.insert(0, str(_STAGE_DIR / "acquisition"))
+    from filings_fetcher import fetch_filings
+    filing_passages, filing_metadata = fetch_filings(ticker)
+    n_10k_p = filing_metadata.get("10-K", {}).get("passage_count", 0) if filing_metadata.get("10-K") else 0
+    n_10q_p = filing_metadata.get("10-Q", {}).get("passage_count", 0) if filing_metadata.get("10-Q") else 0
+    n_8k_filings = len(filing_metadata.get("8-K", []))
+    n_8k_p  = sum(f.get("passage_count", 0) for f in filing_metadata.get("8-K", []))
+    print(f"    10-K passages:   {n_10k_p}")
+    print(f"    10-Q passages:   {n_10q_p}")
+    print(f"    8-K filings:     {n_8k_filings}  ({n_8k_p} passages)")
+    print(f"    total passages:  {len(filing_passages)}")
+
+    # ── 3A. Transcript quote extraction ───────────────────────────────
+    print("\n[3A] Transcript quote extraction …")
     sys.path.insert(0, str(_STAGE_DIR / "extraction"))
-    from quote_extractor import extract_quotes
-    quotes = extract_quotes(transcript)
-    print(f"    extracted: {len(quotes)} quotes")
+    from quote_extractor import extract_quotes, extract_filing_quotes
+    transcript_quotes = extract_quotes(transcript)
+    print(f"    extracted: {len(transcript_quotes)} transcript quotes")
+
+    # ── 3B. Filing quote extraction ────────────────────────────────────
+    print("\n[3B] Filing quote extraction …")
+    filing_quotes, filing_stats = extract_filing_quotes(filing_passages, ticker)
+    print(f"    extracted: {len(filing_quotes)} filing quotes")
+    for ft, cnt in sorted(filing_stats.items()):
+        print(f"      {ft}: {cnt} passages processed")
+
+    # ── 3C. Merge raw quotes ───────────────────────────────────────────
+    print("\n[3C] Merging quotes …")
+    raw_quotes = transcript_quotes + filing_quotes
+    print(f"    total raw: {len(raw_quotes)} quotes")
 
     # ── 4. Contradiction extraction ───────────────────────────────────
     print("\n[4] Contradiction extraction …")
@@ -122,8 +148,8 @@ def main():
     # ── 5. Deduplication ──────────────────────────────────────────────
     print("\n[5] Deduplication …")
     from deduplicate import deduplicate
-    before_count = len(quotes)
-    quotes       = deduplicate(quotes)
+    before_count = len(raw_quotes)
+    quotes       = deduplicate(raw_quotes)
     removed      = before_count - len(quotes)
     print(f"    duplicates removed: {removed}   remaining: {len(quotes)}")
 
@@ -131,9 +157,16 @@ def main():
     print("\n[6] Evidence validation …")
     sys.path.insert(0, str(_STAGE_DIR / "validation"))
     from evidence_validator import validate_evidence
-    validated    = validate_evidence(quotes, transcript)
-    passed       = len(validated)
-    routed       = len(quotes) - passed
+    # Combine transcript + all filing passages for verbatim search
+    combined_raw = transcript["raw_text"]
+    if filing_passages:
+        combined_raw += "\n\n" + "\n\n".join(
+            p["passage_text"] for p in filing_passages if p.get("passage_text")
+        )
+    combined_transcript = {**transcript, "raw_text": combined_raw}
+    validated = validate_evidence(quotes, combined_transcript)
+    passed    = len(validated)
+    routed    = len(quotes) - passed
     print(f"    passed: {passed}   routed to review queue: {routed}")
 
     # ── 7. Evidence discovery (Perplexity) ───────────────────────────
@@ -166,14 +199,22 @@ def main():
             "reliability":      transcript["reliability"],
             "discovered_by":    transcript["discovered_by"],
         },
+        "sec_filings": {
+            "10-K": filing_metadata.get("10-K"),
+            "10-Q": filing_metadata.get("10-Q"),
+            "8-K":  filing_metadata.get("8-K", []),
+        },
         "evidence_items":          validated,
         "contradictions":          contradictions,
         "discovery_candidates":    discovery_candidates,
         "metadata": {
-            "quotes_extracted":          len(quotes) + removed,
+            "quotes_extracted":          len(raw_quotes),
             "duplicates_removed":        removed,
             "quotes_passed_validation":  passed,
             "quotes_routed_to_review":   routed,
+            "transcript_quotes":         len(transcript_quotes),
+            "filing_quotes":             len(filing_quotes),
+            "filing_passages_total":     len(filing_passages),
             "perplexity_candidates":     len(perplexity_candidates),
             "news_candidates":           len(news_candidates),
             "company_name":              company_name,
@@ -198,14 +239,39 @@ def main():
     print(f"  Document subtype:  {transcript['document_subtype']}")
     print(f"  Fiscal period:     {transcript['fiscal_year']} {transcript['fiscal_quarter']}")
     print()
+
+    # SEC filings summary
+    print("  SEC Filings:")
+    fm_10k = filing_metadata.get("10-K")
+    fm_10q = filing_metadata.get("10-Q")
+    if fm_10k:
+        print(f"    10-K:  {fm_10k['filing_date']}  ({fm_10k['passage_count']} passages)")
+    else:
+        print(f"    10-K:  (not found)")
+    if fm_10q:
+        print(f"    10-Q:  {fm_10q['filing_date']}  ({fm_10q['passage_count']} passages)")
+    else:
+        print(f"    10-Q:  (not found)")
+    print(f"    8-K:   {n_8k_filings} post-10-Q earnings filings  ({n_8k_p} passages)")
+    print()
+
+    print("  Quote counts by item_class:")
+    for cls, n in _count_by_class(validated).items():
+        print(f"    {cls:<28} {n}")
+    if not validated:
+        print("    (none — ANTHROPIC_API_KEY required for extraction)")
+    print()
+
     print("  Quote counts by category:")
     for cat, n in _count_by_category(validated).items():
         print(f"    {cat:<30} {n}")
     if not validated:
-        print("    (none — ANTHROPIC_API_KEY required for extraction)")
+        print("    (none)")
     print()
+
     print(f"  Contradictions:    {len(contradictions)}")
     print()
+
     _QT_ORDER = [
         "bear_case", "bull_case",
         "competitive_risk", "competitive_advantage",
@@ -213,7 +279,6 @@ def main():
     ]
     pplx_by_qt: dict = {}
     for c in perplexity_candidates:
-        # query_types (list) is the current schema; query_type (str) is legacy
         qts = c.get("query_types") or [c.get("query_type", "unknown")]
         for qt in qts:
             pplx_by_qt[qt] = pplx_by_qt.get(qt, 0) + 1

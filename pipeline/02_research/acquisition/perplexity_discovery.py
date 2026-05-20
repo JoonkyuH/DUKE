@@ -288,9 +288,10 @@ def discover_evidence(ticker: str, company_name: str) -> list:
             if url not in by_url:
                 by_url[url] = {
                     **result,
-                    "query_types": [query_type],
-                    "source_type": "discovery_candidate",
-                    "reliability": 0.55,
+                    "query_types":     [query_type],
+                    "source_type":     "discovery_candidate",
+                    "source_priority": "external_discovery",
+                    "reliability":     0.55,
                 }
                 new_count += 1
             else:
