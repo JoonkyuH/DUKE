@@ -1,0 +1,17 @@
+name: stage03_scoring
+version: "1.0.0"
+
+# Higher weight = category carries more signal for analysts
+category_weights:
+  guidance: 1.00
+  risk_factors: 0.95
+  tone_shift: 0.90
+  competitive_positioning: 0.85
+  margin_commentary: 0.80
+  demand_commentary: 0.75
+
+# Multiplied into the raw score; primary SEC is authoritative
+source_priority_multipliers:
+  primary_sec: 1.00
+  official_company_material: 0.95
+  external_discovery: 0.70
