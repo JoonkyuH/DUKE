@@ -7,6 +7,7 @@ Entry points:
     get_company_name(ticker: str) -> str
 """
 
+import json
 import logging
 import re
 import sqlite3
@@ -21,10 +22,7 @@ log = logging.getLogger("ir_discovery")
 
 _DB_PATH = Path(__file__).resolve().parent / "cache" / "duke_cache.db"
 
-_EDGAR_SEARCH   = (
-    "https://efts.sec.gov/LATEST/search-index?q={ticker}"
-    "&dateRange=custom&startdt=2020-01-01&forms=10-K"
-)
+_EDGAR_TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
 _HEADERS = {"User-Agent": "DUKE-research contact@duke-research.ai"}
 
 _CACHE_TTL_DAYS = 60
@@ -108,22 +106,15 @@ def _cache_mark(ticker: str, status: str) -> None:
 # ─────────────────────────────────────────────
 
 def get_company_name(ticker: str) -> str:
-    """Return company name from SEC EDGAR full-text search; fall back to ticker."""
+    """Return company name from SEC EDGAR company_tickers.json; fall back to ticker."""
     try:
-        url = _EDGAR_SEARCH.format(ticker=urllib.request.quote(ticker.upper()))
-        req = urllib.request.Request(url, headers=_HEADERS)
+        req = urllib.request.Request(_EDGAR_TICKERS_URL, headers=_HEADERS)
         with urllib.request.urlopen(req, timeout=10) as r:
             data = json.loads(r.read())
-        hits = data.get("hits", {}).get("hits", [])
-        if not hits:
-            return ticker
-        # display_names looks like "NVIDIA CORP  (NVDA)  (CIK 0001045810)"
-        names = hits[0].get("_source", {}).get("display_names", [])
-        if names:
-            raw = names[0]
-            # Strip the CIK suffix and ticker parenthetical
-            name = re.split(r"\s+\(", raw)[0].strip().title()
-            return name or ticker
+        tk_upper = ticker.upper()
+        for entry in data.values():
+            if entry.get("ticker", "").upper() == tk_upper:
+                return entry.get("title", ticker)
     except Exception as exc:
         log.debug("Company name lookup failed for %s: %s", ticker, exc)
     return ticker
@@ -145,6 +136,13 @@ def _page_has_recent_date(text: str) -> bool:
     return False
 
 
+def _significant_words(company_name: str) -> list:
+    cleaned = re.sub(r"\b(inc|corp|corporation|ltd|co|the|technologies|technology)\b", "",
+                     company_name.lower())
+    words = re.sub(r"[^a-z0-9\s]", " ", cleaned).split()
+    return [w for w in words if len(w) > 2]
+
+
 def _domain_matches(url: str, ticker: str, company_name: str) -> bool:
     try:
         domain = re.search(r"https?://([^/]+)", url)
@@ -152,25 +150,37 @@ def _domain_matches(url: str, ticker: str, company_name: str) -> bool:
             return False
         d = domain.group(1).lower()
         tk = ticker.lower()
-        # Strip common words from company name for matching
-        words = re.sub(r"\b(inc|corp|corporation|ltd|co|the|technologies|technology)\b", "",
-                       company_name.lower()).split()
-        significant = [w for w in words if len(w) > 2]
+        significant = _significant_words(company_name)
         if tk in d:
             return True
-        return any(w in d for w in significant)
+        if any(w in d for w in significant):
+            return True
+        # Companies like Alphabet use non-obvious holding-company domains (abc.xyz);
+        # accept if the URL path explicitly signals an IR section.
+        if re.search(r"/(investor|investors|ir)(/|$)", url, re.I):
+            return True
+        return False
     except Exception:
         return False
 
 
 def _validate_url(url: str, ticker: str, company_name: str) -> bool:
     """Return True if URL passes all validation checks."""
+    body = None
     try:
-        req = urllib.request.Request(url, headers={**_HEADERS, "User-Agent": _HEADERS["User-Agent"]})
+        req = urllib.request.Request(url, headers=_HEADERS)
         with urllib.request.urlopen(req, timeout=10) as r:
             if r.status != 200:
                 return False
             body = r.read(200_000).decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as exc:
+        # 403: server is live and refused us — if domain matches, accept it.
+        # Many company IR sites block scrapers but are genuinely valid IR pages.
+        if exc.code == 403 and _domain_matches(url, ticker, company_name):
+            log.info("URL %s: 403 but domain matches — accepting", url)
+            return True
+        log.debug("Validation fetch failed for %s: %s", url, exc)
+        return False
     except Exception as exc:
         log.debug("Validation fetch failed for %s: %s", url, exc)
         return False
@@ -183,6 +193,11 @@ def _validate_url(url: str, ticker: str, company_name: str) -> bool:
     if not _domain_matches(url, ticker, company_name):
         log.debug("URL %s: domain does not match %s / %s", url, ticker, company_name)
         return False
+
+    # Official IR pages often render dates via JS; skip date check when
+    # domain identity and keyword density are both high.
+    if keyword_hits >= 10:
+        return True
 
     if not _page_has_recent_date(body):
         log.debug("URL %s: no recent date found in page content", url)
@@ -199,6 +214,16 @@ _AGGREGATOR_DOMAINS = {
     "alphaspread.com", "stocktitan.net", "public.com",
     "macrotrends.net", "wisesheets.io", "stockanalysis.com",
     "simplywall.st", "finance.yahoo.com",
+    # press-release wires — never the company's own IR page
+    "prnewswire.com", "businesswire.com", "globenewswire.com", "accesswire.com",
+    # financial aggregators / data resellers
+    "wealthtender.com", "daloopa.com", "clickbalance.com", "landing.clickbalance.com",
+    "marketwatch.com", "wsj.com", "seeking alpha.com", "seekingalpha.com",
+    "fool.com", "motleyfool.com", "investopedia.com",
+    # social / video — never an IR page
+    "youtube.com", "twitter.com", "linkedin.com",
+    # financial data / research aggregators
+    "quartr.com",
 }
 
 
@@ -212,9 +237,7 @@ def _score_candidate(result: dict, ticker: str, company_name: str) -> int:
         score -= 10
 
     tk = ticker.lower()
-    words = re.sub(r"\b(inc|corp|corporation|ltd|co|the|technologies|technology)\b", "",
-                   company_name.lower()).split()
-    sig = [w for w in words if len(w) > 2]
+    sig = _significant_words(company_name)
 
     if tk in url or any(w in url for w in sig):
         score += 2
@@ -245,9 +268,13 @@ def _discover_via_perplexity(ticker: str, company_name: str) -> Optional[str]:
 
     scored = sorted(results, key=lambda r: _score_candidate(r, ticker, company_name), reverse=True)
     best   = scored[0]
+    best_score = _score_candidate(best, ticker, company_name)
     url    = best.get("url") or ""
     log.info("Perplexity top candidate for %s: %s (score=%d)",
-             ticker, url, _score_candidate(best, ticker, company_name))
+             ticker, url, best_score)
+    if best_score < 3:
+        log.warning("%s: best candidate score %d below threshold (3), skipping", ticker, best_score)
+        return None
     return url or None
 
 
