@@ -38,13 +38,27 @@ from invalidation_checker import check_invalidation
 # ─────────────────────────────────────────────
 # CONVICTION THRESHOLDS
 # Rules are evaluated in order; first match wins.
+#
+# Bear path (added v1.1.0): evidence_score < -15 is evaluated using
+# abs(evidence_score) against _BEAR_RULES thresholds — symmetric to bull.
+# Neutral band: -15 ≤ evidence_score < +15 → WATCH.
 # ─────────────────────────────────────────────
 
-_CONVICTION_RULES = [
+# Bull path + neutral band: standard >= comparison on evidence_score
+_BULL_WATCH_RULES = [
     # (evidence_score_min, confidence_score_min, ConvictionLevel)
-    (55.0, 70.0, ConvictionLevel.HIGH),
-    (35.0, 55.0, ConvictionLevel.MEDIUM),
-    (15.0, 40.0, ConvictionLevel.LOW),
+    (55.0,  70.0, ConvictionLevel.HIGH),
+    (35.0,  55.0, ConvictionLevel.MEDIUM),
+    (15.0,  40.0, ConvictionLevel.LOW),
+    (-15.0, 40.0, ConvictionLevel.WATCH),   # neutral band: -15 ≤ ev < +15
+]
+
+# Bear path: evaluated as abs(evidence_score) >= threshold (strongest first)
+_BEAR_RULES = [
+    # (abs_evidence_score_min, confidence_score_min, ConvictionLevel)
+    (55.0, 70.0, ConvictionLevel.HIGH_BEAR),
+    (35.0, 55.0, ConvictionLevel.MEDIUM_BEAR),
+    (15.0, 40.0, ConvictionLevel.LOW_BEAR),
 ]
 
 # If confidence is below this floor, cap conviction at INSUFFICIENT regardless of evidence score.
@@ -157,8 +171,15 @@ def _determine_conviction(
     if confidence_score < _CONFIDENCE_FLOOR:
         return ConvictionLevel.INSUFFICIENT
 
-    for ev_min, conf_min, level in _CONVICTION_RULES:
+    # Bull path and neutral band (standard >= comparison)
+    for ev_min, conf_min, level in _BULL_WATCH_RULES:
         if evidence_score >= ev_min and confidence_score >= conf_min:
+            return level
+
+    # Bear path: evidence_score < -15; evaluate abs value against bear thresholds
+    abs_ev = abs(evidence_score)
+    for ev_min, conf_min, level in _BEAR_RULES:
+        if abs_ev >= ev_min and confidence_score >= conf_min:
             return level
 
     return ConvictionLevel.INSUFFICIENT
@@ -168,6 +189,18 @@ def _determine_conviction(
 # RECOMMENDATION
 # ─────────────────────────────────────────────
 
+_CONVICTION_TO_RECOMMENDATION = {
+    ConvictionLevel.HIGH:         Recommendation.STRONG_CONVICTION_ENTER,
+    ConvictionLevel.MEDIUM:       Recommendation.MODERATE_CONVICTION_ENTER,
+    ConvictionLevel.LOW:          Recommendation.WATCH_POSITIVE,
+    ConvictionLevel.WATCH:        Recommendation.WATCH_NEUTRAL,
+    ConvictionLevel.LOW_BEAR:     Recommendation.WATCH_NEGATIVE,
+    ConvictionLevel.MEDIUM_BEAR:  Recommendation.AVOID,
+    ConvictionLevel.HIGH_BEAR:    Recommendation.STRONG_AVOID,
+    ConvictionLevel.INSUFFICIENT: Recommendation.INSUFFICIENT_DATA,
+}
+
+
 def _determine_recommendation(
     conviction:          ConvictionLevel,
     evidence_score:      float,
@@ -176,19 +209,7 @@ def _determine_recommendation(
     if invalidation_status == InvalidationStatus.FATAL:
         return Recommendation.INVALIDATED
 
-    if conviction == ConvictionLevel.HIGH:
-        return Recommendation.STRONG_BUY if evidence_score >= 70.0 else Recommendation.BUY
-
-    if conviction == ConvictionLevel.MEDIUM:
-        return Recommendation.BUY if evidence_score >= 50.0 else Recommendation.WATCH
-
-    if conviction == ConvictionLevel.LOW:
-        return Recommendation.WATCH
-
-    # INSUFFICIENT conviction
-    if evidence_score < -50.0:
-        return Recommendation.STRONG_AVOID
-    return Recommendation.AVOID
+    return _CONVICTION_TO_RECOMMENDATION.get(conviction, Recommendation.INSUFFICIENT_DATA)
 
 
 # ─────────────────────────────────────────────
@@ -204,9 +225,15 @@ _SIZE_ORDER = [
 ]
 
 _BASE_SIZING = {
+    # Bull path
     ConvictionLevel.HIGH:         PositionSizing.FULL,
     ConvictionLevel.MEDIUM:       PositionSizing.HALF,
     ConvictionLevel.LOW:          PositionSizing.QUARTER,
+    # Neutral / bear / fallback — no long position
+    ConvictionLevel.WATCH:        PositionSizing.NONE,
+    ConvictionLevel.LOW_BEAR:     PositionSizing.NONE,
+    ConvictionLevel.MEDIUM_BEAR:  PositionSizing.NONE,
+    ConvictionLevel.HIGH_BEAR:    PositionSizing.NONE,
     ConvictionLevel.INSUFFICIENT: PositionSizing.NONE,
 }
 

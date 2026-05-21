@@ -12,19 +12,38 @@ from typing import List
 
 
 class ConvictionLevel(str, Enum):
+    # Bull path
     HIGH         = "high"
     MEDIUM       = "medium"
     LOW          = "low"
+    # Neutral band (-15 ≤ evidence_score < +15)
+    WATCH        = "watch"
+    # Bear path (symmetric to bull, resolved via abs(evidence_score))
+    LOW_BEAR     = "low_bear"
+    MEDIUM_BEAR  = "medium_bear"
+    HIGH_BEAR    = "high_bear"
+    # Fallback
     INSUFFICIENT = "insufficient"
 
 
 class Recommendation(str, Enum):
+    # Bull path
+    STRONG_CONVICTION_ENTER  = "strong_conviction_enter"
+    MODERATE_CONVICTION_ENTER = "moderate_conviction_enter"
+    WATCH_POSITIVE           = "watch_positive"
+    # Neutral
+    WATCH_NEUTRAL            = "watch_neutral"
+    # Bear path
+    WATCH_NEGATIVE           = "watch_negative"
+    AVOID                    = "avoid"
+    STRONG_AVOID             = "strong_avoid"
+    # Special states
+    INSUFFICIENT_DATA        = "insufficient_data"
+    INVALIDATED              = "invalidated"
+    # Legacy values retained for backward compatibility
     STRONG_BUY   = "strong_buy"
     BUY          = "buy"
     WATCH        = "watch"
-    AVOID        = "avoid"
-    STRONG_AVOID = "strong_avoid"
-    INVALIDATED  = "invalidated"
 
 
 class PositionSizing(str, Enum):

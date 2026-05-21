@@ -1,5 +1,9 @@
 name: stage03_scoring
-version: "1.0.0"
+version: "1.1.0"
+# v1.1.0: scorer.py now supports a symmetric bear conviction path.
+# Negative evidence scores (< -15) resolve to LOW_BEAR/MEDIUM_BEAR/HIGH_BEAR
+# using abs(evidence_score) against the same thresholds as the bull path.
+# No changes to category weights or source multipliers.
 
 # Higher weight = category carries more signal for analysts
 category_weights:
