@@ -43,21 +43,38 @@ period that follows.
   FCF-to-net-income for incremental ROIC). The backtest
   scores the proxies, not the intended V1.5 signals.
 
+## Fixed parameters (committed before runner built)
+
+- Test dates: January 1 of each year from 2013 to 2022
+  inclusive (10 dates). If January 1 is not a trading
+  day, use the next trading day.
+- Holding period: 12 months forward total return from
+  each test date.
+- In-sample dates: 2013, 2014, 2015, 2016, 2017, 2018
+  (6 dates). Used for any weight or threshold tuning
+  only.
+- Hold-out dates: 2019, 2020, 2021, 2022 (4 dates).
+  Scored once, not tuned against.
+- Benchmark: S&P 500 total return over the same 12-month
+  holding period for each test date.
+- Cost assumption: subtract a flat 0.2% per position as
+  a one-time entry cost from the shortlist's return.
+- Shortlist: whatever the screener's regime logic
+  produces at each date (size varies 8–20 by regime);
+  equal-weighted.
+
 ## Success criteria — fixed in advance
 
-PASS: the screener's candidate set beats the S&P 500
-total return, after reasonable cost assumptions, over
-the holding period, on the hold-out set — by a margin
-large enough not to be noise.
+PASS: on the hold-out set, the shortlist's average
+annualized total return (after the 0.2% cost) exceeds
+the S&P 500 by at least 3.0 percentage points.
 
-MARGINAL: the candidate set roughly matches the index.
-The screener is not destroying value but is not yet
-adding it. The archetype weights need work before the
-reasoning layer can be trusted to add edge.
+MARGINAL: the shortlist beats the index by more than 0
+but less than 3.0 percentage points, OR trails it by
+less than 1.0 point.
 
-FAIL: the candidate set underperforms the index on the
-hold-out set. The screener is selecting bad candidates.
-The reasoning layer cannot fix this.
+FAIL: the shortlist trails the S&P 500 by 1.0 percentage
+point or more on the hold-out set.
 
 ## Commitment
 
