@@ -46,14 +46,21 @@ def _top_n(items: list, n: int) -> tuple:
     return ranked[:n], max(0, len(ranked) - n)
 
 
-def _is_bull(candidate: dict) -> bool:
+def _classify(candidate: dict) -> str:
+    """Return 'bear', 'bull', or 'neither'. Bear wins on tie (contested signal)."""
     qt = set(candidate.get("query_types") or [])
-    return bool(qt & _BULL_QUERY_TYPES)
+    has_bear = bool(qt & _BEAR_QUERY_TYPES)
+    has_bull = bool(qt & _BULL_QUERY_TYPES)
+    if has_bear:
+        return "bear"
+    if has_bull:
+        return "bull"
+    return "neither"
 
 
-def _is_bear(candidate: dict) -> bool:
-    qt = set(candidate.get("query_types") or [])
-    return bool(qt & _BEAR_QUERY_TYPES)
+def _severity_rank(item: dict) -> int:
+    sev = str(item.get("severity") or "").lower()
+    return {"high": 1, "medium": 2, "low": 3}.get(sev, 4)
 
 
 def rank_and_budget(
@@ -72,17 +79,18 @@ def rank_and_budget(
     """
     mgmt   = [e for e in scored_items if e.get("item_class") == "management_quote"]
     filing = [e for e in scored_items if e.get("item_class") == "filing_quote"]
-    bull   = [c for c in scored_candidates if _is_bull(c)]
-    bear   = [c for c in scored_candidates if _is_bear(c)]
+    bull   = [c for c in scored_candidates if _classify(c) == "bull"]
+    bear   = [c for c in scored_candidates if _classify(c) == "bear"]
 
     mgmt_kept,   mgmt_excl   = _top_n(mgmt,   _BUDGETS["management_quotes"])
     filing_kept, filing_excl = _top_n(filing, _BUDGETS["filing_quotes"])
     bull_kept,   bull_excl   = _top_n(bull,   _BUDGETS["external_bull_evidence"])
     bear_kept,   bear_excl   = _top_n(bear,   _BUDGETS["external_bear_evidence"])
 
-    # Uncertainties come directly from the contradictions list, capped at 3
-    uncertainties_kept  = (contradictions or [])[:_BUDGETS["uncertainties"]]
-    uncertainties_excl  = max(0, len(contradictions or []) - _BUDGETS["uncertainties"])
+    # Uncertainties: sort by severity (high first) before capping at 3
+    sorted_contradictions = sorted(contradictions or [], key=_severity_rank)
+    uncertainties_kept  = sorted_contradictions[:_BUDGETS["uncertainties"]]
+    uncertainties_excl  = max(0, len(sorted_contradictions) - _BUDGETS["uncertainties"])
 
     excluded_counts = {
         "management_quotes":      mgmt_excl,
