@@ -155,11 +155,13 @@ def build_analyst_brief(packet: dict) -> dict:
     contradictions = packet.get("contradictions") or []
     con_ids       = build_contradiction_ids(contradictions)
     today         = datetime.now(timezone.utc).date()
+    # Fallback date for management_quotes whose transcript URL isn't in url_date_map
+    packet_date   = (packet.get("generated_at") or "")[:10] or today.isoformat()
 
     # ── Score evidence_items ────────────────
     scored_items = []
     for item in (packet.get("evidence_items") or []):
-        s = score_evidence_item(item, weights, con_ids, url_date_map, today)
+        s = score_evidence_item(item, weights, con_ids, url_date_map, today, packet_date)
         scored_items.append({**item, "_score": s})
 
     # ── Score discovery_candidates ──────────

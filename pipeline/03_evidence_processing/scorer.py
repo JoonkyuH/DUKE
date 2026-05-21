@@ -142,6 +142,7 @@ def score_evidence_item(
     contradiction_ids: set,
     url_date_map: dict,
     today=None,
+    packet_date: Optional[str] = None,
 ) -> float:
     """
     Score a management_quote or filing_quote evidence item.
@@ -163,8 +164,11 @@ def score_evidence_item(
                               (item.get("extraction_confidence") or "").lower(), 0.5)
     category_weight     = float(category_weights.get(item.get("category") or "", 0.5))
 
-    # Recency: filing_date on the item itself (10-K/10-Q), else look up via source_url
+    # Recency: filing_date on item (10-K/10-Q), else source_url lookup, else
+    # fall back to packet_date for management_quotes (transcript URL not in map)
     date_str = item.get("filing_date") or url_date_map.get(item.get("source_url") or "")
+    if not date_str and item.get("item_class") == "management_quote":
+        date_str = packet_date or None
     recency  = _recency_score(date_str, today)
 
     # filing_quotes and management_quotes carry no query_types → default 0.5
