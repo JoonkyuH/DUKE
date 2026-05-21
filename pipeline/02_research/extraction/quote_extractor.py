@@ -15,6 +15,7 @@ Entry points:
         source_priority="primary_sec".
 """
 
+import hashlib
 import logging
 import re
 import sys
@@ -38,6 +39,13 @@ _FILING_SECTION_LABELS: dict = {
 
 def _filing_section_label(section: str) -> str:
     return _FILING_SECTION_LABELS.get(section, section)
+
+
+def _evidence_id(ticker: str, source_url: str, quote_text: str) -> str:
+    raw = ticker + source_url + quote_text[:100]
+    digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+    return "EV-" + digest[:12]
+
 
 sys.path.insert(0, str(_REPO_ROOT))
 
@@ -137,6 +145,7 @@ def extract_quotes(transcript: dict) -> list:
         if not quote_text:
             continue
         items.append({
+            "evidence_id":         _evidence_id(ticker, source_url, quote_text),
             "quote_text":          quote_text,
             "quote_type":          "direct",
             "speaker":             q.get("speaker") or "Management",
@@ -276,6 +285,7 @@ def extract_filing_quotes(passages: list, ticker: str) -> tuple:
             if not quote_text:
                 continue
             all_items.append({
+                "evidence_id":              _evidence_id(ticker.upper(), doc_url, quote_text),
                 "quote_text":               quote_text,
                 "quote_type":               "direct",
                 "speaker":                  "SEC Filing",
