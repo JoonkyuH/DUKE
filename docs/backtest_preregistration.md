@@ -42,6 +42,20 @@ period that follows.
   CAGR and gross margin trend for TAM share-gain;
   FCF-to-net-income for incremental ROIC). The backtest
   scores the proxies, not the intended V1.5 signals.
+- Regime classification during the backtest uses fixed
+  default values for three inputs (hy_spread,
+  sector_dispersion, breadth_adv_decline) because no
+  free historical per-date source exists. Regime
+  detection in the backtest is therefore partly
+  synthetic.
+- The binary-event-risk signal is inert during the
+  backtest (earnings_data is empty); its weight is
+  redistributed to the other signals by the screener.
+- EDGAR XBRL coverage is sparse before roughly
+  2016–2018, so a large share of the S&P 500 universe
+  has no point-in-time fundamentals on the early test
+  dates and is excluded before screening. The early
+  in-sample dates therefore screen a thinned universe.
 
 ## Fixed parameters (committed before runner built)
 
