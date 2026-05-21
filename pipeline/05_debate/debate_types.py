@@ -8,7 +8,7 @@ Every field that Layer 6 touches is defined here.
 
 from dataclasses import dataclass, field, asdict
 from enum import Enum
-from typing import List, Optional
+from typing import Any, List, Optional
 
 
 class AnalystRole(str, Enum):
@@ -43,6 +43,7 @@ class AnalystPosition:
     raised_risks:          List[str]    # New risks not in the original packet
     score_adjustment:      float        # Recommended adjustment to evidence_score  [-15, +15]
     confidence_adjustment: float        # Recommended adjustment to confidence_score [-10, +10]
+    learning_hooks:        List[Any]    = field(default_factory=list)  # Falsifiable predictions; checked at 90/180/365 days
 
 
 @dataclass

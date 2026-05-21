@@ -57,7 +57,7 @@ def score_confidence(
     # ── Base confidence ────────────────────────────────────────────────────────
     directional = [
         item for item in evidence_items
-        if item.get("direction", "").lower() in ("bullish", "bearish")
+        if str(item.get("direction") or "").lower() in ("bullish", "bearish")
     ]
     n = len(directional)
 
@@ -119,8 +119,8 @@ def _contradiction_penalty(contradictions: List[dict]) -> float:
 def _binary_catalyst_penalty(catalyst_map: List[dict]) -> float:
     penalty = 0.0
     for cat in catalyst_map:
-        if (cat.get("direction") == "binary"
-                and cat.get("expected_impact") == "high"):
+        if (str(cat.get("direction") or "").lower() == "binary"
+                and str(cat.get("expected_impact") or "").lower() == "high"):
             penalty += 8.0
     return min(penalty, 24.0)
 

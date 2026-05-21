@@ -176,13 +176,15 @@ def _format_evidence(items: List[dict]) -> List[dict]:
     """Return a clean, brief-safe subset of evidence item fields."""
     return [
         {
-            "evidence_id": item.get("evidence_id"),
-            "content":     item.get("content"),
-            "source":      item.get("source"),
-            "reliability": item.get("reliability"),
-            "category":    item.get("category"),
-            "date":        item.get("date"),
-            "quote":       item.get("quote"),
+            "evidence_id":          item.get("evidence_id", ""),
+            "content":              item.get("quote_text", ""),
+            "source":               item.get("source_url", ""),
+            "reliability":          item.get("reliability"),
+            "category":             item.get("category", ""),
+            "date":                 item.get("filing_date", ""),
+            "quote":                item.get("quote_text", ""),
+            "speaker":              item.get("speaker", ""),
+            "filing_section_label": item.get("filing_section_label", ""),
         }
         for item in items
     ]

@@ -127,6 +127,11 @@
         "confidence_adjustment": {
           "type": "number", "minimum": -10, "maximum": 10,
           "description": "Analyst's recommended adjustment to the Layer 4 confidence_score"
+        },
+        "learning_hooks": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Falsifiable predictions from this analyst. Checked at 90/180/365 days. Empty list if analyst did not return hooks."
         }
       }
     }

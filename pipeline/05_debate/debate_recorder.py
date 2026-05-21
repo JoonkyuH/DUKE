@@ -120,6 +120,7 @@ def _parse_position(pos: dict, role: AnalystRole) -> AnalystPosition:
         raised_risks=list(pos.get("raised_risks", [])),
         score_adjustment=float(pos.get("score_adjustment", 0.0)),
         confidence_adjustment=float(pos.get("confidence_adjustment", 0.0)),
+        learning_hooks=list(pos.get("learning_hooks", [])),
     )
 
 

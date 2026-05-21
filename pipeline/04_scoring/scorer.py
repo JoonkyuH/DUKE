@@ -248,7 +248,7 @@ def _determine_position_sizing(
     inv_report:   InvalidationReport,
     catalyst_map: List[dict],
 ) -> PositionSizing:
-    sizing = _BASE_SIZING[conviction]
+    sizing = _BASE_SIZING.get(conviction, PositionSizing.NONE)
 
     # Active FATAL or MAJOR invalidation: reduce exposure
     if inv_report.status in (InvalidationStatus.FATAL, InvalidationStatus.MAJOR):
@@ -256,8 +256,8 @@ def _determine_position_sizing(
 
     # HIGH-impact BINARY catalyst within 7 days: binary gap risk, reduce exposure
     imminent_binary = any(
-        c.get("direction") == "binary"
-        and c.get("expected_impact") == "high"
+        str(c.get("direction") or "").lower() == "binary"
+        and str(c.get("expected_impact") or "").lower() == "high"
         and c.get("days_away") is not None
         and 0 <= int(c["days_away"]) <= 7
         for c in catalyst_map

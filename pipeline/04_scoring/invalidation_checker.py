@@ -46,8 +46,8 @@ def check_invalidation(
 
     for tic in thesis_invalidation_conditions:
         cid      = tic.get("condition_id", "")
-        status   = tic.get("current_status", "not_triggered")
-        severity = tic.get("severity", "minor")
+        status   = str(tic.get("current_status") or "not_triggered").lower()
+        severity = str(tic.get("severity") or "minor").lower()
 
         if status == "triggered":
             triggered.append(cid)

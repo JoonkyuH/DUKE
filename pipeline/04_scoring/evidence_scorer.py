@@ -39,7 +39,7 @@ def score_evidence(evidence_items: List[dict]) -> EvidenceScoreBreakdown:
 
     for item in evidence_items:
         rel       = float(item.get("reliability", 0.0))
-        direction = item.get("direction", "neutral").lower()
+        direction = str(item.get("direction") or "neutral").lower()
 
         if rel >= 0.70:
             high_rel_count += 1
@@ -70,7 +70,7 @@ def score_evidence(evidence_items: List[dict]) -> EvidenceScoreBreakdown:
         net_score=round(net_score, 1),
         directional_count=sum(
             1 for item in evidence_items
-            if item.get("direction", "").lower() in ("bullish", "bearish")
+            if str(item.get("direction") or "").lower() in ("bullish", "bearish")
         ),
         high_reliability_count=high_rel_count,
     )

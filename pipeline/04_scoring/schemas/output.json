@@ -42,13 +42,25 @@
 
     "conviction": {
       "type": "string",
-      "enum": ["high", "medium", "low", "insufficient"],
-      "description": "high: evidence_score >= 55 AND confidence >= 70. medium: >= 35 AND >= 55. low: >= 15 AND >= 40. insufficient: below thresholds or confidence < 30."
+      "enum": [
+        "high", "medium", "low",
+        "watch",
+        "low_bear", "medium_bear", "high_bear",
+        "insufficient"
+      ],
+      "description": "Bull: high>=55/70, medium>=35/55, low>=15/40. Neutral: watch (-15 to +15). Bear (abs value): low_bear>=15/40, medium_bear>=35/55, high_bear>=55/70. insufficient: below all thresholds or confidence<30."
     },
 
     "recommendation": {
       "type": "string",
-      "enum": ["strong_buy", "buy", "watch", "avoid", "strong_avoid", "invalidated"]
+      "enum": [
+        "strong_conviction_enter", "moderate_conviction_enter",
+        "watch_positive", "watch_neutral", "watch_negative",
+        "avoid", "strong_avoid",
+        "insufficient_data", "invalidated",
+        "strong_buy", "buy", "watch"
+      ],
+      "description": "Last three values (strong_buy, buy, watch) are legacy — no longer produced."
     },
 
     "position_sizing": {
