@@ -100,10 +100,17 @@ def _entries(facts: dict, *concepts: str, unit: str = "USD") -> list:
     return []
 
 
-def _extract(raw: list, n_annual: int = 2, n_quarterly: int = 4) -> dict:
+def _extract(raw: list, n_annual: int = 2, n_quarterly: int = 4,
+             as_of: str | None = None) -> dict:
     """
     Extract last n_annual annual periods and last n_quarterly individual
     quarters from a raw EDGAR entry list.
+
+    as_of: ISO date string (YYYY-MM-DD). When provided, only entries whose
+        'filed' date is <= as_of are considered. This makes fundamentals
+        point-in-time: the returned figures are exactly what was available
+        from EDGAR on that date, with no lookahead from later restated filings.
+        Pass None (default) for live use with current data.
 
     Annual: 10-K filings with fp="FY".
     Quarterly strategy (in order):
@@ -117,6 +124,8 @@ def _extract(raw: list, n_annual: int = 2, n_quarterly: int = 4) -> dict:
     broken by latest filed date (handles amendments).
     """
     valid = [e for e in raw if e.get("form") in ("10-K", "10-Q")]
+    if as_of is not None:
+        valid = [e for e in valid if e.get("filed", "") <= as_of]
 
     # ── Annual ────────────────────────────────
     # Two-pass: (1) dedup by (fy, end) keeping latest filed;
@@ -261,9 +270,13 @@ def _gross_profit_from_cogs(revenue: dict, cogs: dict) -> dict:
 # PUBLIC ENTRY POINT
 # ─────────────────────────────────────────────
 
-def fetch_financials(ticker: str) -> dict:
+def fetch_financials(ticker: str, as_of: str | None = None) -> dict:
     """
     Fetch EDGAR financial facts for ticker and return structured metrics.
+
+    as_of: ISO date string (YYYY-MM-DD). When provided, all _extract() calls
+        filter to filings where filed <= as_of, making fundamentals point-in-time.
+        Pass None (default) for live use with current data.
 
     Raises:
         ValueError  — ticker not in SEC company list
@@ -279,14 +292,17 @@ def fetch_financials(ticker: str) -> dict:
     def shares(*concepts):
         return _entries(facts, *concepts, unit="shares")
 
-    revenue = _extract(usd(
+    def ex(raw, **kw):
+        return _extract(raw, as_of=as_of, **kw)
+
+    revenue = ex(usd(
         "Revenues",
         "RevenueFromContractWithCustomerExcludingAssessedTax",
         "SalesRevenueNet",
     ))
     _gp_raw = usd("GrossProfit")
     if _gp_raw:
-        gross_profit = _extract(_gp_raw)
+        gross_profit = ex(_gp_raw)
     else:
         # Companies (e.g. AMZN) that stopped tagging GrossProfit as a concept:
         # derive it as Revenue − COGS.
@@ -296,32 +312,32 @@ def fetch_financials(ticker: str) -> dict:
             "CostOfGoodsSold",
         )
         gross_profit = (
-            _gross_profit_from_cogs(revenue, _extract(cogs_entries))
+            _gross_profit_from_cogs(revenue, ex(cogs_entries))
             if cogs_entries else {"annual": [], "quarterly": []}
         )
-    operating_income = _extract(usd("OperatingIncomeLoss"))
-    net_income       = _extract(usd("NetIncomeLoss", "NetIncomeLossAvailableToCommonStockholdersBasic"))
+    operating_income = ex(usd("OperatingIncomeLoss"))
+    net_income       = ex(usd("NetIncomeLoss", "NetIncomeLossAvailableToCommonStockholdersBasic"))
 
-    operating_cf = _extract(usd(
+    operating_cf = ex(usd(
         "NetCashProvidedByUsedInOperatingActivities",
         "NetCashProvidedByUsedInOperatingActivitiesContinuingOperations",
     ))
-    capex = _extract(usd(
+    capex = ex(usd(
         "PaymentsToAcquireProductiveAssets",
         "PaymentsToAcquirePropertyPlantAndEquipment",
         "PaymentsForCapitalImprovements",
     ))
     free_cash_flow = _fcf(operating_cf, capex)
 
-    total_debt = _extract(usd(
+    total_debt = ex(usd(
         "LongTermDebt",                # combined current + noncurrent for most filers
         "DebtAndCapitalLeaseObligations",
     ))
-    cash = _extract(usd(
+    cash = ex(usd(
         "CashAndCashEquivalentsAtCarryingValue",
         "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents",
     ))
-    shares_out = _extract(shares(
+    shares_out = ex(shares(
         "CommonStockSharesOutstanding",
         "WeightedAverageNumberOfDilutedSharesOutstanding",
         "WeightedAverageNumberOfSharesOutstandingBasic",
