@@ -107,3 +107,32 @@ commitment is fixed before the number is seen.
 A backtest that is only believed when it agrees with the
 builder is not a decision gate. This document exists so
 that the result is acted on whichever way it lands.
+
+## Corrections discovered after Backtest Result 01
+
+These items were identified by reading the screener code
+after the result was recorded. They are stated here as
+post-run corrections, not quiet edits, so the record
+remains honest.
+
+1. Signal description error. This document describes the
+   TAM share-gain proxy as "3-year CAGR." The screener
+   code (signal_scorer.py) does not compute a 3-year
+   CAGR. It computes a one-year year-over-year revenue
+   change (rev_ann0 vs rev_ann1). Backtest Result 01
+   therefore tested a one-year YoY signal, not a 3-year
+   CAGR. The result remains valid as a test of the actual
+   code; this note corrects the description.
+
+2. Regime system inert in scoring. The per-regime weight
+   dicts in regime_classifier.py (_BASE_PROFILES) are
+   emitted into output metadata but are never read by
+   run_screening() when computing composite scores. The
+   field regime_adjusted_score is assigned the
+   unadjusted composite directly. Scoring uses only the
+   three fixed archetype weight sets (COMPOUNDER_WEIGHTS,
+   QUALITY_COMPOUNDER_WEIGHTS, DEEP_VALUE_WEIGHTS) in
+   every regime. Consequently, all 10 backtest dates were
+   scored by an identical profile regardless of regime
+   classification; the screener has no regime-adaptive
+   scoring behavior in V1 as tested.
