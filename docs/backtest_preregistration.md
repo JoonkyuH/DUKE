@@ -56,6 +56,12 @@ period that follows.
   has no point-in-time fundamentals on the early test
   dates and is excluded before screening. The early
   in-sample dates therefore screen a thinned universe.
+- All 10 test dates (January 2013–2022) were classified
+  as risk_on_momentum. The backtest exercises only one
+  of the screener's six regimes; the other five
+  (risk_off_defensive, liquidity_expansion,
+  liquidity_contraction, earnings_volatility,
+  macro_uncertainty) are unvalidated by this run.
 
 ## Fixed parameters (committed before runner built)
 
