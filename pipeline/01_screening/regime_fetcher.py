@@ -120,14 +120,23 @@ def fetch_regime_indicators() -> Tuple[dict, dict]:
     spy_20d_return = round((spy_last - float(spy_hist.iloc[-21])) / float(spy_hist.iloc[-21]) * 100, 2)
     spy_vs_ma200   = spy_last > float(spy_hist.tail(200).mean())
 
-    vix = round(float(yf.Ticker("^VIX").history(period="5d")["Close"].iloc[-1]), 2)
+    try:
+        vix_hist = yf.Ticker("^VIX").history(period="5d")["Close"]
+        if vix_hist.empty:
+            log.warning("VIX history empty — using default 20.0")
+            vix = 20.0
+        else:
+            vix = round(float(vix_hist.iloc[-1]), 2)
+    except Exception as exc:
+        log.warning("VIX fetch failed (%s) — using default 20.0", exc)
+        vix = 20.0
 
     sector_dispersion = breadth_adv_decline = None
     sector_etf_data: dict = {}
     try:
         sector_dispersion, breadth_adv_decline, sector_etf_data = _sector_metrics()
-    except Exception:
-        pass
+    except Exception as exc:
+        log.warning("Sector metrics fetch failed: %s — regime classification using defaults", exc)
 
     regime_indicators = {
         "vix":                 vix,

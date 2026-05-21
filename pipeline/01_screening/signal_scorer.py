@@ -25,8 +25,12 @@ Call compute_fundamental_metrics(fund_d, market_d) once per ticker, then pass
 the result to each score_* function and to build_mispricing_hypothesis().
 """
 
+import logging
+
 from dataclasses import dataclass
 from typing import Optional
+
+log = logging.getLogger("signal_scorer")
 
 
 @dataclass
@@ -326,7 +330,7 @@ def score_valuation_vs_growth(metrics: dict) -> Optional[float]:
         elif peg_ratio < 3.0:   score += 9
         # ≥ 3: 0 pts
     else:
-        score += 20   # Neutral: no P/E computable (loss-making or no data)
+        log.warning("peg_ratio unavailable — valuation vs growth score contribution set to 0")
 
     # P/FCF (40 pts)
     if pfcf_ratio is not None:
@@ -706,7 +710,10 @@ def score_binary_event_risk(earnings_d: dict) -> Optional[float]:
     if not earnings_d:
         return None
 
-    days_to = earnings_d.get("days_to_earnings", 999)
+    days_to = earnings_d.get("days_to_earnings")
+    if days_to is None:
+        log.warning("days_to_earnings missing — binary risk score defaulting to 50.0 (unknown)")
+        return 50.0
 
     if days_to > 90:    return 92.0   # Far away — no binary risk
     elif days_to > 45:  return 78.0   # On radar, not imminent

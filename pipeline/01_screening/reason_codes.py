@@ -9,8 +9,11 @@ Flags mark concerns — they do NOT disqualify a ticker. A passing ticker with
 a flag still passed screening; the flag tells Stage 02 what to scrutinize.
 """
 
+import logging
 from typing import List, Tuple
 from signal_scorer import SignalScores
+
+log = logging.getLogger("reason_codes")
 
 
 # ─────────────────────────────────────────────
@@ -147,7 +150,7 @@ def assign_reason_codes(
         codes.append(HIGH_EARNINGS_QUALITY)
 
     # Revenue acceleration
-    if rev_pairs == 3:
+    if rev_pairs is not None and rev_pairs >= 3:
         codes.append(REVENUE_ACCELERATION)
 
     # Multi-signal confluence
@@ -164,8 +167,11 @@ def assign_reason_codes(
     # ── Flags ─────────────────────────────────
 
     # Binary event risk
-    days_to = earn_d.get("days_to_earnings", 999)
-    if days_to <= 14:
+    days_to = earn_d.get("days_to_earnings")
+    if days_to is None:
+        ticker = record.get("ticker", "UNKNOWN")
+        log.warning("%s: days_to_earnings missing — FLAG_BINARY_EVENT_RISK cannot be evaluated", ticker)
+    elif days_to <= 14:
         flags.append(FLAG_BINARY_EVENT_RISK)
 
     # FCF quality concern
