@@ -68,7 +68,11 @@ def _load_prompt(name: str) -> dict:
     if after.startswith("\n"):
         after = after[1:]
 
-    # Stop at next top-level YAML key
+    # Stop at next top-level YAML key (a line starting at column 0 with a letter).
+    # Safe for all current prompts: YAML `|` literal blocks require content to be
+    # indented, so no prompt line ever starts at column 0. If a future file adds a
+    # top-level key after `prompt:` (e.g. `examples:`), this regex will correctly
+    # stop before it.
     end_m = re.search(r"\n(?=[a-zA-Z])", after)
     if end_m:
         after = after[: end_m.start()]

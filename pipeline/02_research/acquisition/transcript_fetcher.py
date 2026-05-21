@@ -30,7 +30,7 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, date, timezone
+from datetime import datetime, date, timedelta, timezone
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Optional
@@ -119,51 +119,67 @@ def _ir_cache_get(ticker: str) -> Optional[sqlite3.Row]:
 def _fiscal_periods(ticker: str) -> tuple:
     """
     Return (fiscal_year, fiscal_quarter, calendar_period, reported_date)
-    for the most recently completed quarter, using ir_cache for fiscal calendar.
+    for the most recently completed fiscal quarter.
+
+    Finds the fiscal quarter whose end date most recently passed today, rather
+    than proxying through calendar quarters. The prior calendar-quarter proxy
+    was wrong for companies like AVGO (FY ends Oct): on May 20 the proxy
+    returned FQ1 (ended Jan 31) even though FQ2 ended Apr 30 and is complete.
+
+    Fiscal quarter end months for a FY ending in month M:
+      FQ1: (M - 9) mod 12,  FQ2: (M - 6) mod 12,
+      FQ3: (M - 3) mod 12,  FQ4: M
     """
     row          = _ir_cache_get(ticker)
     fy_end_month = (row["fiscal_year_end_month"] or 12) if row else 12
 
-    today  = date.today()
-    cal_m  = today.month
-    cal_yr = today.year
+    today = date.today()
 
-    cur_q = (cal_m - 1) // 3 + 1   # current calendar quarter (1-based)
+    # Build the four fiscal quarter end months (FQ1..FQ4), 1-based.
+    fq_end_months = [((fy_end_month - 3 * (4 - n) - 1) % 12) + 1 for n in range(1, 5)]
 
-    # Step back to most recently completed quarter
-    prev_q  = cur_q - 1
-    prev_yr = cal_yr
-    if prev_q < 1:
-        prev_q  = 4
-        prev_yr = cal_yr - 1
+    # Search this year and last year; pick the latest end date before today.
+    best_end_date: Optional[date] = None
+    best_fq_num:   Optional[int]  = None
+    best_end_yr:   Optional[int]  = None
 
-    cal_q_label = f"Q{prev_q}"
-    cal_period  = f"{cal_q_label} {prev_yr}"
+    for yr in (today.year, today.year - 1):
+        for fq_num, end_m in enumerate(fq_end_months, 1):
+            last = (
+                date(yr + 1, 1, 1) - timedelta(days=1) if end_m == 12
+                else date(yr, end_m + 1, 1) - timedelta(days=1)
+            )
+            if last < today and (best_end_date is None or last > best_end_date):
+                best_end_date = last
+                best_fq_num   = fq_num
+                best_end_yr   = yr
 
-    if fy_end_month == 12:
-        fq    = cal_q_label
-        fy_yr = prev_yr
-    elif fy_end_month == 1:
-        # FY ends Jan: cal Q1→FQ4 same year, cal Q2/3/4 → FQ1/2/3 next FY
-        fq_map = {1: ("Q4", 0), 2: ("Q1", 1), 3: ("Q2", 1), 4: ("Q3", 1)}
-        fq, yr_add = fq_map[prev_q]
-        fy_yr = prev_yr + yr_add
-    else:
-        shift  = (12 - fy_end_month) // 3
-        fq_num = ((prev_q - 1 + shift) % 4) + 1
-        fq     = f"Q{fq_num}"
-        fy_yr  = prev_yr + (1 if fq_num < prev_q else 0)
+    # Fallback: should never be reached for any real ticker
+    if best_fq_num is None:
+        best_fq_num = 4
+        best_end_yr = today.year - 1
+
+    fq_end_m = fq_end_months[best_fq_num - 1]
+
+    # Fiscal year: if the FQ's end month is after fy_end_month in the calendar
+    # year, it belongs to the *next* fiscal year (e.g. MSFT FQ1 ends Sep, FY
+    # ends Jun → FY label uses best_end_yr + 1).
+    fy_yr = best_end_yr + (1 if fq_end_m > fy_end_month else 0)
 
     fiscal_year    = f"FY{fy_yr}"
-    fiscal_quarter = fq
+    fiscal_quarter = f"Q{best_fq_num}"
 
-    q_end_month = prev_q * 3
+    # Calendar quarter for the FQ end month (display / cache label only)
+    cal_q      = (fq_end_m - 1) // 3 + 1
+    cal_period = f"Q{cal_q} {best_end_yr}"
+
+    # Estimated reported date: one month after fiscal quarter end
+    rep_m = fq_end_m + 1 if fq_end_m < 12 else 1
+    rep_y = best_end_yr if fq_end_m < 12 else best_end_yr + 1
     try:
-        rep_month = q_end_month + 1 if q_end_month < 12 else 1
-        rep_year  = prev_yr if q_end_month < 12 else prev_yr + 1
-        reported  = date(rep_year, rep_month, 15).isoformat()
+        reported = date(rep_y, rep_m, 15).isoformat()
     except ValueError:
-        reported = date(prev_yr, 12, 15).isoformat()
+        reported = date(best_end_yr, 12, 15).isoformat()
 
     return fiscal_year, fiscal_quarter, cal_period, reported
 

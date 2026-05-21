@@ -15,9 +15,12 @@ Extended fields not in the schema (market_cap, 52-week range, 30-day volume
 average) are nested under "extended_data".
 """
 
+import pandas as pd
 import yfinance as yf
 from datetime import datetime, timezone, date
 from typing import Optional
+
+log = __import__("logging").getLogger("data_fetcher")
 
 
 SECTOR_ETF_MAP = {
@@ -111,7 +114,12 @@ def fetch_market_data(ticker: str) -> dict:
     ma_200 = round(float(closes.tail(200).mean()), 4) if len(closes) >= 200 else None
 
     # ── Volume ───────────────────────────────────────
-    volume_today   = int(volumes.iloc[-1])
+    vol = volumes.iloc[-1]
+    if pd.isna(vol):
+        log.warning("%s: volume_today is NaN — defaulting to 0", ticker)
+        volume_today = 0
+    else:
+        volume_today = int(vol)
     volume_avg_20d = int(volumes.tail(20).mean()) if len(volumes) >= 20 else None
     volume_avg_30d = int(volumes.tail(30).mean()) if len(volumes) >= 30 else None
     volume_ratio   = round(volume_today / volume_avg_20d, 4) if volume_avg_20d else None
