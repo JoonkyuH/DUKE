@@ -37,8 +37,8 @@ def build_bull_brief(packet: dict, scoring: dict) -> dict:
     not ignore the bear case — the brief explicitly surfaces it.
     """
     evidence_items = packet.get("evidence_items", [])
-    bull_items     = [e for e in evidence_items if e.get("direction") == "bullish"]
-    bear_items     = [e for e in evidence_items if e.get("direction") == "bearish"]
+    bull_items     = [e for e in evidence_items if e.get("direction", "").lower() == "bullish"]
+    bear_items     = [e for e in evidence_items if e.get("direction", "").lower() == "bearish"]
 
     # Highest-reliability bearish items the bull must address
     must_address = sorted(
@@ -104,8 +104,8 @@ def build_bear_brief(packet: dict, scoring: dict) -> dict:
     original packet under 'raised_risks'.
     """
     evidence_items = packet.get("evidence_items", [])
-    bull_items     = [e for e in evidence_items if e.get("direction") == "bullish"]
-    bear_items     = [e for e in evidence_items if e.get("direction") == "bearish"]
+    bull_items     = [e for e in evidence_items if e.get("direction", "").lower() == "bullish"]
+    bear_items     = [e for e in evidence_items if e.get("direction", "").lower() == "bearish"]
 
     # Highest-reliability bullish items the bear must challenge
     must_address = sorted(

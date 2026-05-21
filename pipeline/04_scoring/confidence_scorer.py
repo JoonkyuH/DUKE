@@ -57,7 +57,7 @@ def score_confidence(
     # ── Base confidence ────────────────────────────────────────────────────────
     directional = [
         item for item in evidence_items
-        if item.get("direction") in ("bullish", "bearish")
+        if item.get("direction", "").lower() in ("bullish", "bearish")
     ]
     n = len(directional)
 
