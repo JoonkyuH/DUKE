@@ -8,6 +8,7 @@ Usage:
     python3 run_screening.py NVDA AAPL MSFT
 """
 
+import json
 import sys
 import concurrent.futures
 from datetime import datetime, timezone
@@ -112,6 +113,40 @@ def _cell(v) -> str:
     return f"{v:5.1f}" if v is not None else "    —"
 
 
+def _save_output(rows: list, out: dict, universe_size: int) -> Path:
+    repo_root = Path(__file__).resolve().parent.parent.parent
+    out_dir = repo_root / "data" / "screening"
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    today = datetime.now(timezone.utc).strftime("%Y%m%d")
+    out_path = out_dir / f"shortlist_{today}.json"
+
+    passing = [r for r in rows if r["passed"]]
+    payload = {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "universe_size": universe_size,
+        "shortlist_size": len(passing),
+        "regime": out["market_regime"],
+        "tickers": [
+            {
+                "ticker": r["ticker"],
+                "archetype": r["archetype"],
+                "composite_score": r["composite"],
+                "conviction": _conviction(r["composite"]),
+                "reason_codes": r["reason_codes"],
+                "flags": r["flags"],
+                "rank": r["priority"],
+            }
+            for r in passing
+        ],
+    }
+
+    with open(out_path, "w") as f:
+        json.dump(payload, f, indent=2)
+
+    return out_path
+
+
 def _fetch_fundamental(ticker: str) -> tuple:
     """Fetch EDGAR data for one ticker. Returns (ticker, data_or_None, error_or_None)."""
     try:
@@ -125,9 +160,16 @@ def _fetch_fundamental(ticker: str) -> tuple:
 # ─────────────────────────────────────────────
 
 def main():
-    tickers = [t.upper() for t in sys.argv[1:]]
-    if not tickers:
-        sys.exit("Usage: python3 run_screening.py TICKER [TICKER ...]")
+    if sys.argv[1:]:
+        tickers = [t.upper() for t in sys.argv[1:]]
+        universe_label = "custom"
+    else:
+        from universe.sp500 import get_sp500_tickers
+        print("Loading S&P 500 ticker list …")
+        tickers = get_sp500_tickers()
+        universe_label = "S&P 500"
+
+    print(f"Universe: {len(tickers)} tickers ({universe_label})")
 
     # ── 1. Regime indicators + sector ETF RS data ────────────────
     print("Fetching regime indicators …")
@@ -316,6 +358,11 @@ def main():
         print("  Fetch Errors:")
         for t, err in all_errors.items():
             print(f"    {t:<8}  {err}")
+
+    # Save shortlist to disk
+    saved_path = _save_output(rows, out, len(tickers))
+    print()
+    print(f"  Saved → {saved_path}")
 
     print()
     print("═" * W)

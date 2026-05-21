@@ -1,0 +1,54 @@
+{
+  "generated_at": "2026-05-21T14:10:06.938285+00:00",
+  "universe_size": 3,
+  "shortlist_size": 3,
+  "regime": "risk_on_momentum",
+  "tickers": [
+    {
+      "ticker": "NVDA",
+      "archetype": "long_term_compounder",
+      "composite_score": 74.23,
+      "conviction": "HIGH",
+      "reason_codes": [
+        "STRONG_REVENUE_GROWTH",
+        "HIGH_GROSS_MARGIN",
+        "EXPANDING_MARGINS",
+        "STRONG_FCF",
+        "UNDERVALUED_PEG",
+        "REVENUE_ACCELERATION",
+        "MULTI_SIGNAL_CONFLUENCE"
+      ],
+      "flags": [],
+      "rank": 1
+    },
+    {
+      "ticker": "MSFT",
+      "archetype": "quality_compounder",
+      "composite_score": 56.65,
+      "conviction": "MEDIUM",
+      "reason_codes": [
+        "MODERATE_REVENUE_GROWTH",
+        "HIGH_GROSS_MARGIN",
+        "STRONG_FCF",
+        "REVENUE_ACCELERATION"
+      ],
+      "flags": [
+        "FLAG_FCF_BELOW_EARNINGS"
+      ],
+      "rank": 2
+    },
+    {
+      "ticker": "AAPL",
+      "archetype": "quality_compounder",
+      "composite_score": 56.28,
+      "conviction": "MEDIUM",
+      "reason_codes": [
+        "EXPANDING_MARGINS",
+        "STRONG_FCF",
+        "HIGH_EARNINGS_QUALITY"
+      ],
+      "flags": [],
+      "rank": 3
+    }
+  ]
+}
