@@ -98,8 +98,21 @@ def main():
     from transcript_fetcher import fetch_transcript
     transcript = fetch_transcript(ticker)
     if not transcript:
-        print("    ERROR: all transcript sources exhausted — aborting")
-        sys.exit(1)
+        log.warning("%s: no transcript acquired — continuing with filing evidence only", ticker)
+        print("    WARNING: no transcript acquired — continuing with filing evidence only")
+        transcript = {
+            "ticker":           ticker,
+            "raw_text":         "",
+            "source_type":      "not_available",
+            "document_subtype": "not_available",
+            "source_url":       "",
+            "reliability":      0.0,
+            "discovered_by":    "none",
+            "fiscal_year":      None,
+            "fiscal_quarter":   None,
+            "calendar_period":  None,
+            "has_q_and_a":      False,
+        }
     print(f"    source_type:     {transcript['source_type']}")
     print(f"    document_subtype:{transcript['document_subtype']}")
     print(f"    discovered_by:   {transcript['discovered_by']}")

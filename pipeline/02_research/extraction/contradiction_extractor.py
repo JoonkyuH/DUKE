@@ -165,6 +165,8 @@ def extract_contradictions(ticker: str, current: dict) -> list:
     if raw_items is None:
         return []
 
+    from quote_extractor import _evidence_id
+
     items = []
     for item in raw_items:
         if not isinstance(item, dict):
@@ -172,9 +174,11 @@ def extract_contradictions(ticker: str, current: dict) -> list:
         change_type = item.get("change_type", "").strip()
         if not change_type:
             continue
+        current_quote = item.get("current_quote", "")
         items.append({
+            "evidence_id":    _evidence_id(ticker, source_url, current_quote),
             "change_type":    change_type,
-            "current_quote":  item.get("current_quote", ""),
+            "current_quote":  current_quote,
             "prior_quote":    item.get("prior_quote"),
             "category":       item.get("category", ""),
             "direction":      item.get("direction", "NEUTRAL"),

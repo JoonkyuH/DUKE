@@ -171,6 +171,15 @@ def validate_evidence(items: list, transcript: dict) -> list:
                 "extraction_confidence": "high",
                 "possibly_truncated":    truncated,
             })
+            prior_quote = (item.get("prior_quote") or "").strip()
+            if prior_quote:
+                pq_start, _ = _find_verbatim(prior_quote, raw_text)
+                if pq_start is None:
+                    log.warning(
+                        "%s: prior_quote unverified for contradiction item (cat=%s)",
+                        ticker, item.get("category", "?"),
+                    )
+                    enriched["prior_quote_unverified"] = True
             validated.append(enriched)
             class_stats[cls]["passed"] += 1
         else:

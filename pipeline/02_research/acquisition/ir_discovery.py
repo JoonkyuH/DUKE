@@ -47,6 +47,27 @@ def _db() -> sqlite3.Connection:
     return con
 
 
+def _ensure_ir_table() -> None:
+    _DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with _db() as con:
+        con.execute("""
+            CREATE TABLE IF NOT EXISTS ir_cache (
+                ticker                   TEXT NOT NULL PRIMARY KEY,
+                company_name             TEXT,
+                ir_url                   TEXT,
+                fiscal_year_end_month    INTEGER,
+                calendar_quarter_offset  INTEGER,
+                discovered_by            TEXT,
+                last_verified_at         TEXT,
+                status                   TEXT,
+                confidence               REAL
+            )
+        """)
+
+
+_ensure_ir_table()
+
+
 def _cache_get(ticker: str) -> Optional[sqlite3.Row]:
     with _db() as con:
         return con.execute(

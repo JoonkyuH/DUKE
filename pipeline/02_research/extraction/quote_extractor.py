@@ -113,6 +113,12 @@ def extract_quotes(transcript: dict) -> list:
     prompt_def = _load_prompt("quote_extractor")
     period     = f"{fiscal_quarter} {fiscal_year}".strip()
 
+    if len(raw_text) > 100_000:
+        log.warning(
+            "%s: transcript truncated %d → 100,000 chars "
+            "— quotes from second half not extracted",
+            ticker, len(raw_text),
+        )
     filled = prompt_def["prompt"].format(
         document_subtype=document_subtype,
         company=ticker,

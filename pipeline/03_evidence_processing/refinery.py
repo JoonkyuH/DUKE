@@ -27,9 +27,12 @@ from ranker import rank_and_budget
 # ─────────────────────────────────────────────
 
 _TRANSCRIPT_SUBTYPE_STATUS = {
-    "earnings_press_release": "prepared_material_only",
-    "earnings_call":          "full_transcript",
-    "earnings_call_transcript": "full_transcript",
+    "earnings_press_release":       "prepared_material_only",
+    "earnings_call":                "full_transcript",
+    "earnings_call_transcript":     "full_transcript",
+    "sec_8k_exhibit":               "prepared_material_only",
+    "sec_8k_exhibit_press_release": "prepared_material_only",
+    "ir_press_release":             "prepared_material_only",
 }
 
 

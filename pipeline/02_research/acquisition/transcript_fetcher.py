@@ -784,7 +784,8 @@ def _try_fmp(ticker: str) -> Optional[tuple]:
         return None
 
     text = data[0].get("content") or ""
-    return (text, url) if len(text) >= 200 else None
+    safe_url = re.sub(r"apikey=[^&]+", "apikey=REDACTED", url)
+    return (text, safe_url) if len(text) >= 200 else None
 
 
 # ─────────────────────────────────────────────
