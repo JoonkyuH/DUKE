@@ -31,6 +31,9 @@ _COUNT_CHECKS = [
     ("2019-06-01", 480, 510, "First delta era"),
     ("2022-01-03", 480, 510, "Recent"),
     ("2025-01-02", 480, 510, "Near-present"),
+    # Delta-reconstruction integrity: a corrupted delta chain would produce
+    # a count well outside this range even if individual deltas look valid.
+    ("2025-06-01", 495, 510, "Delta-reconstructed mid-2025"),
 ]
 
 # Hardcoded membership facts — includes both additions AND removals.
@@ -68,13 +71,50 @@ _MEMBERSHIP_CHECKS = [
     ("2019-01-09", "GE",           True,  "GE before removal"),
     ("2008-09-12", "AIG",          True,  "AIG in index pre-bailout"),
 
-    # ── Known additions (delta era) ────────────────────────────────────────
+    # ── Known additions (delta era, pre-2019 cutoff) ──────────────────────
     # TFX added 2019-01-18
     ("2019-01-17", "TFX",          False, "TFX not yet added"),
     ("2019-01-19", "TFX",          True,  "TFX added 2019-01-18"),
     # AMZN was added to S&P 500 in 2005; check it's present throughout
     ("2010-01-04", "AMZN",         True,  "AMZN in index 2010"),
     ("2025-01-02", "NVDA",         True,  "NVDA present 2025"),
+
+    # ── Post-2019 delta-era additions ─────────────────────────────────────
+    # TSLA: added 2020-12-21 (replaced AIV). One of the largest-ever S&P
+    # additions; its correct timing is a well-known benchmark fact.
+    ("2020-12-20", "TSLA",         False, "TSLA not yet in index"),
+    ("2020-12-22", "TSLA",         True,  "TSLA added 2020-12-21"),
+    # MRNA: added 2021-07-21 (replaced ALXN post-AstraZeneca acquisition)
+    ("2021-07-22", "MRNA",         True,  "MRNA added 2021-07-21"),
+    # PLTR: added 2024-09-23 — directly in DUKE's current shortlist;
+    # its addition date matters for any backtest using 2024 test dates.
+    ("2024-09-22", "PLTR",         False, "PLTR not in index before addition"),
+    ("2024-09-24", "PLTR",         True,  "PLTR added 2024-09-23"),
+
+    # ── Post-2019 delta-era removals (survivorship-critical) ──────────────
+    # TWTR: removed 2022-11-01 when Elon Musk took Twitter private.
+    # A missed removal keeps a delisted company in every post-2022 universe.
+    ("2022-10-31", "TWTR",         True,  "TWTR in index before Musk acquisition"),
+    ("2022-11-02", "TWTR",         False, "TWTR removed 2022-11-01 (taken private)"),
+    # SIVB (Silicon Valley Bank): removed 2023-03-15 following bank failure.
+    ("2023-03-14", "SIVB",         True,  "SIVB in index day before removal"),
+    ("2023-03-16", "SIVB",         False, "SIVB removed 2023-03-15 after bank failure"),
+    # SBNY (Signature Bank): also removed 2023-03-15, same bank-crisis wave.
+    ("2023-03-16", "SBNY",         False, "SBNY removed 2023-03-15 after bank failure"),
+
+    # ── Ticker rename: FB → META 2022-06-09 ───────────────────────────────
+    # The dataset records this as FB removed, META added on the same date.
+    # Both sides must be correct: a one-sided rename leaks a phantom FB or
+    # drops the entity from the universe entirely.
+    ("2022-06-08", "FB",           True,  "FB in index before rename"),
+    ("2022-06-10", "FB",           False, "FB removed 2022-06-09 (renamed META)"),
+    ("2022-06-10", "META",         True,  "META added 2022-06-09 (renamed from FB)"),
+
+    # ── PCG re-addition after earlier removal ─────────────────────────────
+    # PCG was removed 2019-01-18 (bankruptcy), re-added 2022-10-03.
+    # Tests that the delta chain correctly handles add-after-remove.
+    ("2022-10-02", "PCG",          False, "PCG not yet re-added (removed since 2019)"),
+    ("2022-10-04", "PCG",          True,  "PCG re-added 2022-10-03"),
 ]
 
 
