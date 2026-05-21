@@ -1,0 +1,70 @@
+{
+  "score_id": "SC-AMD-20260521-1605-12D3",
+  "packet_reference": "AMD_20260521",
+  "ticker": "AMD",
+  "company_name": "ADVANCED MICRO DEVICES INC",
+  "scored_at": "2026-05-21T16:05:19.542452+00:00",
+  "evidence_score": 38.6,
+  "confidence_score": 95.3,
+  "conviction": "medium",
+  "recommendation": "moderate_conviction_enter",
+  "position_sizing": "half",
+  "evidence_breakdown": {
+    "bull_weight": 8.35,
+    "bear_weight": 3.7,
+    "neutral_weight": 2.75,
+    "binary_weight": 0.0,
+    "total_weight": 14.8,
+    "net_score": 38.6,
+    "directional_count": 13,
+    "high_reliability_count": 16
+  },
+  "confidence_breakdown": {
+    "base_confidence": 90.3,
+    "contradiction_penalty": 0.0,
+    "binary_catalyst_penalty": 0.0,
+    "stale_data_penalty": 0.0,
+    "thin_evidence_penalty": 0.0,
+    "total_penalty": 0.0,
+    "bonuses": 5.0,
+    "final_confidence": 95.3
+  },
+  "invalidation_report": {
+    "status": "clear",
+    "triggered_conditions": [],
+    "monitoring_conditions": [],
+    "fatal_triggered": false,
+    "major_triggered": false,
+    "notes": "All thesis invalidation conditions are clear."
+  },
+  "primary_risks": [
+    "As of March 28, 2026, we had unconditional commitments of approximately $25.7 billion, of which $18.3 billion are for the remainder of fiscal year 2026. Our contractual obligations and purchase commitments relate primarily to our obligations to purchase wafers, substrates and components from third parties and future payments related to multi-year cloud service provider arrangements, and certain software and technology licenses.",
+    "The warrant will vest in tranches based on AMD Instinct GPU purchase milestones by Meta, or its affiliates, or indirectly through authorized third parties and achievement of specified AMD stock price targets. Each vested tranche is further subject to the fulfillment of certain other technical and commercial conditions by Meta prior to exercisability."
+  ],
+  "screening_score": 64.92,
+  "screening_reason_codes": [
+    "STRONG_REVENUE_GROWTH",
+    "EXPANDING_MARGINS",
+    "STRONG_FCF",
+    "HIGH_EARNINGS_QUALITY"
+  ],
+  "evidence_score_note": "13 directional items; bull weight 8.35 vs bear 3.70 \u2192 net +38.6",
+  "confidence_score_note": "base 90.3  /  bonuses +5.0  \u2192  95.3",
+  "metadata": {
+    "evidence_item_count": 16,
+    "contradiction_count": 0,
+    "catalyst_count": 0,
+    "tic_count": 0,
+    "risk_factor_count": 2
+  },
+  "generated_at": "2026-05-21T16:05:19.542596+00:00",
+  "analyst_brief_date": "20260521",
+  "screening_score_used": 64.92,
+  "data_availability": {
+    "fundamentals": "not_available",
+    "catalyst_map": "not_available",
+    "thesis_invalidation_conditions": "not_available",
+    "data_freshness": "not_available",
+    "screening_score": "available"
+  }
+}

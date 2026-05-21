@@ -1,9 +1,9 @@
 {
-  "score_id": "SC-NVDA-20260521-1557-85C8",
+  "score_id": "SC-NVDA-20260521-1605-2D0D",
   "packet_reference": "NVDA_20260521",
   "ticker": "NVDA",
   "company_name": "NVIDIA CORP",
-  "scored_at": "2026-05-21T15:57:30.490938+00:00",
+  "scored_at": "2026-05-21T16:05:19.274833+00:00",
   "evidence_score": -63.6,
   "confidence_score": 96.3,
   "conviction": "high_bear",
@@ -61,7 +61,7 @@
     "tic_count": 0,
     "risk_factor_count": 7
   },
-  "generated_at": "2026-05-21T15:57:30.491058+00:00",
+  "generated_at": "2026-05-21T16:05:19.274969+00:00",
   "analyst_brief_date": "20260521",
   "screening_score_used": 74.95,
   "data_availability": {
