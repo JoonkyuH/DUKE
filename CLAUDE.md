@@ -94,6 +94,8 @@ Raw Data → 01_screening → 02_research → 03_processing → 04_scoring → 0
 
 **All inter-layer data passes as plain dicts.** Typed dataclasses (`ScoringOutput`, `DebateRecord`, `SynthesisOutput`, etc.) are internal to each stage. Layers communicate via JSON-compatible dicts to avoid cross-directory import issues.
 
+**Stage run.py bridges are the orchestration layer** — each reads from its input data directory, calls internal module entry points, makes any required LLM calls, and writes to its output data directory. They are the only files that make Claude API calls.
+
 ## Role Assignments (Multi-Agent System)
 
 | Role | Tool | Responsibility |
@@ -107,11 +109,12 @@ Raw Data → 01_screening → 02_research → 03_processing → 04_scoring → 0
 
 | Stage | Status |
 |---|---|
-| 01 Screening | Complete |
-| 02 Research | Prompt-only (no Python) |
+| 01 Screening | Complete — screener, data_fetcher.py, regime_fetcher.py built |
+| 02 Research | Complete — acquisition, extraction, validation modules built |
 | 03 Processing | Complete |
-| 04 Scoring | Complete |
-| 05 Debate | Complete (Python + 4 analyst prompts) |
-| 06 Synthesis | Complete |
-| 07 Output | Complete (formatter, decision capture, journal) |
-| Data ingestion | Pending |
+| 04 Scoring | Complete — run.py bridge built, output in data/scored/ |
+| 05 Debate | Complete — run.py bridge, rebuttal prompts, tested against NVDA |
+| 06 Synthesis | Complete — run.py bridge, tested against NVDA |
+| 07 Output | Complete — run.py bridge, journal write tested against NVDA |
+| Data ingestion | Complete — yfinance + EDGAR; hy_spread pending external feed |
+| Master orchestrator | Not started |
