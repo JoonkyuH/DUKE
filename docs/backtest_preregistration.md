@@ -108,6 +108,48 @@ A backtest that is only believed when it agrees with the
 builder is not a decision gate. This document exists so
 that the result is acted on whichever way it lands.
 
+## Weekly backtest v2 — success criteria (fixed before run)
+
+This section was committed before the weekly backtest was run.
+It is a decision gate, not a post-hoc interpretation.
+
+The v2 weekly backtest reports excess return vs SPY at 1, 3, 6, and
+12-month horizons. Each horizon is accompanied by a Newey-West
+standard error (bandwidth = h − 1, theoretically correct for
+overlapping returns), an effective sample size (ESS = T × S₀ / V_NW),
+and a 95% block-bootstrap confidence interval on mean excess return
+(circular bootstrap, B = 4999, block length = max(h_weeks, ⌊T^(1/3)⌋)).
+
+**Primary verdict is based on the 12-month horizon only.**
+
+PASS: the 95% bootstrap confidence interval on mean 12-month excess
+return lies entirely above zero — a statistically distinguishable
+positive edge over the S&P 500.
+
+NO EDGE DEMONSTRATED: the 95% CI on mean 12-month excess return
+includes zero — the screener's performance cannot be statistically
+distinguished from the index at the 5% level.
+
+The shorter horizons (1, 3, 6 months) and the per-regime breakdown
+are reported as supporting context. They inform where the signal is
+strongest and under which regime conditions it holds, but they do not
+gate the primary verdict.
+
+This criterion replaces the v1 +3.0 pp / MARGINAL-band criteria.
+Those thresholds were written for the 10-date annual design (4 hold-out
+observations), where overlapping windows were not a concern and a large
+excess-return margin was used as a substitute for statistical power.
+They do not transfer to a weekly overlapping-window design, where the
+correct question is whether the CI excludes zero rather than whether a
+point estimate clears an arbitrary threshold.
+
+If the verdict is NO EDGE DEMONSTRATED, the next work item is
+reworking the screener's signal set or weights — not building Stage 06,
+not refining Stage 05. This commitment is fixed before the result is
+seen.
+
+---
+
 ## Corrections discovered after Backtest Result 01
 
 These items were identified by reading the screener code
