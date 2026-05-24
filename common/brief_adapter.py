@@ -67,6 +67,7 @@ def build_evidence_packet(brief: dict, scoring: dict) -> dict:
             "filing_section_label": q.get("document_subtype", ""),
             "item_class":           "management_quote",
             "evidence_nature":      q.get("evidence_nature") or _derive_evidence_nature("management_quote", cat),
+            "specificity":          q.get("specificity", ""),
         })
 
     for q in brief.get("filing_quotes", []):
@@ -83,6 +84,7 @@ def build_evidence_packet(brief: dict, scoring: dict) -> dict:
             "filing_section_label": q.get("filing_section", ""),
             "item_class":           "filing_quote",
             "evidence_nature":      q.get("evidence_nature") or _derive_evidence_nature("filing_quote", cat),
+            "specificity":          q.get("specificity", ""),
         })
 
     for e in brief.get("external_bull_evidence", []):

@@ -1,21 +1,21 @@
 {
-  "score_id": "SC-MSFT-20260524-0217-68D9",
+  "score_id": "SC-MSFT-20260524-0401-8587",
   "packet_reference": "MSFT_20260524",
   "ticker": "MSFT",
   "company_name": "MICROSOFT CORP",
-  "scored_at": "2026-05-24T02:17:25.239432+00:00",
-  "evidence_score": -8.405000000000001,
+  "scored_at": "2026-05-24T04:01:22.534931+00:00",
+  "evidence_score": -3.6050000000000004,
   "confidence_score": 94.0,
   "conviction": "watch",
   "recommendation": "watch_neutral",
   "position_sizing": "none",
   "evidence_breakdown": {
-    "bull_weight": 4.1,
-    "bear_weight": 15.5,
+    "bull_weight": 4.32,
+    "bear_weight": 17.56,
     "neutral_weight": 0.0,
     "binary_weight": 0.0,
-    "total_weight": 19.6,
-    "net_score": -58.2,
+    "total_weight": 21.88,
+    "net_score": -60.5,
     "directional_count": 24,
     "high_reliability_count": 16
   },
@@ -25,9 +25,11 @@
     "binary_catalyst_penalty": 0.0,
     "stale_data_penalty": 0.0,
     "thin_evidence_penalty": 0.0,
+    "coverage_penalty": 0.0,
     "total_penalty": 0.0,
     "bonuses": 5.0,
-    "final_confidence": 94.0
+    "final_confidence": 94.0,
+    "management_quote_count": 8
   },
   "invalidation_report": {
     "status": "clear",
@@ -38,9 +40,9 @@
     "notes": "All thesis invalidation conditions are clear."
   },
   "primary_risks": [
-    "Further, global, regional, and local economic developments and changes in global trade policies such as restrictions on international trade, including tariffs and other controls on imports or exports, could result in increased supply chain challenges, cost volatility, and consumer and economic uncertainty which may adversely affect our results of operations.",
-    "In the NOPAs, the IRS is seeking an additional tax payment of $28.9 billion plus penalties and interest.",
-    "Our datacenters depend on the availability of permitted and buildable land, predictable energy, networking supplies, and servers, including graphics processing units and other components. Our devices are primarily manufactured by third-party contract manufacturers. For the majority of our products, we have the ability to use other manufacturers if a current vendor becomes unavailable or unable to meet our requirements. However, some of our products contain certain components for which there are very few qualified suppliers. Extended disruptions at these suppliers could impact our ability to manufacture devices on time to meet consumer demand."
+    "In the NOPAs, the IRS is seeking an additional tax payment of $28.9 billion plus penalties and interest. As of March 31, 2026, we believe our allowances for income tax contingencies are adequate. We disagree with the proposed adjustments and will vigorously contest the NOPAs through the IRS's administrative appeals office and, if necessary, judicial proceedings.",
+    "If we are not effective in executing organizational and technical changes to increase efficiency and accelerate innovation, or if we fail to generate sufficient usage of our new products and services, we may not grow revenue in line with the infrastructure and development investments described above.",
+    "We face intense competition across all markets for our products and services, which could adversely affect our results of operations."
   ],
   "screening_score": 56.65,
   "screening_reason_codes": [
@@ -49,10 +51,10 @@
     "STRONG_FCF",
     "REVENUE_ACCELERATION"
   ],
-  "raw_directional_thesis_score": -10.4,
-  "directional_thesis_score": -8.405000000000001,
+  "raw_directional_thesis_score": -5.6,
+  "directional_thesis_score": -3.6050000000000004,
   "risk_burden_score": 100.0,
-  "evidence_score_note": "24 directional items; bull weight 4.10 vs bear 15.50 \u2192 net -58.2",
+  "evidence_score_note": "24 directional items; bull weight 4.32 vs bear 17.56 \u2192 net -60.5",
   "confidence_score_note": "base 89.0  /  bonuses +5.0  \u2192  94.0",
   "metadata": {
     "evidence_item_count": 24,
@@ -74,7 +76,8 @@
         "speaker": "Management",
         "filing_section_label": "earnings_press_release",
         "item_class": "management_quote",
-        "evidence_nature": "disclosed_risk"
+        "evidence_nature": "disclosed_risk",
+        "specificity": ""
       },
       {
         "evidence_id": "EV-002",
@@ -87,7 +90,8 @@
         "speaker": "Management",
         "filing_section_label": "earnings_press_release",
         "item_class": "management_quote",
-        "evidence_nature": "disclosed_risk"
+        "evidence_nature": "disclosed_risk",
+        "specificity": ""
       },
       {
         "evidence_id": "EV-003",
@@ -100,7 +104,8 @@
         "speaker": "Management",
         "filing_section_label": "earnings_press_release",
         "item_class": "management_quote",
-        "evidence_nature": "disclosed_risk"
+        "evidence_nature": "disclosed_risk",
+        "specificity": ""
       },
       {
         "evidence_id": "EV-004",
@@ -113,7 +118,8 @@
         "speaker": "Management",
         "filing_section_label": "earnings_press_release",
         "item_class": "management_quote",
-        "evidence_nature": "disclosed_risk"
+        "evidence_nature": "disclosed_risk",
+        "specificity": ""
       },
       {
         "evidence_id": "EV-005",
@@ -126,7 +132,8 @@
         "speaker": "Management",
         "filing_section_label": "earnings_press_release",
         "item_class": "management_quote",
-        "evidence_nature": "disclosed_risk"
+        "evidence_nature": "disclosed_risk",
+        "specificity": ""
       },
       {
         "evidence_id": "EV-006",
@@ -139,7 +146,8 @@
         "speaker": "Management",
         "filing_section_label": "earnings_press_release",
         "item_class": "management_quote",
-        "evidence_nature": "disclosed_risk"
+        "evidence_nature": "disclosed_risk",
+        "specificity": ""
       },
       {
         "evidence_id": "EV-007",
@@ -152,7 +160,8 @@
         "speaker": "Management",
         "filing_section_label": "earnings_press_release",
         "item_class": "management_quote",
-        "evidence_nature": "disclosed_risk"
+        "evidence_nature": "disclosed_risk",
+        "specificity": ""
       },
       {
         "evidence_id": "EV-008",
@@ -165,55 +174,67 @@
         "speaker": "Management",
         "filing_section_label": "earnings_press_release",
         "item_class": "management_quote",
-        "evidence_nature": "disclosed_risk"
+        "evidence_nature": "disclosed_risk",
+        "specificity": ""
       },
       {
         "evidence_id": "EV-014",
         "direction": "bearish",
         "reliability": 0.95,
         "category": "risk_factors",
-        "quote_text": "Further, global, regional, and local economic developments and changes in global trade policies such as restrictions on international trade, including tariffs and other controls on imports or exports, could result in increased supply chain challenges, cost volatility, and consumer and economic uncertainty which may adversely affect our results of operations.",
+        "quote_text": "In the NOPAs, the IRS is seeking an additional tax payment of $28.9 billion plus penalties and interest. As of March 31, 2026, we believe our allowances for income tax contingencies are adequate. We disagree with the proposed adjustments and will vigorously contest the NOPAs through the IRS's administrative appeals office and, if necessary, judicial proceedings.",
         "source_url": "https://www.sec.gov/Archives/edgar/data/789019/000119312526191507/msft-20260331.htm",
         "filing_date": "2026-04-29",
         "speaker": "SEC Filing",
         "filing_section_label": "item_3_market_risk",
         "item_class": "filing_quote",
-        "evidence_nature": "disclosed_risk"
+        "evidence_nature": "disclosed_risk",
+        "specificity": "specific"
       },
       {
         "evidence_id": "EV-015",
         "direction": "bearish",
         "reliability": 0.95,
         "category": "risk_factors",
-        "quote_text": "In the NOPAs, the IRS is seeking an additional tax payment of $28.9 billion plus penalties and interest.",
-        "source_url": "https://www.sec.gov/Archives/edgar/data/789019/000119312526191507/msft-20260331.htm",
-        "filing_date": "2026-04-29",
+        "quote_text": "We face intense competition across all markets for our products and services, which could adversely affect our results of operations.",
+        "source_url": "https://www.sec.gov/Archives/edgar/data/789019/000095017025100235/msft-20250630.htm",
+        "filing_date": "2025-07-30",
         "speaker": "SEC Filing",
-        "filing_section_label": "item_3_market_risk",
+        "filing_section_label": "item_1a_risk_factors",
         "item_class": "filing_quote",
-        "evidence_nature": "disclosed_risk"
+        "evidence_nature": "disclosed_risk",
+        "specificity": "generic"
       },
       {
         "evidence_id": "EV-016",
         "direction": "bearish",
         "reliability": 0.95,
         "category": "risk_factors",
-        "quote_text": "Our datacenters depend on the availability of permitted and buildable land, predictable energy, networking supplies, and servers, including graphics processing units and other components. Our devices are primarily manufactured by third-party contract manufacturers. For the majority of our products, we have the ability to use other manufacturers if a current vendor becomes unavailable or unable to meet our requirements. However, some of our products contain certain components for which there are very few qualified suppliers. Extended disruptions at these suppliers could impact our ability to manufacture devices on time to meet consumer demand.",
-        "source_url": "https://www.sec.gov/Archives/edgar/data/789019/000119312526191507/msft-20260331.htm",
-        "filing_date": "2026-04-29",
+        "quote_text": "If we are not effective in executing organizational and technical changes to increase efficiency and accelerate innovation, or if we fail to generate sufficient usage of our new products and services, we may not grow revenue in line with the infrastructure and development investments described above.",
+        "source_url": "https://www.sec.gov/Archives/edgar/data/789019/000095017025100235/msft-20250630.htm",
+        "filing_date": "2025-07-30",
         "speaker": "SEC Filing",
-        "filing_section_label": "item_3_market_risk",
+        "filing_section_label": "item_1a_risk_factors",
         "item_class": "filing_quote",
-        "evidence_nature": "disclosed_risk"
+        "evidence_nature": "disclosed_risk",
+        "specificity": "specific"
       }
     ],
+    "mgmt_direction_adjustment_applied": false,
+    "external_asymmetry_adjustment_applied": true,
+    "risk_specificity_breakdown": {
+      "specific": 2,
+      "generic": 1,
+      "untagged": 8
+    },
     "screening_adjustment_applied": 1.99,
+    "mgmt_coverage_conviction_cap": false,
     "conviction_ceiling_applied": false,
     "risk_burden_cap_applied": false,
     "risk_burden_cap_reason": "",
     "position_sizing_before_cap": null
   },
-  "generated_at": "2026-05-24T02:17:25.239640+00:00",
+  "generated_at": "2026-05-24T04:01:22.535069+00:00",
   "analyst_brief_date": "20260524",
   "screening_score_used": 56.65,
   "data_availability": {

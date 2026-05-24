@@ -89,9 +89,113 @@ def _load_prompt(name: str) -> dict:
     }
 
 
+def _extract_quotes_from_speakers(
+    transcript: dict,
+    ticker: str,
+    prompt_def: dict,
+    client,
+) -> list:
+    """
+    Extract quotes from EarningsCall speaker-segmented transcript.
+    Each management segment gets its own focused LLM call with the
+    speaker pre-identified. Returns combined items list.
+    """
+    speakers     = transcript.get("speakers", [])
+    fiscal_year  = transcript.get("fiscal_year", "")
+    fiscal_quarter = transcript.get("fiscal_quarter", "")
+    source_type  = transcript.get("source_type", "earningscall_api")
+    source_url   = transcript.get("source_url", "")
+    reliability  = transcript.get("reliability", 0.95)
+
+    period = f"{fiscal_quarter} {fiscal_year}".strip()
+    items  = []
+
+    for seg in speakers:
+        if not seg.get("is_management"):
+            continue
+        name  = seg.get("name", "Management")
+        title = seg.get("title", "")
+        text  = seg.get("text", "")
+        is_qa = seg.get("is_qa", False)
+
+        if not text or len(text) < 50:
+            continue
+
+        speaker_label = f"{name}, {title}".rstrip(", ")
+        doc_subtype   = (
+            "earnings_call_qa"
+            if is_qa
+            else "earnings_call_prepared_remarks"
+        )
+
+        filled = prompt_def["prompt"].format(
+            document_subtype=doc_subtype,
+            company=ticker,
+            period=period,
+            text=text[:40_000],
+        )
+
+        try:
+            raw_response = client.structured_generate(
+                prompt=filled,
+                system=(
+                    "You are a financial analyst extracting verbatim executive quotes "
+                    "from earnings call statements. "
+                    f"The speaker is already identified: {speaker_label}. "
+                    "Do not re-identify the speaker. "
+                    "Return a JSON array and nothing else."
+                ),
+            )
+        except Exception as exc:
+            log.warning("%s: LLM call failed for speaker %s: %s", ticker, name, exc)
+            continue
+
+        raw_quotes = _unwrap(raw_response, ticker, ("quotes", "items", "results", "data"))
+        if not raw_quotes:
+            continue
+
+        for q in raw_quotes:
+            if not isinstance(q, dict):
+                continue
+            quote_text = (q.get("quote_text") or "").strip()
+            if not quote_text:
+                continue
+            items.append({
+                "evidence_id":         _evidence_id(ticker, source_url, quote_text),
+                "quote_text":          quote_text,
+                "quote_type":          "direct",
+                "speaker":             name,
+                "speaker_confidence":  0.99,
+                "category":            q.get("category", ""),
+                "direction":           q.get("direction", "NEUTRAL"),
+                "significance":        q.get("significance", "MEDIUM"),
+                "source_type":         source_type,
+                "source_url":          source_url,
+                "fiscal_year":         fiscal_year,
+                "fiscal_quarter":      fiscal_quarter,
+                "reliability":         reliability,
+                "prompt_name":         prompt_def["name"],
+                "prompt_version":      prompt_def["version"],
+                "document_subtype":    doc_subtype,
+                "ticker":              ticker,
+                "item_class":          "management_quote",
+                "source_priority":     "official_company_material",
+                "category_confidence": float(q.get("category_confidence", 0.75)),
+                "category_source":     "llm_assigned",
+            })
+
+    log.info("%s: speaker-segmented extraction — %d quotes from %d management segments",
+             ticker, len(items), sum(1 for s in speakers if s.get("is_management")))
+    return items
+
+
 def extract_quotes(transcript: dict) -> list:
     """
     Extract structured quotes from a transcript or press release dict.
+
+    When transcript["speakers"] is populated (EarningsCall source), uses
+    per-segment extraction with pre-identified speakers. Otherwise falls
+    through to the wall-of-text extraction path.
 
     Args:
         transcript: dict from fetch_transcript(). Must include raw_text.
@@ -115,7 +219,20 @@ def extract_quotes(transcript: dict) -> list:
         return []
 
     prompt_def = _load_prompt("quote_extractor")
-    period     = f"{fiscal_quarter} {fiscal_year}".strip()
+
+    # ── Speaker-segmented path (EarningsCall) ─────────────────────
+    if transcript.get("speakers"):
+        try:
+            client = get_client("extraction")
+            return _extract_quotes_from_speakers(transcript, ticker, prompt_def, client)
+        except Exception as exc:
+            log.warning(
+                "%s: speaker-segmented extraction failed (%s) — falling back to full text",
+                ticker, exc,
+            )
+
+    # ── Wall-of-text path (all other sources) ────────────────────
+    period = f"{fiscal_quarter} {fiscal_year}".strip()
 
     if len(raw_text) > 100_000:
         log.warning(
@@ -317,6 +434,7 @@ def extract_filing_quotes(passages: list, ticker: str) -> tuple:
                 "source_priority":          "primary_sec",
                 "category_confidence":      float(q.get("category_confidence", 0.75)),
                 "category_source":          "llm_assigned",
+                "specificity":              q.get("specificity", ""),
                 "filing_section_label":     _filing_section_label(section),
                 "chunk_index":              -1,
                 "total_chunks":             total_chunks,

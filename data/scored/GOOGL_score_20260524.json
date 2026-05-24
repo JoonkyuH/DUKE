@@ -1,33 +1,35 @@
 {
-  "score_id": "SC-GOOGL-20260524-0217-245E",
+  "score_id": "SC-GOOGL-20260524-1649-8B03",
   "packet_reference": "GOOGL_20260524",
   "ticker": "GOOGL",
   "company_name": "Alphabet Inc.",
-  "scored_at": "2026-05-24T02:17:25.514242+00:00",
-  "evidence_score": 42.522,
-  "confidence_score": 85.6,
+  "scored_at": "2026-05-24T16:49:48.106861+00:00",
+  "evidence_score": 43.1,
+  "confidence_score": 92.9,
   "conviction": "medium",
   "recommendation": "moderate_conviction_enter",
   "position_sizing": "half",
   "evidence_breakdown": {
-    "bull_weight": 5.05,
-    "bear_weight": 5.05,
-    "neutral_weight": 1.9,
+    "bull_weight": 11.065,
+    "bear_weight": 4.83,
+    "neutral_weight": 2.85,
     "binary_weight": 0.0,
-    "total_weight": 12.0,
-    "net_score": 0.0,
-    "directional_count": 14,
-    "high_reliability_count": 8
+    "total_weight": 18.745,
+    "net_score": 39.2,
+    "directional_count": 21,
+    "high_reliability_count": 16
   },
   "confidence_breakdown": {
-    "base_confidence": 80.6,
+    "base_confidence": 87.9,
     "contradiction_penalty": 0.0,
     "binary_catalyst_penalty": 0.0,
     "stale_data_penalty": 0.0,
     "thin_evidence_penalty": 0.0,
+    "coverage_penalty": 0.0,
     "total_penalty": 0.0,
     "bonuses": 5.0,
-    "final_confidence": 85.6
+    "final_confidence": 92.9,
+    "management_quote_count": 8
   },
   "invalidation_report": {
     "status": "clear",
@@ -38,59 +40,28 @@
     "notes": "All thesis invalidation conditions are clear."
   },
   "primary_risks": [
-    "As of March 31, 2026, we have entered into leases primarily related to data centers that have not yet commenced with future lease payments of $75.6 billion. These leases will commence between 2026 and 2031 with non-cancelable lease terms primarily between one and 25 years.",
+    "As of March 31, 2026, we had short-term accrued legal and regulatory fines and settlements of $15.6 billion. This amount primarily included EC fines, in addition to accruals related to other legal matters and regulatory fines and settlements.",
     "As of March 31, 2026, we had material purchase commitments and other contractual obligations totaling $332.4 billion, of which $138.0 billion was short-term. These purchase commitments primarily relate to costs for technical infrastructure and inventory through long-term supply agreements and open purchase orders.",
-    "As of March 31, 2026, we had short-term accrued legal and regulatory fines and settlements of $15.6 billion. This amount primarily included EC fines, in addition to accruals related to other legal matters and regulatory fines and settlements."
+    "We are monitoring ongoing developments surrounding geopolitical tension, international trade, and the macroeconomic environment. As a result, we may experience direct and indirect effects on our business, operations, and financial results. Our past results may not be indicative of our future performance, and our financial results may differ materially from historical trends."
   ],
-  "screening_score": 60.74,
-  "screening_reason_codes": [
-    "STRONG_REVENUE_GROWTH",
-    "HIGH_GROSS_MARGIN",
-    "EXPANDING_MARGINS",
-    "UNDERVALUED_PEG"
-  ],
-  "raw_directional_thesis_score": 39.3,
-  "directional_thesis_score": 42.522,
-  "risk_burden_score": 57.0,
-  "evidence_score_note": "14 directional items; bull weight 5.05 vs bear 5.05 \u2192 net +0.0",
-  "confidence_score_note": "base 80.6  /  bonuses +5.0  \u2192  85.6",
+  "screening_score": 0.0,
+  "screening_reason_codes": [],
+  "raw_directional_thesis_score": 58.1,
+  "directional_thesis_score": 43.1,
+  "risk_burden_score": 44.6,
+  "evidence_score_note": "21 directional items; bull weight 11.06 vs bear 4.83 \u2192 net +39.2",
+  "confidence_score_note": "base 87.9  /  bonuses +5.0  \u2192  92.9",
   "metadata": {
-    "evidence_item_count": 16,
+    "evidence_item_count": 24,
     "contradiction_count": 0,
     "catalyst_count": 0,
     "tic_count": 0,
     "risk_factor_count": 3,
-    "directional_items_count": 11,
+    "directional_items_count": 19,
     "risk_items_count": 3,
     "disclosed_risk_items": [
       {
-        "evidence_id": "EV-006",
-        "direction": "bearish",
-        "reliability": 0.95,
-        "category": "risk_factors",
-        "quote_text": "As of March 31, 2026, we have entered into leases primarily related to data centers that have not yet commenced with future lease payments of $75.6 billion. These leases will commence between 2026 and 2031 with non-cancelable lease terms primarily between one and 25 years.",
-        "source_url": "https://www.sec.gov/Archives/edgar/data/1652044/000165204426000048/goog-20260331.htm",
-        "filing_date": "2026-04-30",
-        "speaker": "SEC Filing",
-        "filing_section_label": "item_2_mda",
-        "item_class": "filing_quote",
-        "evidence_nature": "disclosed_risk"
-      },
-      {
-        "evidence_id": "EV-007",
-        "direction": "bearish",
-        "reliability": 0.95,
-        "category": "risk_factors",
-        "quote_text": "As of March 31, 2026, we had material purchase commitments and other contractual obligations totaling $332.4 billion, of which $138.0 billion was short-term. These purchase commitments primarily relate to costs for technical infrastructure and inventory through long-term supply agreements and open purchase orders.",
-        "source_url": "https://www.sec.gov/Archives/edgar/data/1652044/000165204426000048/goog-20260331.htm",
-        "filing_date": "2026-04-30",
-        "speaker": "SEC Filing",
-        "filing_section_label": "item_2_mda",
-        "item_class": "filing_quote",
-        "evidence_nature": "disclosed_risk"
-      },
-      {
-        "evidence_id": "EV-008",
+        "evidence_id": "EV-014",
         "direction": "bearish",
         "reliability": 0.95,
         "category": "risk_factors",
@@ -100,23 +71,60 @@
         "speaker": "SEC Filing",
         "filing_section_label": "item_2_mda",
         "item_class": "filing_quote",
-        "evidence_nature": "disclosed_risk"
+        "evidence_nature": "disclosed_risk",
+        "specificity": "specific"
+      },
+      {
+        "evidence_id": "EV-015",
+        "direction": "neutral",
+        "reliability": 0.95,
+        "category": "risk_factors",
+        "quote_text": "As of March 31, 2026, we had material purchase commitments and other contractual obligations totaling $332.4 billion, of which $138.0 billion was short-term. These purchase commitments primarily relate to costs for technical infrastructure and inventory through long-term supply agreements and open purchase orders.",
+        "source_url": "https://www.sec.gov/Archives/edgar/data/1652044/000165204426000048/goog-20260331.htm",
+        "filing_date": "2026-04-30",
+        "speaker": "SEC Filing",
+        "filing_section_label": "item_2_mda",
+        "item_class": "filing_quote",
+        "evidence_nature": "disclosed_risk",
+        "specificity": "specific"
+      },
+      {
+        "evidence_id": "EV-016",
+        "direction": "bearish",
+        "reliability": 0.95,
+        "category": "risk_factors",
+        "quote_text": "We are monitoring ongoing developments surrounding geopolitical tension, international trade, and the macroeconomic environment. As a result, we may experience direct and indirect effects on our business, operations, and financial results. Our past results may not be indicative of our future performance, and our financial results may differ materially from historical trends.",
+        "source_url": "https://www.sec.gov/Archives/edgar/data/1652044/000165204426000048/goog-20260331.htm",
+        "filing_date": "2026-04-30",
+        "speaker": "SEC Filing",
+        "filing_section_label": "item_2_mda",
+        "item_class": "filing_quote",
+        "evidence_nature": "disclosed_risk",
+        "specificity": "generic"
       }
     ],
-    "screening_adjustment_applied": 3.22,
+    "mgmt_direction_adjustment_applied": true,
+    "external_asymmetry_adjustment_applied": true,
+    "risk_specificity_breakdown": {
+      "specific": 2,
+      "generic": 1,
+      "untagged": 0
+    },
+    "screening_adjustment_applied": -15.0,
+    "mgmt_coverage_conviction_cap": false,
     "conviction_ceiling_applied": false,
     "risk_burden_cap_applied": false,
     "risk_burden_cap_reason": "",
     "position_sizing_before_cap": null
   },
-  "generated_at": "2026-05-24T02:17:25.514360+00:00",
+  "generated_at": "2026-05-24T16:49:48.106940+00:00",
   "analyst_brief_date": "20260524",
-  "screening_score_used": 60.74,
+  "screening_score_used": 0.0,
   "data_availability": {
     "fundamentals": "not_available",
     "catalyst_map": "not_available",
     "thesis_invalidation_conditions": "not_available",
     "data_freshness": "not_available",
-    "screening_score": "available"
+    "screening_score": "not_available"
   }
 }

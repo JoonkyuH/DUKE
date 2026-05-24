@@ -1,0 +1,127 @@
+{
+  "generated_at": "2026-05-24T16:50:10.222808+00:00",
+  "universe_size": 5,
+  "shortlist_size": 5,
+  "regime": "risk_on_momentum",
+  "tickers": [
+    {
+      "ticker": "NVDA",
+      "archetype": "long_term_compounder",
+      "composite_score": 78.19,
+      "conviction": "HIGH",
+      "reason_codes": [
+        "STRONG_REVENUE_GROWTH",
+        "HIGH_GROSS_MARGIN",
+        "EXPANDING_MARGINS",
+        "STRONG_FCF",
+        "UNDERVALUED_PEG",
+        "REVENUE_ACCELERATION",
+        "MULTI_SIGNAL_CONFLUENCE"
+      ],
+      "flags": [],
+      "rank": 1,
+      "signal_scores": {
+        "business_quality": 92.0,
+        "valuation_vs_growth": 77.0,
+        "historical_discount": 36.0,
+        "earnings_quality": 74.0,
+        "entry_vs_fundamentals": 55.0,
+        "binary_event_risk": 78.0
+      }
+    },
+    {
+      "ticker": "AMD",
+      "archetype": "long_term_compounder",
+      "composite_score": 64.44,
+      "conviction": "MEDIUM",
+      "reason_codes": [
+        "STRONG_REVENUE_GROWTH",
+        "EXPANDING_MARGINS",
+        "STRONG_FCF",
+        "HIGH_EARNINGS_QUALITY"
+      ],
+      "flags": [
+        "FLAG_HIGH_PFCF"
+      ],
+      "rank": 2,
+      "signal_scores": {
+        "business_quality": 77.0,
+        "valuation_vs_growth": 30.0,
+        "historical_discount": 20.0,
+        "earnings_quality": 91.7,
+        "entry_vs_fundamentals": 39.0,
+        "binary_event_risk": 78.0
+      }
+    },
+    {
+      "ticker": "GOOGL",
+      "archetype": "long_term_compounder",
+      "composite_score": 60.74,
+      "conviction": "MEDIUM",
+      "reason_codes": [
+        "STRONG_REVENUE_GROWTH",
+        "HIGH_GROSS_MARGIN",
+        "EXPANDING_MARGINS",
+        "UNDERVALUED_PEG"
+      ],
+      "flags": [
+        "FLAG_FCF_BELOW_EARNINGS",
+        "FLAG_HIGH_PFCF"
+      ],
+      "rank": 3,
+      "signal_scores": {
+        "business_quality": 70.0,
+        "valuation_vs_growth": 69.0,
+        "historical_discount": 11.0,
+        "earnings_quality": 48.7,
+        "entry_vs_fundamentals": 34.0,
+        "binary_event_risk": 78.0
+      }
+    },
+    {
+      "ticker": "AAPL",
+      "archetype": "quality_compounder",
+      "composite_score": 59.03,
+      "conviction": "MEDIUM",
+      "reason_codes": [
+        "EXPANDING_MARGINS",
+        "STRONG_FCF",
+        "HIGH_EARNINGS_QUALITY"
+      ],
+      "flags": [],
+      "rank": 4,
+      "signal_scores": {
+        "business_quality": 61.0,
+        "valuation_vs_growth": 72.0,
+        "historical_discount": 9.0,
+        "earnings_quality": 76.7,
+        "entry_vs_fundamentals": 11.0,
+        "binary_event_risk": 78.0
+      }
+    },
+    {
+      "ticker": "MSFT",
+      "archetype": "quality_compounder",
+      "composite_score": 56.65,
+      "conviction": "MEDIUM",
+      "reason_codes": [
+        "MODERATE_REVENUE_GROWTH",
+        "HIGH_GROSS_MARGIN",
+        "STRONG_FCF",
+        "REVENUE_ACCELERATION"
+      ],
+      "flags": [
+        "FLAG_FCF_BELOW_EARNINGS"
+      ],
+      "rank": 5,
+      "signal_scores": {
+        "business_quality": 64.0,
+        "valuation_vs_growth": 70.0,
+        "historical_discount": 45.0,
+        "earnings_quality": 42.0,
+        "entry_vs_fundamentals": 43.0,
+        "binary_event_risk": 78.0
+      }
+    }
+  ]
+}

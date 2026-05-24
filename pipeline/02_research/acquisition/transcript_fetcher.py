@@ -84,6 +84,17 @@ _CDN_CONTENT_KW = re.compile(
 def _db() -> sqlite3.Connection:
     con = sqlite3.connect(_DB_PATH)
     con.row_factory = sqlite3.Row
+    # Add new columns introduced in DUKE-03; idempotent on existing databases.
+    for col_ddl in (
+        "ALTER TABLE transcript_cache ADD COLUMN conference_date TEXT",
+        "ALTER TABLE transcript_cache ADD COLUMN has_q_and_a INTEGER DEFAULT 0",
+        "ALTER TABLE transcript_cache ADD COLUMN speakers TEXT",
+    ):
+        try:
+            con.execute(col_ddl)
+            con.commit()
+        except sqlite3.OperationalError:
+            pass  # column already exists
     return con
 
 
@@ -100,17 +111,28 @@ def _cache_get(ticker: str, fiscal_year: str, fiscal_quarter: str) -> Optional[s
 
 
 def _cache_write(row: dict) -> None:
+    import json as _json
+    speakers_json = None
+    if row.get("speakers") is not None:
+        try:
+            speakers_json = _json.dumps(row["speakers"])
+        except Exception:
+            pass
     with _db() as con:
         con.execute(
             """INSERT OR REPLACE INTO transcript_cache
                (id, ticker, fiscal_year, fiscal_quarter, calendar_period,
-                reported_date, source_type, source_url, raw_text, fetched_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                reported_date, source_type, source_url, raw_text, fetched_at,
+                conference_date, has_q_and_a, speakers)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 row["id"], row["ticker"], row["fiscal_year"], row["fiscal_quarter"],
                 row["calendar_period"], row["reported_date"], row["source_type"],
                 row["source_url"], row["raw_text"],
                 datetime.now(timezone.utc).isoformat(),
+                row.get("conference_date"),
+                1 if row.get("has_q_and_a") else 0,
+                speakers_json,
             ),
         )
 
@@ -120,6 +142,82 @@ def _ir_cache_get(ticker: str) -> Optional[sqlite3.Row]:
         return con.execute(
             "SELECT * FROM ir_cache WHERE ticker = ?", (ticker.upper(),)
         ).fetchone()
+
+
+def _read_transcript_cache(ticker: str) -> Optional[dict]:
+    """
+    Return the most recent transcript cache entry for ticker, or None.
+    Searches across all fiscal periods — returns the entry with the latest
+    conference_date (falling back to fetched_at for legacy entries).
+    """
+    import json as _json
+    ticker = ticker.upper()
+    with _db() as con:
+        rows = con.execute(
+            "SELECT * FROM transcript_cache WHERE ticker = ? "
+            "ORDER BY COALESCE(conference_date, fetched_at) DESC LIMIT 1",
+            (ticker,),
+        ).fetchall()
+    if not rows:
+        return None
+    row = rows[0]
+    d = dict(row)
+    # Decode speakers JSON if present
+    if d.get("speakers"):
+        try:
+            d["speakers"] = _json.loads(d["speakers"])
+        except Exception:
+            d["speakers"] = None
+    return d
+
+
+def _cache_transcript(ticker: str, transcript: dict) -> None:
+    """
+    Write a transcript dict (as returned by fetch_earningscall_transcript or
+    fetch_transcript) into transcript_cache. Derives the cache id from ticker,
+    fiscal_year, and fiscal_quarter.
+    """
+    ticker = ticker.upper()
+    fiscal_year    = transcript.get("fiscal_year", "FY0000")
+    fiscal_quarter = transcript.get("fiscal_quarter", "Q0")
+    cache_id       = _cache_key(ticker, fiscal_year, fiscal_quarter)
+    _cache_write({
+        "id":               cache_id,
+        "ticker":           ticker,
+        "fiscal_year":      fiscal_year,
+        "fiscal_quarter":   fiscal_quarter,
+        "calendar_period":  transcript.get("calendar_period") or "",
+        "reported_date":    transcript.get("reported_date") or "",
+        "source_type":      transcript.get("source_type", ""),
+        "source_url":       transcript.get("source_url", ""),
+        "raw_text":         transcript.get("raw_text", ""),
+        "conference_date":  transcript.get("conference_date"),
+        "has_q_and_a":      transcript.get("has_q_and_a", False),
+        "speakers":         transcript.get("speakers"),
+    })
+
+
+def _is_transcript_stale(cached: dict) -> bool:
+    """
+    Return True if the cached transcript should be re-fetched.
+    conference_date-based check with TTL fallback for legacy entries.
+    """
+    conf_date_str = cached.get("conference_date")
+    if conf_date_str:
+        try:
+            conf_date = date.fromisoformat(conf_date_str)
+            return conf_date < date.today()
+        except Exception:
+            pass
+    # Legacy entry — use TTL fallback
+    fetched_at = cached.get("fetched_at", "")
+    try:
+        age_days = (
+            datetime.now(timezone.utc) - datetime.fromisoformat(fetched_at)
+        ).days
+        return age_days >= _TRANSCRIPT_CACHE_TTL_DAYS
+    except Exception:
+        return True  # Unknown age — treat as stale
 
 
 # ─────────────────────────────────────────────
@@ -916,6 +1014,7 @@ def _try_youtube(ir_url: Optional[str], ticker: str) -> Optional[tuple]:
 
 def _source_reliability(source_type: str) -> float:
     return {
+        "earningscall_api":               0.95,
         "ir_transcript_pdf":              0.95,
         "sec_8k_exhibit":                 0.95,
         "sec_8k_exhibit_press_release":   0.95,
@@ -927,6 +1026,8 @@ def _source_reliability(source_type: str) -> float:
 
 
 def _document_subtype(source_type: str) -> str:
+    if source_type == "earningscall_api":
+        return "earnings_call_transcript"
     if source_type in (
         "sec_8k_exhibit", "sec_8k_exhibit_press_release",
         "ir_press_release", "ir_earnings_event",
@@ -943,10 +1044,48 @@ def _document_subtype(source_type: str) -> str:
 # PUBLIC ENTRY POINT
 # ─────────────────────────────────────────────
 
+def _build_transcript_return(cached: dict) -> dict:
+    """Build the public return dict from a cached row or a fresh fetch result."""
+    import json as _json
+    st = cached.get("source_type", "")
+    speakers = cached.get("speakers")
+    if isinstance(speakers, str):
+        try:
+            speakers = _json.loads(speakers)
+        except Exception:
+            speakers = None
+    return {
+        "ticker":           cached.get("ticker", ""),
+        "source_type":      st,
+        "source_url":       cached.get("source_url", ""),
+        "raw_text":         cached.get("raw_text", ""),
+        "fiscal_year":      cached.get("fiscal_year", ""),
+        "fiscal_quarter":   cached.get("fiscal_quarter", ""),
+        "calendar_period":  cached.get("calendar_period"),
+        "reported_date":    cached.get("reported_date", ""),
+        "reliability":      _source_reliability(st),
+        "discovered_by":    cached.get("discovered_by", "cache"),
+        "document_subtype": _document_subtype(st),
+        "source_priority":  "official_company_material",
+        "has_q_and_a":      bool(cached.get("has_q_and_a")),
+        "conference_date":  cached.get("conference_date"),
+        "speakers":         speakers or [],
+    }
+
+
 def fetch_transcript(ticker: str) -> Optional[dict]:
     """
     Fetch the most recent earnings transcript via priority waterfall.
     Returns None only if every source fails.
+
+    Waterfall order:
+      0. EarningsCall API (primary — full transcript with speaker attribution)
+      1A. Perplexity transcript discovery
+      1B. Static IR page PDF scraping
+      2.  IR press release HTML
+      3.  SEC 8-K exhibit
+      4.  FMP API
+      5.  YouTube transcript
     """
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from ir_discovery import get_ir_url, get_company_name
@@ -954,59 +1093,56 @@ def fetch_transcript(ticker: str) -> Optional[dict]:
     ticker = ticker.upper()
     fiscal_year, fiscal_quarter, cal_period, reported_date = _fiscal_periods(ticker)
 
-    # ── Cache check ──────────────────────────
-    cached = _cache_get(ticker, fiscal_year, fiscal_quarter)
+    # ── Cache check ──────────────────────────────────────────────
+    # Use the most-recent entry across all fiscal periods, then validate
+    # staleness using conference_date (or TTL fallback for legacy entries).
+    cached = _read_transcript_cache(ticker)
     if cached:
-        try:
-            age_days = (
-                datetime.now(timezone.utc)
-                - datetime.fromisoformat(cached["fetched_at"])
-            ).days
-        except Exception:
-            age_days = 0
-
-        if age_days < _TRANSCRIPT_CACHE_TTL_DAYS:
+        if not _is_transcript_stale(cached):
             log.info(
-                "%s: transcript cache hit (%s %s, age=%dd)",
-                ticker, fiscal_year, fiscal_quarter, age_days,
+                "%s: transcript cache hit (conference_date %s)",
+                ticker, cached.get("conference_date", "unknown"),
             )
-            st = cached["source_type"]
-            return {
-                "ticker":           cached["ticker"],
-                "source_type":      st,
-                "source_url":       cached["source_url"],
-                "raw_text":         cached["raw_text"],
-                "fiscal_year":      cached["fiscal_year"],
-                "fiscal_quarter":   cached["fiscal_quarter"],
-                "calendar_period":  cached["calendar_period"],
-                "reported_date":    cached["reported_date"],
-                "reliability":      _source_reliability(st),
-                "discovered_by":    "cache",
-                "document_subtype": _document_subtype(st),
-                "source_priority":  "official_company_material",
-            }
-
-        log.info(
-            "%s: transcript cache stale (age=%dd ≥ %d) — re-fetching",
-            ticker, age_days, _TRANSCRIPT_CACHE_TTL_DAYS,
-        )
+            return _build_transcript_return(cached)
+        else:
+            log.info("%s: transcript cache stale — re-fetching", ticker)
 
     ir_url       = get_ir_url(ticker)
     company_name = get_company_name(ticker)
 
-    result_text  = None
-    source_type  = None
-    source_url   = None
+    result_text   = None
+    source_type   = None
+    source_url    = None
     discovered_by = None
+    ec_result     = None
 
-    # 1A — Perplexity direct discovery
+    # ── Priority 0: EarningsCall API ─────────────────────────────
+    log.info("%s: [0] EarningsCall API …", ticker)
+    try:
+        _STAGE_DIR = Path(__file__).resolve().parent
+        sys.path.insert(0, str(_STAGE_DIR))
+        from earningscall_fetcher import fetch_earningscall_transcript
+        ec = fetch_earningscall_transcript(ticker, company_name)
+        if ec and ec.get("raw_text"):
+            log.info(
+                "%s: EarningsCall transcript acquired (%d chars, %s %s)",
+                ticker, len(ec["raw_text"]),
+                ec.get("fiscal_year", "?"), ec.get("fiscal_quarter", "?"),
+            )
+            ec_result = ec
+            _cache_transcript(ticker, ec)
+            return _build_transcript_return(ec)
+    except Exception as exc:
+        log.warning("%s: EarningsCall Priority 0 failed: %s", ticker, exc)
+
+    # ── Priority 1A: Perplexity direct discovery ──────────────────
     log.info("%s: [1A] Perplexity transcript discovery …", ticker)
     out = _try_perplexity_transcript(ir_url, ticker, company_name, fiscal_year, fiscal_quarter)
     if out:
         result_text, source_url, source_type = out
         discovered_by = "perplexity"
 
-    # 1B — Static IR page HTML scraping
+    # ── Priority 1B: Static IR page PDF scraping ──────────────────
     if result_text is None and ir_url:
         log.info("%s: [1B] static IR page PDF scraping …", ticker)
         out = _try_ir_pdf(ir_url, ticker)
@@ -1015,7 +1151,7 @@ def fetch_transcript(ticker: str) -> Optional[dict]:
             source_type   = "ir_transcript_pdf"
             discovered_by = "direct"
 
-    # 2 — IR press release
+    # ── Priority 2: IR press release ──────────────────────────────
     if result_text is None and ir_url:
         log.info("%s: [2] IR press release …", ticker)
         out = _try_ir_press_release(ir_url, ticker)
@@ -1024,7 +1160,7 @@ def fetch_transcript(ticker: str) -> Optional[dict]:
             source_type   = "ir_press_release"
             discovered_by = "direct"
 
-    # 3 — SEC 8-K (returns 3-tuple with source_type)
+    # ── Priority 3: SEC 8-K (returns 3-tuple with source_type) ───
     if result_text is None:
         log.info("%s: [3] SEC 8-K exhibit …", ticker)
         out = _try_sec_8k(ticker)
@@ -1032,7 +1168,7 @@ def fetch_transcript(ticker: str) -> Optional[dict]:
             result_text, source_url, source_type = out
             discovered_by = "sec_edgar"
 
-    # 4 — FMP API
+    # ── Priority 4: FMP API ───────────────────────────────────────
     if result_text is None:
         log.info("%s: [4] FMP API …", ticker)
         out = _try_fmp(ticker)
@@ -1041,7 +1177,7 @@ def fetch_transcript(ticker: str) -> Optional[dict]:
             source_type   = "fmp_transcript"
             discovered_by = "fmp"
 
-    # 5 — YouTube
+    # ── Priority 5: YouTube ───────────────────────────────────────
     if result_text is None:
         log.info("%s: [5] YouTube transcript …", ticker)
         out = _try_youtube(ir_url, ticker)
@@ -1053,8 +1189,6 @@ def fetch_transcript(ticker: str) -> Optional[dict]:
     if result_text is None:
         log.warning("%s: all transcript sources exhausted", ticker)
         return None
-
-    reliability = _source_reliability(source_type)
 
     cache_id = _cache_key(ticker, fiscal_year, fiscal_quarter)
     _cache_write({
@@ -1082,8 +1216,11 @@ def fetch_transcript(ticker: str) -> Optional[dict]:
         "fiscal_quarter":   fiscal_quarter,
         "calendar_period":  cal_period,
         "reported_date":    reported_date,
-        "reliability":      reliability,
+        "reliability":      _source_reliability(source_type),
         "discovered_by":    discovered_by,
         "document_subtype": _document_subtype(source_type),
         "source_priority":  "official_company_material",
+        "has_q_and_a":      False,
+        "conference_date":  None,
+        "speakers":         [],
     }

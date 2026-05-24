@@ -425,6 +425,51 @@ def main():
     print()
     print(f"  Saved → {saved_path}")
 
+    # ── Transcript prefetch ───────────────────────────────────────
+    try:
+        import sys as _sys
+        _sys.path.insert(0, str(
+            Path(__file__).resolve().parent.parent /
+            "02_research" / "acquisition"
+        ))
+        from earningscall_fetcher import fetch_earningscall_transcript
+        from transcript_fetcher import (
+            _cache_transcript,
+            _read_transcript_cache,
+            _is_transcript_stale,
+        )
+        from ir_discovery import get_company_name
+
+        print()
+        print("  [Transcript prefetch]")
+        prefetched = skipped = failed = 0
+        for rec in raw_records:
+            t = rec.get("ticker", "")
+            if not t:
+                continue
+            try:
+                cached = _read_transcript_cache(t)
+                if cached and not _is_transcript_stale(cached):
+                    skipped += 1
+                    continue
+                cn = get_company_name(t)
+                result = fetch_earningscall_transcript(t, cn)
+                if result:
+                    _cache_transcript(t, result)
+                    prefetched += 1
+                else:
+                    failed += 1
+            except Exception as exc:
+                log.warning("%s: prefetch failed: %s", t, exc)
+                failed += 1
+        print(
+            f"    Prefetched: {prefetched}  "
+            f"Skipped (fresh): {skipped}  "
+            f"Failed/no coverage: {failed}"
+        )
+    except Exception as exc:
+        log.warning("Transcript prefetch error: %s", exc)
+
     print()
     print("═" * W)
     print()

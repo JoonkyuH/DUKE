@@ -1,13 +1,33 @@
 {
-  "generated_at": "2026-05-21T14:10:06.938285+00:00",
-  "universe_size": 3,
-  "shortlist_size": 3,
+  "generated_at": "2026-05-21T14:19:52.813681+00:00",
+  "universe_size": 10,
+  "shortlist_size": 8,
   "regime": "risk_on_momentum",
   "tickers": [
     {
+      "ticker": "PLTR",
+      "archetype": "long_term_compounder",
+      "composite_score": 76.04,
+      "conviction": "HIGH",
+      "reason_codes": [
+        "STRONG_REVENUE_GROWTH",
+        "HIGH_GROSS_MARGIN",
+        "EXPANDING_MARGINS",
+        "STRONG_FCF",
+        "HISTORICAL_DISCOUNT",
+        "HIGH_EARNINGS_QUALITY",
+        "REVENUE_ACCELERATION",
+        "MULTI_SIGNAL_CONFLUENCE"
+      ],
+      "flags": [
+        "FLAG_HIGH_PFCF"
+      ],
+      "rank": 1
+    },
+    {
       "ticker": "NVDA",
       "archetype": "long_term_compounder",
-      "composite_score": 74.23,
+      "composite_score": 74.95,
       "conviction": "HIGH",
       "reason_codes": [
         "STRONG_REVENUE_GROWTH",
@@ -19,7 +39,72 @@
         "MULTI_SIGNAL_CONFLUENCE"
       ],
       "flags": [],
-      "rank": 1
+      "rank": 2
+    },
+    {
+      "ticker": "AMD",
+      "archetype": "long_term_compounder",
+      "composite_score": 64.92,
+      "conviction": "MEDIUM",
+      "reason_codes": [
+        "STRONG_REVENUE_GROWTH",
+        "EXPANDING_MARGINS",
+        "STRONG_FCF",
+        "HIGH_EARNINGS_QUALITY"
+      ],
+      "flags": [
+        "FLAG_HIGH_PFCF"
+      ],
+      "rank": 3
+    },
+    {
+      "ticker": "GOOGL",
+      "archetype": "long_term_compounder",
+      "composite_score": 60.74,
+      "conviction": "MEDIUM",
+      "reason_codes": [
+        "STRONG_REVENUE_GROWTH",
+        "HIGH_GROSS_MARGIN",
+        "EXPANDING_MARGINS",
+        "UNDERVALUED_PEG"
+      ],
+      "flags": [
+        "FLAG_FCF_BELOW_EARNINGS",
+        "FLAG_HIGH_PFCF"
+      ],
+      "rank": 4
+    },
+    {
+      "ticker": "META",
+      "archetype": "either",
+      "composite_score": 58.66,
+      "conviction": "MEDIUM",
+      "reason_codes": [
+        "MODERATE_REVENUE_GROWTH",
+        "HIGH_GROSS_MARGIN",
+        "STRONG_FCF",
+        "UNDERVALUED_PEG"
+      ],
+      "flags": [],
+      "rank": 5
+    },
+    {
+      "ticker": "AVGO",
+      "archetype": "quality_compounder",
+      "composite_score": 58.08,
+      "conviction": "MEDIUM",
+      "reason_codes": [
+        "MODERATE_REVENUE_GROWTH",
+        "HIGH_GROSS_MARGIN",
+        "STRONG_FCF",
+        "HIGH_EARNINGS_QUALITY",
+        "REVENUE_ACCELERATION"
+      ],
+      "flags": [
+        "FLAG_BINARY_EVENT_RISK",
+        "FLAG_HIGH_PFCF"
+      ],
+      "rank": 6
     },
     {
       "ticker": "MSFT",
@@ -35,7 +120,7 @@
       "flags": [
         "FLAG_FCF_BELOW_EARNINGS"
       ],
-      "rank": 2
+      "rank": 7
     },
     {
       "ticker": "AAPL",
@@ -48,7 +133,7 @@
         "HIGH_EARNINGS_QUALITY"
       ],
       "flags": [],
-      "rank": 3
+      "rank": 8
     }
   ]
 }
