@@ -4,3 +4,4 @@ __pycache__/
 pipeline/02_research/validation/review_queue/*.json
 data/raw/*.json
 *.egg-info/
+*.db
