@@ -29,6 +29,7 @@ _FACTS_URL      = "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json"
 _HEADERS        = {"User-Agent": "DUKE-research contact@duke-research.ai"}
 
 _ticker_cache: dict = {}   # ticker → zero-padded CIK str, populated on first call
+_facts_cache:  dict = {}   # CIK → raw companyfacts JSON; populated on first fetch per ticker
 _MIN_RECENT_END = "2020-01-01"  # concepts with no entry this recent are considered absent
 
 
@@ -283,8 +284,10 @@ def fetch_financials(ticker: str, as_of: str | None = None) -> dict:
         urllib.error.HTTPError — EDGAR returned 404 (no XBRL data for CIK)
     """
     cik_str = _cik(ticker)
-    time.sleep(0.15)    # polite rate-limiting; EDGAR allows 10 req/sec
-    facts = _get(_FACTS_URL.format(cik=cik_str))
+    if cik_str not in _facts_cache:
+        time.sleep(0.15)    # polite rate-limiting; EDGAR allows 10 req/sec
+        _facts_cache[cik_str] = _get(_FACTS_URL.format(cik=cik_str))
+    facts = _facts_cache[cik_str]
 
     def usd(*concepts):
         return _entries(facts, *concepts, unit="USD")
@@ -357,6 +360,54 @@ def fetch_financials(ticker: str, as_of: str | None = None) -> dict:
         "cash_and_equivalents": cash,
         "shares_outstanding":   shares_out,
     }
+
+
+# ─────────────────────────────────────────────
+# CACHE PREFETCH
+# ─────────────────────────────────────────────
+
+def prefetch_facts(tickers: list, verbose: bool = True) -> None:
+    """
+    Pre-populate _facts_cache for a list of tickers.
+
+    Fetches each ticker's companyfacts JSON once and stores it in _facts_cache
+    so that subsequent calls to fetch_financials() with any as_of date skip the
+    network round-trip and only run the in-memory extraction logic.
+
+    Tickers already in the cache are skipped. Tickers not found in the SEC
+    company list (ValueError) or whose EDGAR request fails are silently skipped
+    with an optional warning; they will return empty fundamentals from
+    fetch_financials().
+
+    Respects EDGAR's 10 req/sec guideline (0.15 s sleep per new fetch).
+    """
+    to_fetch = []
+    for ticker in tickers:
+        try:
+            cik = _cik(ticker)
+        except ValueError:
+            continue
+        if cik not in _facts_cache:
+            to_fetch.append((ticker, cik))
+
+    if verbose:
+        already = len(tickers) - len(to_fetch)
+        print(f"EDGAR prefetch: {len(to_fetch)} to fetch, "
+              f"{already} already cached …", flush=True)
+
+    for i, (ticker, cik) in enumerate(to_fetch):
+        try:
+            time.sleep(0.15)
+            _facts_cache[cik] = _get(_FACTS_URL.format(cik=cik))
+        except Exception as exc:
+            if verbose:
+                print(f"  WARN: EDGAR {ticker} ({cik}): {exc}")
+        if verbose and (i + 1) % 50 == 0:
+            print(f"  … {i + 1}/{len(to_fetch)}", flush=True)
+
+    if verbose:
+        print(f"EDGAR prefetch complete ({len(_facts_cache)} tickers cached).\n",
+              flush=True)
 
 
 # ─────────────────────────────────────────────
