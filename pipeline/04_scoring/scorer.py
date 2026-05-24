@@ -125,6 +125,16 @@ def score_packet(packet: dict) -> ScoringOutput:
     else:
         conviction = _determine_conviction(evidence_score, confidence_score)
 
+    # Zero management quotes caps conviction at MEDIUM — no management voice means
+    # we cannot confirm narrative quality regardless of evidence score.
+    mgmt_quote_count = sum(
+        1 for e in evidence_items if e.get("item_class") == "management_quote"
+    )
+    mgmt_coverage_conviction_cap = False
+    if mgmt_quote_count == 0 and conviction == ConvictionLevel.HIGH:
+        conviction = ConvictionLevel.MEDIUM
+        mgmt_coverage_conviction_cap = True
+
     # Risk burden conviction ceiling: extreme structural risk caps bull conviction
     conviction_ceiling_applied = False
     if risk_burden_score >= 90.0 and conviction == ConvictionLevel.HIGH:
@@ -197,9 +207,10 @@ def score_packet(packet: dict) -> ScoringOutput:
             "disclosed_risk_items":              split["risk_items"],
             "mgmt_direction_adjustment_applied": split.get("mgmt_direction_adjustment_applied", False),
             "risk_specificity_breakdown":        split.get("risk_specificity_breakdown", {}),
-            "screening_adjustment_applied":  round(screening_adjustment, 2),
-            "conviction_ceiling_applied":    conviction_ceiling_applied,
-            "risk_burden_cap_applied":       risk_burden_cap_applied,
+            "screening_adjustment_applied":    round(screening_adjustment, 2),
+            "mgmt_coverage_conviction_cap":   mgmt_coverage_conviction_cap,
+            "conviction_ceiling_applied":     conviction_ceiling_applied,
+            "risk_burden_cap_applied":        risk_burden_cap_applied,
             "risk_burden_cap_reason":        risk_burden_cap_reason,
             "position_sizing_before_cap":    sizing_before_cap.value if risk_burden_cap_applied else None,
         },
