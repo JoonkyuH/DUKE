@@ -33,6 +33,115 @@ from typing import Optional
 log = logging.getLogger("signal_scorer")
 
 
+# ─────────────────────────────────────────────
+# SECTOR-AWARE THRESHOLD MULTIPLIERS
+# Source: pages.stern.nyu.edu/~adamodar — January 2026 US data
+# Multiplier = sector_median / Technology_median for gross margin,
+# revenue growth, and FCF margin. Refresh annually.
+# ─────────────────────────────────────────────
+
+_DAMODARAN_VERSION = "January 2026"
+_DAMODARAN_SECTOR_MULTIPLIERS = {
+    "Technology":             1.00,
+    "Communication Services": 0.70,
+    "Consumer Cyclical":      0.50,
+    "Consumer Defensive":     0.55,
+    "Healthcare":             0.65,
+    "Industrials":            0.55,
+    "Energy":                 0.55,
+    "Financials":             0.50,
+    "Real Estate":            0.45,
+    "Utilities":              0.40,
+    "Basic Materials":        0.55,
+    "Unknown":                1.00,
+}
+
+# Technology baselines (percentages) used when the self-computed tech sample
+# has fewer than 10 tickers — keeps the normalization stable.
+_TECH_BASELINES = {
+    "gross_margin":   65.0,
+    "revenue_growth": 20.0,
+    "fcf_margin":     20.0,
+}
+
+# Sector sample accumulated by screener.py during each screening pass.
+# sector_name -> list of (gross_margin, revenue_growth, fcf_margin) tuples.
+_sector_sample: dict = {}
+_logged_sectors: set = set()
+
+
+def reset_sector_sample() -> None:
+    """Clear sample and logging state. Call at the start of each screening run."""
+    _sector_sample.clear()
+    _logged_sectors.clear()
+
+
+def add_to_sector_sample(
+    sector: str,
+    gross_margin,
+    revenue_growth,
+    fcf_margin,
+) -> None:
+    """Accumulate one ticker's metrics into the sector sample."""
+    _sector_sample.setdefault(sector, []).append(
+        (gross_margin, revenue_growth, fcf_margin)
+    )
+
+
+def _get_sector_multiplier(sector: str, signal: str) -> tuple:
+    """
+    Return (multiplier, source_label) for the given sector and signal.
+
+    Primary: if the sector has ≥ 10 tickers in _sector_sample, compute
+    multiplier = sample_median / tech_baseline for that signal.
+    Fallback: _DAMODARAN_SECTOR_MULTIPLIERS[sector] (one multiplier per sector).
+
+    source_label is one of:
+      "self-computed (N=14)"
+      "Damodaran fallback (N=3, below minimum of 10)"
+      "Damodaran fallback (no sample)"
+    """
+    _IDX = {"gross_margin": 0, "revenue_growth": 1, "fcf_margin": 2}
+    idx = _IDX.get(signal, 0)
+
+    sample = _sector_sample.get(sector, [])
+    n = len(sample)
+
+    if n >= 10:
+        vals = sorted(v[idx] for v in sample if v[idx] is not None)
+        if vals:
+            sector_med = vals[len(vals) // 2]
+            tech_sample = _sector_sample.get("Technology", [])
+            if len(tech_sample) >= 10:
+                tech_vals = sorted(v[idx] for v in tech_sample if v[idx] is not None)
+                tech_med = tech_vals[len(tech_vals) // 2] if tech_vals else _TECH_BASELINES[signal]
+            else:
+                tech_med = _TECH_BASELINES[signal]
+            if tech_med and tech_med > 0:
+                m = round(sector_med / tech_med, 3)
+                source = f"self-computed (N={n})"
+                _log_sector_once(sector, m, source)
+                return (m, source)
+
+    m = _DAMODARAN_SECTOR_MULTIPLIERS.get(sector, 1.00)
+    source = (
+        f"Damodaran fallback (N={n}, below minimum of 10)"
+        if n > 0
+        else "Damodaran fallback (no sample)"
+    )
+    _log_sector_once(sector, m, source)
+    return (m, source)
+
+
+def _log_sector_once(sector: str, m: float, source: str) -> None:
+    if sector not in _logged_sectors:
+        log.warning(
+            "%s: threshold multiplier %.2f — %s [%s]",
+            sector, m, source, _DAMODARAN_VERSION,
+        )
+        _logged_sectors.add(sector)
+
+
 @dataclass
 class SignalScores:
     business_quality:      Optional[float]
@@ -90,7 +199,11 @@ def _yoy(curr: Optional[float], prev: Optional[float]) -> Optional[float]:
 # METRICS COMPUTATION (single pass per ticker)
 # ─────────────────────────────────────────────
 
-def compute_fundamental_metrics(fund_d: dict, market_d: dict) -> dict:
+def compute_fundamental_metrics(
+    fund_d: dict,
+    market_d: dict,
+    sector: str = "Unknown",
+) -> dict:
     """
     Derive all fundamental metrics from common.edgar_client output and market price data.
     Called once per ticker; the result dict is passed to all six score functions
@@ -99,6 +212,7 @@ def compute_fundamental_metrics(fund_d: dict, market_d: dict) -> dict:
     fund_d   — common.edgar_client.fetch_financials() output
     market_d — {"market_cap": int, "current_price": float,
                  "week_52_high": float, "week_52_low": float}
+    sector   — yfinance sector string (e.g. "Technology"); drives threshold multipliers
     """
     rev  = fund_d.get("revenue", {})
     gp   = fund_d.get("gross_profit", {})
@@ -220,6 +334,8 @@ def compute_fundamental_metrics(fund_d: dict, market_d: dict) -> dict:
         "week_52_low":          week_52_low,
         "pct_from_high":        pct_from_high,          # % below 52w high (≤ 0)
         "implied_pfcf_at_high": implied_pfcf_at_high,   # peak-valuation proxy
+        # Sector
+        "sector_name":          sector,                 # yfinance sector string
     }
 
 
@@ -252,36 +368,41 @@ def score_business_quality(metrics: dict) -> Optional[float]:
 
     score = 0.0
 
-    # Revenue growth (30 pts)
+    sector = metrics.get("sector_name", "Unknown")
+    m_rev, _ = _get_sector_multiplier(sector, "revenue_growth")
+    m_gm, _  = _get_sector_multiplier(sector, "gross_margin")
+    m_fcf, _ = _get_sector_multiplier(sector, "fcf_margin")
+
+    # Revenue growth (30 pts) — thresholds scaled by sector multiplier
     if rev_growth is not None:
-        if rev_growth > 50:     score += 30
-        elif rev_growth > 30:   score += 26
-        elif rev_growth > 20:   score += 21
-        elif rev_growth > 10:   score += 15
-        elif rev_growth > 5:    score += 9
-        elif rev_growth > 0:    score += 4
+        if rev_growth > 50 * m_rev:     score += 30
+        elif rev_growth > 30 * m_rev:   score += 26
+        elif rev_growth > 20 * m_rev:   score += 21
+        elif rev_growth > 10 * m_rev:   score += 15
+        elif rev_growth > 5 * m_rev:    score += 9
+        elif rev_growth > 0:            score += 4
         # ≤ 0: 0 pts (shrinking or flat)
 
     # Gross margin level (20 pts) + trend bonus (5 pts)
     if gm_ann is not None:
-        if gm_ann > 65:     score += 20
-        elif gm_ann > 50:   score += 16
-        elif gm_ann > 35:   score += 12
-        elif gm_ann > 20:   score += 7
-        else:               score += 3   # <20%: commodity/hardware
+        if gm_ann > 65 * m_gm:     score += 20
+        elif gm_ann > 50 * m_gm:   score += 16
+        elif gm_ann > 35 * m_gm:   score += 12
+        elif gm_ann > 20 * m_gm:   score += 7
+        else:                       score += 3   # below sector-adjusted floor
     if gm_trend is not None:
         if gm_trend > 3:    score += 5   # Strong margin expansion
         elif gm_trend > 1:  score += 3
         elif gm_trend > -1: score += 1   # Roughly flat
         # < -1 pp: 0 pts (compressing margins)
 
-    # FCF margin (25 pts)
+    # FCF margin (25 pts) — thresholds scaled by sector multiplier
     if fcf_margin is not None:
-        if fcf_margin > 30:     score += 25
-        elif fcf_margin > 20:   score += 20
-        elif fcf_margin > 10:   score += 13
-        elif fcf_margin > 5:    score += 7
-        elif fcf_margin > 0:    score += 3
+        if fcf_margin > 30 * m_fcf:     score += 25
+        elif fcf_margin > 20 * m_fcf:   score += 20
+        elif fcf_margin > 10 * m_fcf:   score += 13
+        elif fcf_margin > 5 * m_fcf:    score += 7
+        elif fcf_margin > 0:            score += 3
         # ≤ 0: 0 pts (cash burning)
 
     # Net cash as % of market cap (20 pts)
@@ -390,13 +511,16 @@ def score_valuation_vs_growth_compounder(metrics: dict) -> Optional[float]:
 
     score = 0.0
 
-    # Revenue growth tier (40 pts) — the dominant signal in compounder mode
+    sector = metrics.get("sector_name", "Unknown")
+    m_rev, _ = _get_sector_multiplier(sector, "revenue_growth")
+
+    # Revenue growth tier (40 pts) — dominant signal; thresholds scaled by sector
     if rev_growth is not None:
-        if rev_growth > 50:     score += 40
-        elif rev_growth > 30:   score += 30
-        elif rev_growth > 20:   score += 20
-        elif rev_growth > 10:   score += 10
-        # ≤ 10%: 0 pts — not a compounder growth rate
+        if rev_growth > 50 * m_rev:     score += 40
+        elif rev_growth > 30 * m_rev:   score += 30
+        elif rev_growth > 20 * m_rev:   score += 20
+        elif rev_growth > 10 * m_rev:   score += 10
+        # below sector-adjusted floor: 0 pts — not a compounder growth rate
     else:
         score += 15   # Neutral
 
@@ -451,6 +575,9 @@ def score_valuation_vs_growth_quality_compounder(metrics: dict) -> Optional[floa
 
     score = 0.0
 
+    sector = metrics.get("sector_name", "Unknown")
+    m_gm, _ = _get_sector_multiplier(sector, "gross_margin")
+
     # P/FCF quality-adjusted (60 pts)
     # Premium multiples are acceptable for mature businesses with durable moats;
     # thresholds are deliberately more lenient than the standard VG signal.
@@ -479,13 +606,12 @@ def score_valuation_vs_growth_quality_compounder(metrics: dict) -> Optional[floa
     else:
         score += 12   # Neutral
 
-    # Gross margin quality gate (15 pts)
-    # High gross margins are the clearest fingerprint of a durable economic moat.
+    # Gross margin quality gate (15 pts) — thresholds scaled by sector multiplier
     if gm_ann is not None:
-        if gm_ann > 60:     score += 15   # Exceptional (software, payments, luxury)
-        elif gm_ann > 40:   score += 10   # Strong quality business
-        elif gm_ann > 25:   score += 5    # Acceptable
-        # ≤ 25%: 0 pts — commodity economics
+        if gm_ann > 60 * m_gm:     score += 15   # Exceptional for this sector
+        elif gm_ann > 40 * m_gm:   score += 10   # Strong quality business
+        elif gm_ann > 25 * m_gm:   score += 5    # Acceptable
+        # below sector-adjusted floor: 0 pts — commodity economics
 
     return min(100.0, max(0.0, score))
 
@@ -651,6 +777,9 @@ def score_entry_vs_fundamentals(metrics: dict) -> Optional[float]:
 
     score = 0.0
 
+    sector = metrics.get("sector_name", "Unknown")
+    m_rev, _ = _get_sector_multiplier(sector, "revenue_growth")
+
     # Price drawdown from 52-week high (55 pts)
     # A deeper drawdown with improving fundamentals = better entry
     if pct_from_high is not None:
@@ -665,14 +794,13 @@ def score_entry_vs_fundamentals(metrics: dict) -> Optional[float]:
     else:
         score += 20   # Neutral
 
-    # Revenue growth rate (30 pts)
-    # Strong fundamental growth justifies interest despite price nearness to high
+    # Revenue growth rate (30 pts) — thresholds scaled by sector multiplier
     if rev_growth is not None:
-        if rev_growth > 50:     score += 30
-        elif rev_growth > 30:   score += 24
-        elif rev_growth > 20:   score += 18
-        elif rev_growth > 10:   score += 11
-        elif rev_growth > 0:    score += 5
+        if rev_growth > 50 * m_rev:     score += 30
+        elif rev_growth > 30 * m_rev:   score += 24
+        elif rev_growth > 20 * m_rev:   score += 18
+        elif rev_growth > 10 * m_rev:   score += 11
+        elif rev_growth > 0:            score += 5
         # ≤ 0: 0 pts — declining fundamentals make any entry less attractive
     else:
         score += 10   # Neutral

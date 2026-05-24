@@ -33,6 +33,8 @@ from signal_scorer import (
     score_entry_vs_fundamentals,
     score_binary_event_risk,
     build_mispricing_hypothesis,
+    reset_sector_sample,
+    add_to_sector_sample,
 )
 from regime_classifier import RegimeProfile, MarketRegime, classify_regime
 from reason_codes import assign_reason_codes
@@ -183,6 +185,8 @@ def run_screening(
     """
     start_ms = time.monotonic()
 
+    reset_sector_sample()
+
     # ── Step 1: Classify regime ──────────────
     regime   = classify_regime(regime_indicators)
     warnings: List[str] = []
@@ -191,11 +195,12 @@ def run_screening(
     scored: List[Tuple[float, ShortlistEntry]] = []
 
     for record in raw_records:
-        ticker     = record.get("ticker", "UNKNOWN")
-        fund_d     = record.get("fundamental_data", {})
-        price_d    = record.get("price_data", {})
-        ext_d      = record.get("extended_data", {})
-        earnings_d = record.get("earnings_data", {})
+        ticker      = record.get("ticker", "UNKNOWN")
+        fund_d      = record.get("fundamental_data", {})
+        price_d     = record.get("price_data", {})
+        ext_d       = record.get("extended_data", {})
+        earnings_d  = record.get("earnings_data", {})
+        sector_name = record.get("sector_name", "Unknown")
 
         market_d = {
             "market_cap":    ext_d.get("market_cap"),
@@ -204,7 +209,7 @@ def run_screening(
             "week_52_low":   ext_d.get("week_52_low"),
         }
 
-        metrics = compute_fundamental_metrics(fund_d, market_d) if fund_d else {}
+        metrics = compute_fundamental_metrics(fund_d, market_d, sector=sector_name) if fund_d else {}
 
         # ── Signals shared across all three archetypes ─────────────
         bq = score_business_quality(metrics)
@@ -253,6 +258,15 @@ def run_screening(
         scores          = top_scores
         composite       = top_score
         winning_weights = top_weights
+
+        # Accumulate sector sample for self-computed multipliers in future runs
+        if metrics:
+            add_to_sector_sample(
+                sector_name,
+                metrics.get("gm_ann"),
+                metrics.get("rev_growth"),
+                metrics.get("fcf_margin"),
+            )
 
         # Stash metrics on record for reason_codes.py access
         record["fundamental_metrics"] = metrics

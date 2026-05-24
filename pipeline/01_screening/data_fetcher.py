@@ -195,7 +195,8 @@ def fetch_market_data(ticker: str) -> dict:
     week_52_low  = round(float(closes.min()), 4)
 
     # ── Sector ───────────────────────────────────────
-    sector_name = info.get("sector", "")
+    sector_name = (info.get("sector") or "Unknown").strip()
+    industry    = (info.get("industry") or "Unknown").strip()
     sector_etf  = SECTOR_ETF_MAP.get(sector_name)
 
     # ── Relative strength vs SPY ──────────────────────
@@ -372,9 +373,11 @@ def fetch_market_data(ticker: str) -> dict:
         price_data["volume_ratio"] = volume_ratio
 
     return {
-        "ticker":    ticker,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "sector":    sector_etf,
+        "ticker":      ticker,
+        "timestamp":   datetime.now(timezone.utc).isoformat(),
+        "sector":      sector_etf,
+        "sector_name": sector_name,
+        "industry":    industry,
         "price_data": price_data,
         "relative_strength": _nonempty({
             "rs_vs_spy_10d":    rs_vs_spy_10d,
@@ -394,7 +397,7 @@ def fetch_market_data(ticker: str) -> dict:
             "week_52_high":   week_52_high,
             "week_52_low":    week_52_low,
             "volume_avg_30d": volume_avg_30d,
-            "sector_name":    sector_name or None,
+            "sector_name":    sector_name,
         }),
     }
 

@@ -34,6 +34,7 @@ from signal_scorer import (
     score_earnings_quality,
     score_entry_vs_fundamentals,
     score_binary_event_risk,
+    _get_sector_multiplier,
 )
 
 
@@ -56,10 +57,11 @@ def _score_record(record: dict) -> tuple:
     Compute composite score, per-signal scores, and archetype for a raw record.
     Runs both compounder and deep value passes; returns the higher composite.
     """
-    fund_d     = record.get("fundamental_data", {})
-    price_d    = record.get("price_data", {})
-    ext_d      = record.get("extended_data", {})
-    earnings_d = record.get("earnings_data", {})
+    fund_d      = record.get("fundamental_data", {})
+    price_d     = record.get("price_data", {})
+    ext_d       = record.get("extended_data", {})
+    earnings_d  = record.get("earnings_data", {})
+    sector_name = record.get("sector_name", "Unknown")
 
     market_d = {
         "market_cap":    ext_d.get("market_cap"),
@@ -68,7 +70,7 @@ def _score_record(record: dict) -> tuple:
         "week_52_low":   ext_d.get("week_52_low"),
     }
 
-    metrics = compute_fundamental_metrics(fund_d, market_d) if fund_d else {}
+    metrics = compute_fundamental_metrics(fund_d, market_d, sector=sector_name) if fund_d else {}
 
     bq = score_business_quality(metrics)
     hd = score_historical_discount(metrics)
@@ -257,6 +259,7 @@ def main():
                 "reason_codes": entry["reason_codes"],
                 "flags":        entry["flags"],
                 "hypothesis":   entry["mispricing_hypothesis"],
+                "sector_name":  rec.get("sector_name", "Unknown"),
             })
         else:
             comp, sigs, archetype = _score_record(rec)
@@ -270,6 +273,7 @@ def main():
                 "reason_codes": [],
                 "flags":        [],
                 "hypothesis":   "",
+                "sector_name":  rec.get("sector_name", "Unknown"),
             })
 
     # Sort: passing tickers by priority, then failing by composite desc
@@ -357,7 +361,10 @@ def main():
         for r in rows:
             if not r["passed"] or not r["hypothesis"]:
                 continue
+            sector_n = r.get("sector_name", "Unknown")
+            m, src = _get_sector_multiplier(sector_n, "revenue_growth")
             print(f"\n    [{r['ticker']}]")
+            print(f"    Sector: {sector_n} | Threshold multiplier: {m:.2f}x ({src})")
             # Word-wrap at ~70 chars
             words = r["hypothesis"].split()
             line = "    "
