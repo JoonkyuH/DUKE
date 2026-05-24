@@ -23,10 +23,14 @@ Not available from yfinance (returned as None; classifier defaults apply):
   fed_action_recent  — Recent Fed speech/decision. Needs a news or FOMC calendar feed.
 """
 
+import logging
+import os
 import warnings
 import yfinance as yf
-from datetime import date
+from datetime import date, timedelta
 from typing import Optional, Tuple
+
+log = logging.getLogger(__name__)
 
 
 SECTOR_ETFS = ["XLK", "XLF", "XLE", "XLV", "XLI", "XLY", "XLP", "XLB", "XLC", "XLRE", "XLU"]
@@ -101,6 +105,37 @@ def _sector_metrics() -> Tuple[Optional[float], Optional[float], dict]:
     return dispersion, breadth, sector_etf_data
 
 
+# Announcement dates (day 2 of each two-day FOMC meeting) for 2025–2027.
+# Source: Federal Reserve published calendar.
+_FOMC_DATES = [
+    # 2025
+    date(2025,  1, 29), date(2025,  3, 19), date(2025,  5,  7),
+    date(2025,  6, 18), date(2025,  7, 30), date(2025,  9, 17),
+    date(2025, 10, 29), date(2025, 12, 10),
+    # 2026
+    date(2026,  1, 28), date(2026,  3, 18), date(2026,  4, 29),
+    date(2026,  6, 10), date(2026,  7, 29), date(2026,  9, 16),
+    date(2026, 10, 28), date(2026, 12,  9),
+    # 2027
+    date(2027,  1, 27), date(2027,  3, 17), date(2027,  4, 28),
+    date(2027,  6, 16), date(2027,  7, 28), date(2027,  9, 15),
+    date(2027, 10, 27), date(2027, 12,  8),
+]
+
+
+def _is_fed_action_recent() -> Tuple[bool, Optional[str]]:
+    """
+    Return (True, meeting_date_iso) if today falls within the 14-day window
+    [meeting_date, meeting_date + 14 days] for any scheduled FOMC date.
+    Otherwise return (False, None).
+    """
+    today = date.today()
+    for meeting in _FOMC_DATES:
+        if meeting <= today <= meeting + timedelta(days=14):
+            return True, str(meeting)
+    return False, None
+
+
 def fetch_regime_indicators() -> Tuple[dict, dict]:
     """
     Fetch live market regime indicators for classify_regime().
@@ -138,13 +173,29 @@ def fetch_regime_indicators() -> Tuple[dict, dict]:
     except Exception as exc:
         log.warning("Sector metrics fetch failed: %s — regime classification using defaults", exc)
 
+    # HY spread — live from FRED (BAMLH0A0HYM2)
+    from fred_fetcher import fetch_hy_spread
+    hy_spread = fetch_hy_spread()
+    if hy_spread is not None:
+        print(f"  HY spread: {hy_spread:.0f} bps (FRED)")
+    else:
+        reason = "FRED_API_KEY not set" if not os.environ.get("FRED_API_KEY") else "FRED fetch failed"
+        print(f"  HY spread: None ({reason})")
+
+    # Fed action — FOMC calendar window
+    fed_recent, fomc_date = _is_fed_action_recent()
+    if fed_recent:
+        print(f"  Fed action recent: True (FOMC {fomc_date})")
+    else:
+        print(f"  Fed action recent: False")
+
     regime_indicators = {
         "vix":                 vix,
         "spy_20d_return":      spy_20d_return,
         "spy_vs_ma200":        spy_vs_ma200,
-        "hy_spread":           None,
+        "hy_spread":           hy_spread,
         "earnings_season":     _is_earnings_season(),
-        "fed_action_recent":   None,
+        "fed_action_recent":   fed_recent,
         "sector_dispersion":   sector_dispersion,
         "breadth_adv_decline": breadth_adv_decline,
     }
