@@ -91,9 +91,21 @@ def _atr(hist, period: int = 14) -> Optional[float]:
 def fetch_next_earnings_date(ticker: str) -> Optional[int]:
     """
     Return days from today to the nearest future earnings date via yfinance calendar.
-    Returns None if no future date is available (e.g., earnings just passed or unknown).
+
+    Primary path: returns the actual next earnings date from the calendar.
+
+    Estimation fallback: when yfinance has only a past date (e.g., earnings just
+    reported), estimates the next date as last_earnings_date + 91 days and logs
+    the estimation. The fallback fires only when:
+      - A past earnings date is present in the calendar
+      - The estimated date is strictly in the future
+      - The estimated date is no more than 120 days away (prevents stale data
+        from producing absurd estimates)
+
+    Returns None if no future date can be determined (actual or estimated).
     Handles both datetime.date and datetime.datetime objects returned by yfinance.
     """
+    from datetime import timedelta
     try:
         cal = yf.Ticker(ticker.upper()).calendar
         if not isinstance(cal, dict):
@@ -103,15 +115,31 @@ def fetch_next_earnings_date(ticker: str) -> Optional[int]:
             ed_val = [ed_val]
         today_d = date.today()
         future = []
+        past = []
         for d in ed_val:
             if hasattr(d, "date"):
                 d = d.date()
-            if isinstance(d, date) and d > today_d:
-                future.append(d)
-        if not future:
-            return None
-        future.sort()
-        return (future[0] - today_d).days
+            if isinstance(d, date):
+                if d > today_d:
+                    future.append(d)
+                else:
+                    past.append(d)
+        if future:
+            future.sort()
+            return (future[0] - today_d).days
+        # Estimation fallback: no future date found
+        if past:
+            past.sort(reverse=True)
+            last_date = past[0]
+            estimated = last_date + timedelta(days=91)
+            days_est = (estimated - today_d).days
+            if 0 < days_est <= 120:
+                log.warning(
+                    "%s: estimating next earnings ~91 days from last reported date %s",
+                    ticker, last_date.isoformat(),
+                )
+                return days_est
+        return None
     except Exception:
         log.warning("%s: fetch_next_earnings_date failed", ticker)
         return None
@@ -294,6 +322,26 @@ def fetch_market_data(ticker: str) -> dict:
                 if last_d < today_d:
                     last_earnings_date  = last_d.isoformat()
                     days_since_earnings = (today_d - last_d).days
+        except Exception:
+            pass
+
+    # Strategy 4: estimation fallback (+91 days from last reported date)
+    # Fires when all strategies above failed to find a future earnings date but
+    # a past date is known — e.g., earnings just reported and calendar not yet
+    # updated with the next date.
+    if days_to_earnings is None and last_earnings_date is not None:
+        try:
+            from datetime import timedelta
+            last_d    = date.fromisoformat(last_earnings_date)
+            estimated = last_d + timedelta(days=91)
+            days_est  = (estimated - today_d).days
+            if 0 < days_est <= 120:
+                log.warning(
+                    "%s: estimating next earnings ~91 days from last reported date %s",
+                    ticker, last_earnings_date,
+                )
+                next_earnings_date = estimated.isoformat()
+                days_to_earnings   = days_est
         except Exception:
             pass
 
