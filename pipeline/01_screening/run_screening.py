@@ -8,9 +8,14 @@ Usage:
     python3 run_screening.py NVDA AAPL MSFT
 """
 
+import argparse
 import json
+import logging
+import os
 import sys
+import time
 import concurrent.futures
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as _FuturesTimeoutError
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -37,10 +42,29 @@ from signal_scorer import (
 )
 from economic_profile_classifier import classify
 
+log = logging.getLogger(__name__)
+
 
 # ─────────────────────────────────────────────
 # HELPERS
 # ─────────────────────────────────────────────
+
+
+def _fetch_sp500_tickers() -> list[str]:
+    """Fetch S&P 500 tickers from the EarningsCall SDK."""
+    try:
+        import earningscall
+    except ImportError:
+        sys.exit("earningscall SDK not installed — run: pip install earningscall")
+    earningscall.api_key = os.environ.get("EARNINGSCALL_API_KEY")
+    print("Fetching S&P 500 company list from EarningsCall …")
+    companies = list(earningscall.get_sp500_companies())
+    tickers = sorted({
+        c.company_info.symbol
+        for c in companies
+        if c.company_info and c.company_info.symbol
+    })
+    return tickers
 
 _CONVICTION_TIERS = [(70, "HIGH"), (55, "MEDIUM"), (0, "LOW")]
 
@@ -182,12 +206,19 @@ def _save_output(rows: list, out: dict, universe_size: int, raw_records: list) -
     return out_path
 
 
-def _fetch_fundamental(ticker: str) -> tuple:
-    """Fetch EDGAR data for one ticker. Returns (ticker, data_or_None, error_or_None)."""
+def _fetch_ticker_data(ticker: str) -> dict:
+    """
+    Fetch market data and EDGAR fundamentals for one ticker.
+    Returns the merged record. Raises on market data failure.
+    EDGAR failure is non-fatal — record is returned with empty fundamental_data.
+    """
+    record = fetch_market_data(ticker)
     try:
-        return ticker, fetch_financials(ticker), None
+        record["fundamental_data"] = fetch_financials(ticker)
     except Exception as exc:
-        return ticker, None, str(exc)
+        log.warning("%s: EDGAR fetch failed: %s", ticker, exc)
+        record["fundamental_data"] = {}
+    return record
 
 
 # ─────────────────────────────────────────────
@@ -195,14 +226,23 @@ def _fetch_fundamental(ticker: str) -> tuple:
 # ─────────────────────────────────────────────
 
 def main():
-    if sys.argv[1:]:
-        tickers = [t.upper() for t in sys.argv[1:]]
+    parser = argparse.ArgumentParser(description="DUKE Stage 01 Fundamental Screening")
+    parser.add_argument("tickers", nargs="*", help="Ticker symbols to screen")
+    parser.add_argument(
+        "--universe", choices=["sp500"],
+        help="Screen a predefined universe",
+    )
+    args = parser.parse_args()
+
+    if args.universe == "sp500":
+        tickers = _fetch_sp500_tickers()
+        universe_label = "S&P 500"
+    elif args.tickers:
+        tickers = [t.upper() for t in args.tickers]
         universe_label = "custom"
     else:
-        from universe.sp500 import get_sp500_tickers
-        print("Loading S&P 500 ticker list …")
-        tickers = get_sp500_tickers()
-        universe_label = "S&P 500"
+        parser.print_help()
+        sys.exit(1)
 
     print(f"Universe: {len(tickers)} tickers ({universe_label})")
 
@@ -210,44 +250,27 @@ def main():
     print("Fetching regime indicators …")
     regime_indicators, sector_data = fetch_regime_indicators()
 
-    # ── 2. Market data (parallel, up to 8 workers) ───────────────
-    print(f"Fetching market data: {', '.join(tickers)} …")
+    # ── 2+3. Market data + EDGAR (sequential, 30s per-ticker timeout) ──
+    print(f"Fetching data for {len(tickers)} tickers …")
     raw_records = []
     fetch_errors = {}
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as ex:
-        futures = {ex.submit(fetch_market_data, t): t for t in tickers}
-        for fut in concurrent.futures.as_completed(futures):
-            ticker = futures[fut]
+    for i, t in enumerate(tickers):
+        if i > 0:
+            time.sleep(0.5)
+        with ThreadPoolExecutor(max_workers=1) as ex:
+            future = ex.submit(_fetch_ticker_data, t)
             try:
-                raw_records.append(fut.result())
+                raw_records.append(future.result(timeout=30))
+            except _FuturesTimeoutError:
+                log.warning("%s: data fetch timed out after 30s — skipping", t)
+                fetch_errors[t] = "timed out after 30s"
             except Exception as exc:
-                fetch_errors[ticker] = f"market data: {exc}"
+                log.warning("%s: data fetch failed: %s — skipping", t, exc)
+                fetch_errors[t] = str(exc)
 
     if not raw_records:
         sys.exit("No market data could be fetched.")
-
-    # ── 3. EDGAR fundamental data (parallel, capped at 5 workers) ─
-    # EDGAR allows 10 req/sec; each call sleeps 0.15s plus network latency.
-    # 5 concurrent workers keeps us comfortably under the rate limit.
-    print("Fetching EDGAR fundamentals …")
-    fundamental_map = {}
-    edgar_errors = {}
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as ex:
-        futures = {ex.submit(_fetch_fundamental, r["ticker"]): r["ticker"]
-                   for r in raw_records}
-        for fut in concurrent.futures.as_completed(futures):
-            ticker, data, err = fut.result()
-            if err:
-                edgar_errors[ticker] = f"EDGAR: {err}"
-            else:
-                fundamental_map[ticker] = data
-
-    # Merge fundamental data into records
-    for record in raw_records:
-        t = record["ticker"]
-        record["fundamental_data"] = fundamental_map.get(t, {})
 
     # ── 4. Screen ─────────────────────────────────────────────────
     result    = _screen(raw_records, regime_indicators, sector_data)
@@ -413,7 +436,7 @@ def main():
                 print(line)
 
     # Fetch errors
-    all_errors = {**fetch_errors, **edgar_errors}
+    all_errors = fetch_errors
     if all_errors:
         print()
         print("  Fetch Errors:")
@@ -443,10 +466,17 @@ def main():
         print()
         print("  [Transcript prefetch]")
         prefetched = skipped = failed = 0
-        for rec in raw_records:
+        for i, rec in enumerate(raw_records):
             t = rec.get("ticker", "")
             if not t:
                 continue
+            if i > 0 and i % 50 == 0:
+                print(
+                    f"    [{i}/{len(raw_records)}] "
+                    f"prefetched={prefetched} "
+                    f"skipped={skipped} "
+                    f"failed={failed}"
+                )
             try:
                 cached = _read_transcript_cache(t)
                 if cached and not _is_transcript_stale(cached):
@@ -467,6 +497,27 @@ def main():
             f"Skipped (fresh): {skipped}  "
             f"Failed/no coverage: {failed}"
         )
+        try:
+            import sqlite3
+            db_path = (
+                Path(__file__).resolve().parent.parent
+                / "02_research" / "acquisition" / "cache" / "duke_cache.db"
+            )
+            conn = sqlite3.connect(db_path)
+            cached_total = conn.execute(
+                "SELECT COUNT(*) FROM transcript_cache"
+            ).fetchone()[0]
+            earningscall_cached = conn.execute(
+                "SELECT COUNT(*) FROM transcript_cache "
+                "WHERE source_type='earningscall_api'"
+            ).fetchone()[0]
+            conn.close()
+            print(
+                f"  Cache state: {cached_total} total transcripts "
+                f"({earningscall_cached} from EarningsCall API)"
+            )
+        except Exception:
+            pass
     except Exception as exc:
         log.warning("Transcript prefetch error: %s", exc)
 
