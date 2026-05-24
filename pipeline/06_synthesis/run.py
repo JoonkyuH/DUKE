@@ -24,6 +24,7 @@ Writes:
 import argparse
 import glob
 import json
+import logging
 import os
 import sys
 from pathlib import Path
@@ -44,6 +45,8 @@ _RISK_MAX_TOKENS   = 8192
 _CHIEF_MAX_TOKENS  = 4096
 _REPO_ROOT         = _THIS_DIR.parent.parent
 _PROMPTS_DIR = _REPO_ROOT / "pipeline" / "05_debate" / "prompts"
+
+log = logging.getLogger(__name__)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -130,22 +133,172 @@ def _extract_price_data(shortlist: dict | None, ticker: str) -> dict | None:
     return None
 
 
+def _load_analyst_brief(ticker: str) -> dict:
+    brief_dir = _REPO_ROOT / "data" / "processed"
+    files = sorted(brief_dir.glob(f"{ticker}_analyst_brief_*.json"))
+    if not files:
+        log.warning(
+            "%s: no analyst brief found — evidence slices will be empty",
+            ticker,
+        )
+        return {}
+    brief = json.loads(files[-1].read_text())
+    log.info(
+        "%s: loaded analyst brief (%s) — %d catalysts %d TICs %d mgmt_quotes",
+        ticker,
+        files[-1].name,
+        len(brief.get("catalyst_map", [])),
+        len(brief.get("thesis_invalidation_conditions", [])),
+        len(brief.get("management_quotes", [])),
+    )
+    return brief
+
+
 def _load_prompt(name: str) -> str:
     with open(_PROMPTS_DIR / name) as f:
         return f.read()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# EVIDENCE FORMATTING
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _format_evidence_for_risk_officer(analyst_brief: dict) -> str:
+    """
+    Build a focused evidence summary for the Risk Officer. Includes only
+    risk-relevant management quotes, risk filing quotes, all external bear,
+    and competitive/demand external bull.
+    """
+    lines = []
+
+    RISK_CATEGORIES  = {"risk_factors", "guidance", "tone_shift"}
+    RISK_SIGNIFICANCES = {"HIGH", "MEDIUM"}
+
+    risk_mgmt = [
+        q for q in analyst_brief.get("management_quotes", [])
+        if q.get("category", "") in RISK_CATEGORIES
+        and str(q.get("significance", "")).upper() in RISK_SIGNIFICANCES
+    ]
+    if risk_mgmt:
+        lines.append("MANAGEMENT QUOTES (risk/guidance/tone):")
+        for q in risk_mgmt:
+            speaker = q.get("speaker", "Management")
+            text = (q.get("quote_text") or "").replace("\n", " ")[:200]
+            cat  = q.get("category", "")
+            sig  = q.get("significance", "")
+            dirn = q.get("direction", "")
+            lines.append(f'  [{speaker} | {cat} | {sig} | {dirn}]')
+            lines.append(f'  "{text}"')
+
+    RISK_SECTIONS = {"risk", "mda", "risk_factor"}
+    risk_filing = [
+        q for q in analyst_brief.get("filing_quotes", [])
+        if (q.get("category", "") == "risk_factors"
+            or any(
+                rs in str(q.get("filing_section_label", "")).lower()
+                for rs in RISK_SECTIONS
+            ))
+    ]
+    if risk_filing:
+        lines.append("\nFILING QUOTES (risk/MDA):")
+        for q in risk_filing:
+            src  = q.get("filing_section_label") or "SEC Filing"
+            text = (q.get("quote_text") or "").replace("\n", " ")[:200]
+            cat  = q.get("category", "")
+            sig  = q.get("significance", "")
+            dirn = q.get("direction", "")
+            lines.append(f'  [{src} | {cat} | {sig} | {dirn}]')
+            lines.append(f'  "{text}"')
+
+    bear_ev = analyst_brief.get("external_bear_evidence", [])
+    if bear_ev:
+        lines.append("\nEXTERNAL BEAR EVIDENCE:")
+        for e in bear_ev:
+            snippet = (
+                e.get("snippet") or e.get("quote_text") or e.get("title") or ""
+            ).replace("\n", " ")[:200]
+            src = e.get("source", "")
+            lines.append(f'  [{src}] "{snippet}"')
+
+    BULL_RISK_CATS = {"competitive_positioning", "demand_commentary"}
+    bull_ev = [
+        e for e in analyst_brief.get("external_bull_evidence", [])
+        if e.get("category", "") in BULL_RISK_CATS
+    ]
+    if bull_ev:
+        lines.append("\nEXTERNAL BULL EVIDENCE (competitive/demand):")
+        for e in bull_ev:
+            snippet = (
+                e.get("snippet") or e.get("quote_text") or e.get("title") or ""
+            ).replace("\n", " ")[:200]
+            src = e.get("source", "")
+            lines.append(f'  [{src}] "{snippet}"')
+
+    return "\n".join(lines) if lines else "No filtered evidence available."
+
+
+def _format_evidence_for_chief(analyst_brief: dict) -> str:
+    """
+    Build the full compressed evidence summary for the Chief Analyst. Includes
+    all compressed items across all 4 buckets.
+    """
+    lines = []
+
+    mgmt_qs = analyst_brief.get("management_quotes", [])
+    if mgmt_qs:
+        lines.append("MANAGEMENT QUOTES:")
+        for q in mgmt_qs:
+            speaker = q.get("speaker", "Management")
+            text = (q.get("quote_text") or "").replace("\n", " ")[:200]
+            cat  = q.get("category", "")
+            sig  = q.get("significance", "")
+            dirn = q.get("direction", "")
+            lines.append(f'  [{speaker} | {cat} | {sig} | {dirn}]')
+            lines.append(f'  "{text}"')
+
+    filing_qs = analyst_brief.get("filing_quotes", [])
+    if filing_qs:
+        lines.append("\nFILING QUOTES:")
+        for q in filing_qs:
+            src  = q.get("filing_section_label") or "SEC Filing"
+            text = (q.get("quote_text") or "").replace("\n", " ")[:200]
+            cat  = q.get("category", "")
+            sig  = q.get("significance", "")
+            dirn = q.get("direction", "")
+            lines.append(f'  [{src} | {cat} | {sig} | {dirn}]')
+            lines.append(f'  "{text}"')
+
+    bull_ev = analyst_brief.get("external_bull_evidence", [])
+    if bull_ev:
+        lines.append("\nEXTERNAL BULL EVIDENCE:")
+        for e in bull_ev:
+            snippet = (
+                e.get("snippet") or e.get("quote_text") or e.get("title") or ""
+            ).replace("\n", " ")[:200]
+            src = e.get("source", "")
+            lines.append(f'  [{src}] "{snippet}"')
+
+    bear_ev = analyst_brief.get("external_bear_evidence", [])
+    if bear_ev:
+        lines.append("\nEXTERNAL BEAR EVIDENCE:")
+        for e in bear_ev:
+            snippet = (
+                e.get("snippet") or e.get("quote_text") or e.get("title") or ""
+            ).replace("\n", " ")[:200]
+            src = e.get("source", "")
+            lines.append(f'  [{src}] "{snippet}"')
+
+    return "\n".join(lines) if lines else "No evidence available."
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # RISK OFFICER BRIEF
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _build_risk_brief(debate_record: dict, scoring: dict) -> dict:
+def _build_risk_brief(debate_record: dict, scoring: dict, analyst_brief: dict) -> dict:
     """
-    Assemble the Risk Officer's input from the debate record and scoring output.
-
-    thesis_invalidation_conditions, risk_factors, and catalyst_map are empty
-    in this run because Stage 03 EvidencePacket is not yet wired through.
-    The Risk Officer prompt instructs the model to note coverage gaps.
+    Assemble the Risk Officer's input from the debate record, scoring output,
+    and analyst brief.
     """
     disclosed_risk_items = scoring.get("metadata", {}).get("disclosed_risk_items", [])
     return {
@@ -167,18 +320,10 @@ def _build_risk_brief(debate_record: dict, scoring: dict) -> dict:
             "contentions":             debate_record.get("contentions", []),
             "metadata":                debate_record.get("metadata", {}),
         },
-        # Stage 03 fields — empty until full pipeline wired
-        "thesis_invalidation_conditions": [],
-        "risk_factors":                   [],
-        "catalyst_map":                   [],
-        "invalidation_report":            {},
-        "instruction": (
-            "Note: thesis_invalidation_conditions, risk_factors, and catalyst_map are "
-            "empty because Stage 03 output is not yet wired into this data flow. "
-            "Assess TIC coverage gaps accordingly and note this structural limitation. "
-            "Use the debate record — especially the bear's raised_risks and the "
-            "contentions — as your primary inputs."
-        ),
+        "thesis_invalidation_conditions": analyst_brief.get("thesis_invalidation_conditions", []),
+        "risk_factors":                   scoring.get("metadata", {}).get("risk_factors", []),
+        "catalyst_map":                   analyst_brief.get("catalyst_map", []),
+        "evidence_brief":                 _format_evidence_for_risk_officer(analyst_brief),
     }
 
 
@@ -403,6 +548,12 @@ def main() -> None:
     n_risk = scoring.get("metadata", {}).get("risk_items_count", "n/a")
     print(f"  risk_burden:    {rbs:.1f}  ({n_risk} disclosed risk items)")
 
+    # ── Load analyst brief (for TICs, catalyst_map, and evidence slices) ─────
+    analyst_brief = _load_analyst_brief(args.ticker)
+    n_cats = len(analyst_brief.get("catalyst_map", []))
+    n_tics = len(analyst_brief.get("thesis_invalidation_conditions", []))
+    print(f"  analyst_brief:  {n_cats} catalysts  {n_tics} TICs")
+
     # ── Load price context (optional) ────────────────────────────────────────
     shortlist  = _load_shortlist(date_tag)
     price_data = _extract_price_data(shortlist, args.ticker)
@@ -411,7 +562,7 @@ def main() -> None:
     # ── Risk Officer ──────────────────────────────────────────────────────────
     print("\nRisk Officer assessment")
     risk_system = _load_prompt("risk_officer.md")
-    risk_brief  = _build_risk_brief(debate_record, scoring)
+    risk_brief  = _build_risk_brief(debate_record, scoring, analyst_brief)
     risk_raw    = _call_analyst(client, _RISK_MODEL, risk_system, risk_brief, "Risk Officer", max_tokens=_RISK_MAX_TOKENS)
 
     if risk_raw:
@@ -438,6 +589,7 @@ def main() -> None:
     print("\nChief Analyst synthesis")
     chief_system = _load_prompt("chief_analyst.md")
     chief_brief  = synthesis_dict["chief_analyst_brief"]
+    chief_brief["evidence_brief"] = _format_evidence_for_chief(analyst_brief)
     chief_raw    = _call_analyst(client, _CHIEF_MODEL, chief_system, chief_brief, "Chief Analyst")
 
     chief_output = chief_raw if chief_raw else _chief_fallback(debate_record)

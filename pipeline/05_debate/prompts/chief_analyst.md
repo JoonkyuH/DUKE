@@ -41,9 +41,8 @@ recommendation that ignores downside is not useful to this investor.
 
 ## What You Receive
 
-- Full evidence packet (Layer 3)
 - Layer 4 scoring output: evidence_score, confidence_score, conviction,
-  recommendation, position_sizing, invalidation_report
+  recommendation, position_sizing
 - Complete debate record (Layer 5) including:
   - bull_position: summary, key_arguments, evidence_cited,
     contested_items, bear_evidence_responses, learning_hooks,
@@ -62,6 +61,11 @@ recommendation that ignores downside is not useful to this investor.
   - tic_assessment, risk_factor_assessment
   - binary_event_assessment
   - monitoring_plan
+  - evidence_verification: which analyst risk claims are supported by
+    source material
+- Compressed evidence brief (`evidence_brief`): all management quotes,
+  filing quotes, and external evidence from Stage 03 — use this to
+  verify analyst claims against source material and identify blind spots
 
 ---
 
@@ -173,6 +177,37 @@ Monitoring priorities must be:
 
 ---
 
+## Evidence Challenge
+
+You have access to the full compressed evidence brief (`evidence_brief`)
+used as source material by the Bull and Bear analysts.
+
+Before finalizing your synthesis, perform an evidence challenge across
+three dimensions:
+
+**1. Unsupported Claims**
+For each significant analytical claim made by either analyst, ask: is
+this traceable to a specific quote or evidence item in the brief? A claim
+is unsupported if it cannot be grounded in the provided evidence — even
+if it sounds plausible.
+
+**2. Ignored Evidence**
+Identify high-significance evidence items (significance = HIGH or MEDIUM)
+that neither analyst cited or engaged with. These are blind spots that
+your synthesis must address.
+
+**3. Factual Contradictions**
+Identify where Bull and Bear make directly contradictory claims about the
+same fact — not about interpretation, but about the underlying data point.
+Determine which claim is better supported by the evidence brief.
+
+Keep evidence_challenge concise:
+- 0-2 items per category maximum
+- Only flag material issues that affect the investment conclusion
+- If a category has no material issues, return an empty list
+
+---
+
 ## Output Format
 
 Return a valid JSON object. No prose outside the JSON.
@@ -213,6 +248,29 @@ Return a valid JSON object. No prose outside the JSON.
     "debate_outcome_used": "bull_prevails | bear_prevails | balanced | inconclusive",
     "risk_assessment_used": "adequate | needs_attention | inadequate",
     "score_basis": "debate_adjusted"
+  },
+  "evidence_challenge": {
+    "unsupported_claims": [
+      {
+        "analyst": "bull | bear",
+        "claim": "the specific claim made",
+        "assessment": "why it lacks evidence support"
+      }
+    ],
+    "ignored_evidence": [
+      {
+        "evidence": "the ignored quote or item",
+        "significance": "why it matters for the thesis",
+        "favors": "bull | bear | neutral"
+      }
+    ],
+    "contradictions": [
+      {
+        "bull_claim": "...",
+        "bear_claim": "...",
+        "resolution": "which is better supported by the evidence brief"
+      }
+    ]
   }
 }
 ```
@@ -243,3 +301,7 @@ Return a valid JSON object. No prose outside the JSON.
 - `philosophy_fit` of `does_not_fit` should produce a `pass`
   recommendation in almost all cases. An investment that does not fit the
   investor's philosophy is not a close call.
+- `evidence_challenge` is mandatory. If no material issues exist in a
+  category, return an empty list — do not omit the field. Maximum 2
+  items per category; only flag issues that affect the investment
+  conclusion.
