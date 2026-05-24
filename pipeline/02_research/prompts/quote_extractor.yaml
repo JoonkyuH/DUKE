@@ -1,5 +1,5 @@
 name: quote_extractor
-version: "1.1.0"
+version: "1.2.0"
 description: >
   Extracts structured, attributed executive quotes from earnings documents.
   Returns a JSON array of quote objects with category, direction, and significance.
@@ -10,20 +10,31 @@ prompt: |
   Company: {company}
   Period: {period}
 
-  Extract all significant executive statements. Focus on these categories:
-    - guidance: forward-looking statements about revenue, margins, or growth
-    - competitive_positioning: market position, competitors, moat, product differentiation
-    - margin_commentary: gross margin, operating margin, cost structure, leverage
-    - demand_commentary: demand trends, customer activity, pipeline, bookings, inventory
-    - risk_factors: headwinds, uncertainties, macro concerns, regulatory risk
-    - tone_shift: language that signals a change in posture from prior quarters
+  Extract all significant executive statements. For management quotes from earnings
+  calls and press releases, use ONLY these categories:
+    - guidance:                forward-looking statements, outlook, revenue or margin targets
+    - competitive_positioning: market position, competitive advantages or threats, share
+    - margin_commentary:       gross margin, operating margin, cost structure, profitability
+    - demand_commentary:       customer demand, market conditions, bookings, pipeline, inventory
+    - tone_shift:              notable change in management tone or posture vs prior period
+
+  IMPORTANT: The category "risk_factors" must NOT be used for management quotes.
+  Risk factor language belongs in SEC filing quotes (10-K, 10-Q), not in earnings
+  call or press release quotes.
+
+  If a management quote describes a risk, classify it as:
+    - guidance              — if it gives outlook or targets under that risk condition
+    - competitive_positioning — if it addresses a competitive threat or market challenge
+    - tone_shift            — if it represents a negative shift in posture vs prior period
+    - demand_commentary     — if it discusses demand weakness or customer hesitation
+  Never use risk_factors for management quotes.
 
   For each quote return a JSON object with exactly these fields:
     - quote_text: the exact verbatim quote (no paraphrasing, no ellipsis)
     - quote_type: always "direct"
     - speaker: the speaker's name or role (e.g. "Jensen Huang", "CFO", "Management")
     - speaker_confidence: 0.95 if explicit name given, 0.75 if role only, 0.50 if press release with no attribution, 0.30 if inferred
-    - category: one of [guidance, competitive_positioning, margin_commentary, demand_commentary, risk_factors, tone_shift]
+    - category: one of [guidance, competitive_positioning, margin_commentary, demand_commentary, tone_shift]
     - category_confidence: float 0.0–1.0 — how confident are you that this quote belongs in the assigned category versus another category? 1.0 = certain, 0.5 = ambiguous
     - direction: BULLISH, BEARISH, or NEUTRAL
     - significance: HIGH, MEDIUM, or LOW
