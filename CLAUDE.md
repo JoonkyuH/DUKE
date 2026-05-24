@@ -1,120 +1,251 @@
-# CLAUDE.md
+# DUKE — Developer Reference
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## What is DUKE?
 
-## What DUKE Is
+DUKE ("Doesn't Usually Know Either") is a 7-stage
+multi-agent investment research pipeline built for
+the Li Family Office. It produces structured
+recommendation packets for human review — it is
+NOT a trading bot. Andrew Han is Director of
+Investments and the sole operator.
 
-DUKE ("Doesn't Usually Know Either") is a multi-agent investment intelligence framework. It is not a trading bot — it compresses research, surfaces contradictions, and produces structured recommendation packets for human review before any capital is deployed.
+## Pipeline Architecture
 
-## Running the Code
+Stage 01: Screening
+  cd pipeline/01_screening
+  python3 run_screening.py --universe sp500
+  → data/screening/shortlist_{date}.json
 
-All modules use **Python stdlib only** — no `pip install` needed. (Data ingestion will require `requests`, `pandas`, and source-specific SDKs when built.)
+Stage 02: Research
+  cd pipeline/02_research
+  python3 run.py TICKER ARCHETYPE
+  → data/raw/{TICKER}_evidence_{date}.json
 
-Run modules from their own directory so relative imports resolve:
+Stage 03: Refinery
+  cd pipeline/03_evidence_processing
+  python3 run.py TICKER
+  → data/processed/{TICKER}_analyst_brief_{date}.json
 
-```bash
-cd pipeline/01_screening && python3 screener.py
-cd pipeline/03_processing && python3 synthesizer.py
-cd pipeline/04_scoring    && python3 scorer.py
-cd pipeline/07_output     && python3 decision_capture.py
-```
+Stage 04: Scoring
+  cd pipeline/04_scoring
+  python3 run.py TICKER
+  → data/scored/{TICKER}_score_{date}.json
 
-There are no tests, no build system, and no package manifest — this is a pure-Python pipeline run directly.
+Stage 05: Debate
+  cd pipeline/05_debate
+  python3 run.py TICKER
+  → data/debate/{TICKER}_debate_{date}.json
 
-## Architecture
+Stage 06: Synthesis
+  cd pipeline/06_synthesis
+  python3 run.py TICKER
+  → data/synthesis/{TICKER}_synthesis_{date}.json
 
-The system processes tickers through numbered pipeline stages. Each stage has a defined input/output contract enforced by JSON schemas.
+Stage 07: Output
+  cd pipeline/07_output
+  python3 run.py TICKER
+  → data/journal/DEC-{TICKER}-{YYYYMMDD}.json
 
-```
-Raw Data → 01_screening → 02_research → 03_processing → 04_scoring → 05_debate → 06_synthesis → 07_output
-                                                                                        ↓
-                                                                               Human Review
-```
 
-**Stage 01 — Screening** (`pipeline/01_screening/`)
-- Entry point: `screener.py` → `run_screening(raw_records, regime_indicators, sector_data)`
-- Scores 6 signals per ticker (0–100): momentum, relative strength, volume anomaly, sector leadership, news velocity, earnings proximity
-- `regime_classifier.py` detects market regime (6 types) and sets signal weights + score thresholds
-- Missing data scores `None` — never coerced to zero; weights redistributed proportionally across present signals
-- Outputs a ranked `ScreeningOutput` with `shortlist: List[ShortlistEntry]`, each annotated with reason codes and investigation flags
-- Schema contracts: `schemas/input.json` (raw signal record), `schemas/output.json`
+## CRITICAL: Environment Variables
 
-**Stage 02 — Research** (`pipeline/02_research/`)
-- Prompt-driven; no Python modules
-- AI researchers use `prompts/deep_researcher.md` and `prompts/earnings_call_analyst.md` to gather structured evidence
+ALL API keys live in ~/.zprofile and ~/.zshrc.
+Claude Code bash sessions do NOT source these
+automatically. ALWAYS prefix commands with:
 
-**Stage 03 — Processing** (`pipeline/03_processing/`)
-- Entry point: `synthesizer.py` → `build_packet(...)` assembles an `EvidencePacket`
-- `evidence_types.py` is the type contract between stages; every downstream field is defined here
-- `contradiction_detector.py` runs O(n²) pairwise comparison over evidence items; items sharing a category with opposing BULLISH/BEARISH directions are flagged as contradictions, severity-ranked by source reliability
-- `catalyst_mapper.py` builds and priority-sorts catalysts; binary events (uncertain outcome) are elevated above directional ones
-- Schema contract: `schemas/output.json` (evidence packet)
+  source ~/.zprofile &&
 
-**Stage 04 — Scoring** (`pipeline/04_scoring/`)
-- Entry point: `scorer.py` → `score_packet(packet: dict) -> ScoringOutput`
-- `evidence_scorer.py`: net evidence score = (bull_weight − bear_weight) / (bull_weight + bear_weight) × 100; NEUTRAL/BINARY items excluded from direction
-- `confidence_scorer.py`: base = quality×0.60 + volume×0.40; penalties for contradictions, binary catalysts, stale fields, thin evidence; bonuses for multi-signal confluence and FCF+guidance
-- `invalidation_checker.py`: evaluates TIC statuses; precedence FATAL > MAJOR > MONITORING > CLEAR
-- Conviction thresholds (first match wins): ev≥55 + conf≥70 → HIGH, ev≥35 + conf≥55 → MEDIUM, ev≥15 + conf≥40 → LOW; FATAL → INVALIDATED
-- Position sizing downgrades on MAJOR/FATAL or imminent binary catalyst (≤7 days)
-- `score_types.py` is the type contract; `schemas/output.json` is the inter-layer schema
+Keys required:
+  ANTHROPIC_API_KEY
+  PERPLEXITY_API_KEY
+  NEWSAPI_KEY
+  FRED_API_KEY
+  EARNINGSCALL_API_KEY
 
-**Stage 05 — Debate** (`pipeline/05_debate/`)
-- Four AI analyst roles driven by prompts in `prompts/`: `bull_analyst.md`, `bear_analyst.md`, `risk_officer.md`, `chief_analyst.md`
-- `position_builder.py`: `build_bull_brief()` / `build_bear_brief()` — surfaces top-5 opposing evidence items (reliability ≥ 0.70) as `must_address_evidence`
-- `contention_detector.py`: `detect_contentions()` — identifies CRITICAL (max rel ≥ 0.80) and MATERIAL (≥ 0.60) contentions from cited/contested overlaps
-- `debate_scorer.py`: clamps adjustments (±15 score, ±10 conf); outcome logic — BULL_PREVAILS: net > +8, BEAR_PREVAILS: net < −8, INCONCLUSIVE: gap > 15 with |net| ≤ 8, BALANCED: otherwise
-- `debate_recorder.py`: entry point `record_debate(packet, scoring, bull_pos, bear_pos) -> DebateRecord`
-- Bull and Bear produce `learning_hooks` — falsifiable predictions checked at 90/180/365 days. Risk Officer produces `monitoring_plan`. Chief Analyst synthesizes all into a final recommendation.
-- `debate_types.py` is the type contract; `schemas/output.json` is the inter-layer schema
 
-**Stage 06 — Synthesis** (`pipeline/06_synthesis/`)
-- Entry point: `synthesizer.py` → `synthesize(debate_record, risk_assessment) -> SynthesisOutput`
-- Assembles the structured `chief_analyst_brief` dict the Chief Analyst agent receives: scores, both analyst positions with learning hooks, contentions sorted CRITICAL first, full risk assessment, and an explicit output format template
-- `synthesis_types.py` is the type contract (also defines `ChiefAnalystOutput` — the parsed response from the Chief Analyst agent)
-- `schemas/output.json` is the inter-layer schema
+## Architecture Decisions
 
-**Stage 07 — Output** (`pipeline/07_output/`)
-- `formatter.py`: `format_recommendation(chief_analyst_output, synthesis_output) -> str` — ANSI terminal report covering all output fields
-- `decision_capture.py`: `capture_decision(chief_analyst_output, synthesis_output) -> dict` — displays recommendation, sizing guidance (with downgrade logic for risk flags/weak fit), portfolio context from `data/raw/portfolio/latest.csv` if present, collects investor inputs, writes to `data/journal/`
-- `journal.py`: `write_decision_record()`, `write_outcome_record()`, `write_postmortem_record()`, `read_journal()` — persistent journal in `data/journal/` with naming convention `DEC-{TICKER}-{YYYYMMDD}.json`, `OUT-{TICKER}-{DATE}-{DAYS}d.json`, `POST-{TICKER}-{DATE}.json`
-- `schemas/output.json` defines the `DecisionRecord` written to the journal
+### Economic Profile Classifier
+Tickers are classified into economic profiles
+(not GICS sectors) for threshold normalization.
 
-## Key Design Invariants
+Files:
+  pipeline/01_screening/economic_profiles.json
+  pipeline/01_screening/scoring_adjustments.json
+  pipeline/01_screening/economic_profile_classifier.py
 
-**Schema contracts are the inter-layer API.** Do not modify a schema without checking all downstream consumers. `evidence_types.py` is the single source of truth for what Layer 3 can access — any field Layer 3 needs must be declared there.
+Classification order:
+  1. ticker_override        (confidence 1.0)
+  2. gics_industry pattern  (confidence 0.85)
+  3. financial_signature    (confidence 0.60)
+     added to classification_review_queue
+  4. unknown                (confidence 0.0)
+     neutral multipliers applied
 
-**Evidence reliability hierarchy is enforced.** `SOURCE_RELIABILITY_DEFAULTS` in `evidence_types.py` assigns weights: SEC filings (0.95) down to social media (0.20). Contradiction severity is computed from the minimum reliability of the two conflicting sources.
+Special handling:
+  banking/insurance: gross_margin + fcf_margin
+    disabled entirely
+  reit: fcf_margin disabled
 
-**Regime classification drives all screening thresholds.** Score thresholds and shortlist caps vary by regime (e.g., `LIQUIDITY_CONTRACTION` requires ≥68 composite and caps at 8 tickers; `RISK_ON_MOMENTUM` requires ≥52 and allows 20). Rules fire in priority order; first match wins.
+### Transcript Waterfall
+Priority 0: EarningsCall API
+  earningscall_fetcher.py
+  speaker-segmented, Q&A separated
+  dynamic ticker resolution (GOOGL -> GOOG)
+  staleness: conference_date < today -> re-fetch
+Priority 1A: Perplexity discovery
+Priority 1B: Static IR page PDF
+Priority 2:  IR press release
+Priority 3:  SEC 8-K exhibit
+Priority 4:  FMP API
+Priority 5:  YouTube
 
-**Contradictions are first-class outputs.** `detect_contradictions()` mutates `EvidenceItem` objects in place (sets `contradiction_flag`, `contradiction_with`). Unresolved HIGH-severity contradictions apply uncertainty penalties in Layer 3.
+### Scoring Architecture
+DTS (Directional Thesis Score):
+  excludes disclosed_risk items
+  management quote multipliers applied
+  external evidence asymmetry applied
+  screening adjustment = (screening_score-50)*0.30
 
-**Learning hooks are the core feedback loop.** Bull and Bear analysts produce falsifiable, time-bounded predictions (`learning_hooks`). These are persisted in the journal `DecisionRecord` at entry and checked against outcome records at 90/180/365 days. The Risk Officer's `monitoring_plan` defines the review cadence. Treat `learning_hooks` as first-class outputs — not decorative fields.
+RBS (Risk Burden Score):
+  disclosed_risk items only
+  specificity weighted (specific=1.0, generic=0.35)
 
-**All inter-layer data passes as plain dicts.** Typed dataclasses (`ScoringOutput`, `DebateRecord`, `SynthesisOutput`, etc.) are internal to each stage. Layers communicate via JSON-compatible dicts to avoid cross-directory import issues.
+Confidence:
+  coverage penalty for missing management quotes
+  0 quotes: -20, 1-2: -10, 3-4: -5
 
-**Stage run.py bridges are the orchestration layer** — each reads from its input data directory, calls internal module entry points, makes any required LLM calls, and writes to its output data directory. They are the only files that make Claude API calls.
+NEUTRAL management quotes:
+  zero weight everywhere EXCEPT:
+  item_class=management_quote AND
+  significance=HIGH AND category=guidance
+  -> mild bear signal: eff_weight * 0.08
 
-## Role Assignments (Multi-Agent System)
+### Stage 03 Synthesis
+After evidence compression, one LLM synthesis call
+generates three structured fields:
+  catalyst_map (2-5 items)
+  thesis_invalidation_conditions (2-4 items)
+  uncertainties (1-3 items)
+Prompt: pipeline/03_evidence_processing/prompts/synthesis.md
 
-| Role | Tool | Responsibility |
-|---|---|---|
-| Market Researcher | Perplexity + Grok | Gathers raw signal data for Stages 01–02 |
-| Coder | Claude Code | Implements and runs all Python modules |
-| Orchestrator | Claude Cowork | Coordinates analyst roles, assembles output |
-| Chief / Bull / Bear / Risk Analysts | Claude Finance Agent | Synthesizes evidence, writes recommendation |
+### Stage 05/06 Evidence Slices
+Risk Officer receives filtered evidence:
+  management quotes: risk/guidance/tone, HIGH/MEDIUM
+  filing quotes: risk_factors + MD&A sections
+  all external bear evidence
+  all external bull evidence
+  output: evidence_verification field
 
-## Build Status
+Chief Analyst receives full compressed set:
+  all 8 management quotes
+  all 8 filing quotes
+  all 4 external bull
+  all 4 external bear
+  output: evidence_challenge field
 
-| Stage | Status |
-|---|---|
-| 01 Screening | Complete — screener, data_fetcher.py, regime_fetcher.py built |
-| 02 Research | Complete — acquisition, extraction, validation modules built |
-| 03 Processing | Complete |
-| 04 Scoring | Complete — run.py bridge built, output in data/scored/ |
-| 05 Debate | Complete — run.py bridge, rebuttal prompts, tested against NVDA |
-| 06 Synthesis | Complete — run.py bridge, tested against NVDA |
-| 07 Output | Complete — run.py bridge, journal write tested against NVDA |
-| Data ingestion | Complete — yfinance + EDGAR; hy_spread pending external feed |
-| Master orchestrator | Not started |
+Note: bull_rebuttal.md and bear_rebuttal.md exist
+but are NOT activated. Decision: single-round
+debate only. Chief Analyst performs evidence
+challenge instead.
+
+### EDGAR Data Integrity (3 layers)
+Layer 1 - Concept selection (_entries() in edgar_client.py):
+  Selects concept with most recent data (max end
+  date), not first concept passing loose threshold.
+  Prevents stale XBRL concepts blocking current ones.
+  Falls back with warning log if no recent data.
+
+Layer 2 - Period alignment (signal_scorer.py):
+  Validates revenue and gross_profit are from same
+  fiscal year before computing gross margin.
+  Validates revenue and FCF before FCF margin.
+  Mismatches set derived metric to None and log
+  PERIOD MISMATCH warning.
+
+Layer 3 - Disk cache (edgar_client.py):
+  edgar_snapshot_cache table in duke_cache.db
+  7-day TTL, stores full companyfacts JSON atomically
+  per ticker. Eliminates redundant SEC API fetches.
+  Path: pipeline/02_research/acquisition/cache/duke_cache.db
+
+
+## Known Issues
+
+### Must fix before relying on shortlist
+EQT scores #1 on S&P 500 but is a natural gas E&P.
+Peak-cycle FCF makes it look like a compounder.
+EDGAR gross profit for E&P excludes DD&A/depletion.
+No energy cyclical economic profile handles this.
+
+COF scores #12 but NET_CASH_FORTRESS fires wrong.
+Banking companies carry deposits as liabilities but
+the net cash signal only checks long-term debt.
+Fix: add net_cash_pct to disabled signals for
+banking and insurance in economic_profiles.json.
+
+872 tickers in classification_review_queue after
+S&P 500 run. GICS pattern coverage needs expansion.
+Audit unknown/financial_signature classifications
+and add missing patterns to economic_profiles.json.
+
+### Pending
+DUKE-16: Multi-period trend analysis
+DUKE-19: TAM share-gain and ROIC signals
+
+### Do last
+DUKE-17: Master orchestrator duke.py
+Sector z-score upgrade (needs 500-ticker data)
+
+
+## Commit History
+
+82fd587  fix: days_to_earnings from yfinance (DUKE-01)
+841f681  fix: 91-day earnings estimation fallback
+64fb0f7  feat: Damodaran sector multipliers (DUKE-02 v1)
+92b22f5  feat: economic profile classifier (DUKE-02 v2)
+49f6781  feat: EarningsCall API transcripts (DUKE-03)
+3af1833  feat: NEUTRAL signal + catalyst_map wired (DUKE-09, DUKE-12)
+ef09cdb  feat: Risk Officer + Chief Analyst evidence slices (DUKE-13, DUKE-15)
+c920a69  fix: MD&A filter + external bull filter
+4edd9e4  fix: per-ticker 30s timeout Stage 01
+2ec2f2b  fix: EDGAR concept selection + alignment + disk cache
+
+
+## S&P 500 Screening Results (2026-05-24)
+497 tickers screened, 20 passed, regime: risk_on_momentum
+
+Rank  Ticker  Score  Archetype             Notes
+1     EQT     83.1   long_term_compounder  NEEDS REVIEW: energy E&P peak cycle
+2     PODD    80.6   deep_value
+3     ADBE    79.0   quality_compounder
+4     NVDA    78.2   long_term_compounder
+5     PAYX    78.1   quality_compounder
+6     PTC     76.2   quality_compounder
+7     PLTR    76.0   long_term_compounder
+8     DXCM    75.7   quality_compounder
+9     INTU    75.4   deep_value
+10    BSX     75.4   quality_compounder
+11    VRT     74.9   long_term_compounder
+12    COF     74.7   either                NEEDS REVIEW: bank, NET_CASH_FORTRESS wrong
+13    ADSK    73.4   quality_compounder
+14    FDS     73.3   quality_compounder
+15    SNPS    72.8   quality_compounder
+16    SPGI    72.7   quality_compounder
+17    RMD     72.5   quality_compounder    gross margin bug fixed (was 103%, now 59.4%)
+18    TYL     72.1   quality_compounder
+19    TTD     72.0   deep_value
+20    NOW     71.8   either
+
+Note: Re-run Stage 01 with all fixes before
+running Stages 02-07 on shortlist.
+
+
+## API Services
+
+Service       Env Var                Purpose
+Anthropic     ANTHROPIC_API_KEY      All LLM calls
+Perplexity    PERPLEXITY_API_KEY     Evidence discovery
+NewsAPI       NEWSAPI_KEY            News discovery
+FRED          FRED_API_KEY           HY spread, regime
+EarningsCall  EARNINGSCALL_API_KEY   Transcripts $69/mo
