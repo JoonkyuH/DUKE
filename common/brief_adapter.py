@@ -10,6 +10,24 @@ Stage 04 augments the returned dict with extra fields (data_freshness,
 fundamentals, screening_reason_codes, screening_score, data_availability).
 """
 
+_EVIDENCE_NATURE_MAP: dict = {
+    "guidance":                "forward_guidance",
+    "demand_commentary":       "realized_result",
+    "margin_commentary":       "realized_result",
+    "competitive_positioning": "realized_result",
+    "tone_shift":              "management_commentary",
+    "risk_factors":            "disclosed_risk",
+    "litigation":              "disclosed_risk",
+    "regulatory":              "disclosed_risk",
+}
+
+
+def _derive_evidence_nature(item_class: str, category: str) -> str:
+    """Derive evidence_nature from item_class + category (mirrors ranker logic)."""
+    if item_class in ("external_bull", "external_bear"):
+        return "external_claim"
+    return _EVIDENCE_NATURE_MAP.get(category, "management_commentary")
+
 
 def build_evidence_packet(brief: dict, scoring: dict) -> dict:
     """
@@ -36,31 +54,35 @@ def build_evidence_packet(brief: dict, scoring: dict) -> dict:
         return f"EV-{n:03d}"
 
     for q in brief.get("management_quotes", []):
+        cat = q.get("category", "guidance")
         items.append({
             "evidence_id":          _next_id(),
             "direction":            q.get("direction", "NEUTRAL").lower(),
             "reliability":          q.get("reliability", 0.70),
-            "category":             q.get("category", "guidance"),
+            "category":             cat,
             "quote_text":           q.get("quote_text", ""),
             "source_url":           q.get("source_url", ""),
             "filing_date":          q.get("fiscal_quarter", ""),
             "speaker":              q.get("speaker", ""),
             "filing_section_label": q.get("document_subtype", ""),
             "item_class":           "management_quote",
+            "evidence_nature":      q.get("evidence_nature") or _derive_evidence_nature("management_quote", cat),
         })
 
     for q in brief.get("filing_quotes", []):
+        cat = q.get("category", "filing")
         items.append({
             "evidence_id":          _next_id(),
             "direction":            q.get("direction", "NEUTRAL").lower(),
             "reliability":          q.get("reliability", 0.85),
-            "category":             q.get("category", "filing"),
+            "category":             cat,
             "quote_text":           q.get("quote_text", ""),
             "source_url":           q.get("source_url", ""),
             "filing_date":          q.get("filing_date", ""),
             "speaker":              q.get("speaker", ""),
             "filing_section_label": q.get("filing_section", ""),
             "item_class":           "filing_quote",
+            "evidence_nature":      q.get("evidence_nature") or _derive_evidence_nature("filing_quote", cat),
         })
 
     for e in brief.get("external_bull_evidence", []):
@@ -75,6 +97,7 @@ def build_evidence_packet(brief: dict, scoring: dict) -> dict:
             "speaker":              "",
             "filing_section_label": "",
             "item_class":           "external_bull",
+            "evidence_nature":      "external_claim",
         })
 
     for e in brief.get("external_bear_evidence", []):
@@ -89,6 +112,7 @@ def build_evidence_packet(brief: dict, scoring: dict) -> dict:
             "speaker":              "",
             "filing_section_label": "",
             "item_class":           "external_bear",
+            "evidence_nature":      "external_claim",
         })
 
     risk_factors = [
