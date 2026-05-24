@@ -1,171 +1,77 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "screening_output",
-  "title": "Screening Output",
-  "description": "Full output of the initial screening pass. Contains market regime classification and a ranked shortlist of tickers for Layer 2 deep research.",
+  "title": "Stage 01 Screening Output",
+  "description": "Output written by run_screening.py to data/screening/shortlist_{date}.json",
   "type": "object",
-  "required": ["screening_id", "timestamp", "market_regime", "shortlist"],
+  "required": ["generated_at", "universe_size", "shortlist_size", "regime", "tickers"],
+  "additionalProperties": false,
   "properties": {
-
-    "screening_id": {
+    "generated_at": {
       "type": "string",
-      "description": "Unique ID for this screening run (e.g. SCR-20250514-0930-A3F1)"
+      "description": "ISO 8601 timestamp when the screening was run"
     },
-
-    "timestamp": {
-      "type": "string",
-      "format": "date-time",
-      "description": "UTC timestamp of screening completion"
-    },
-
-    "market_regime": {
-      "type": "string",
-      "enum": [
-        "risk_on_momentum",
-        "risk_off_defensive",
-        "liquidity_expansion",
-        "liquidity_contraction",
-        "earnings_volatility",
-        "macro_uncertainty"
-      ],
-      "description": "Classified market regime at time of screening"
-    },
-
-    "regime_confidence": {
-      "type": "number",
-      "minimum": 0,
-      "maximum": 1,
-      "description": "Confidence in the regime classification (0–1)"
-    },
-
     "universe_size": {
       "type": "integer",
-      "description": "Total number of tickers evaluated in this pass"
+      "description": "Total number of tickers evaluated"
     },
-
-    "threshold_applied": {
-      "type": "number",
-      "description": "Minimum composite score required to enter the shortlist. Regime-dependent. Fallback = 45."
+    "shortlist_size": {
+      "type": "integer",
+      "description": "Number of tickers that passed the regime threshold"
     },
-
-    "shortlist": {
+    "regime": {
+      "type": "string",
+      "description": "Market regime detected by regime_classifier (e.g. RISK_ON_MOMENTUM)"
+    },
+    "tickers": {
       "type": "array",
-      "minItems": 0,
-      "maxItems": 20,
-      "description": "Ranked list of tickers that passed screening. Priority 1 = highest score.",
+      "description": "Shortlist entries — tickers that passed the regime composite threshold",
       "items": {
         "type": "object",
-        "required": ["ticker", "composite_score", "signal_scores", "reason_codes", "priority"],
+        "required": ["ticker", "archetype", "composite_score", "conviction", "reason_codes", "flags", "rank"],
+        "additionalProperties": true,
         "properties": {
-
           "ticker": { "type": "string" },
-
+          "archetype": {
+            "type": "string",
+            "description": "Investment archetype assigned by screener (e.g. long_term_compounder)"
+          },
           "composite_score": {
             "type": "number",
-            "minimum": 0,
-            "maximum": 100,
-            "description": "Raw weighted composite of all six signal scores"
+            "description": "Regime-weighted composite signal score (0–100)"
           },
-
-          "regime_adjusted_score": {
-            "type": "number",
-            "minimum": 0,
-            "maximum": 100,
-            "description": "Composite score after regime weight application (V1: same as composite)"
-          },
-
-          "signal_scores": {
-            "type": "object",
-            "description": "Individual 0–100 scores for each signal",
-            "required": ["momentum", "relative_strength", "volume_anomaly", "sector_leadership", "news_velocity", "earnings_proximity"],
-            "properties": {
-              "momentum":           { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
-              "relative_strength":  { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
-              "volume_anomaly":     { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
-              "sector_leadership":  { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
-              "news_velocity":      { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
-              "earnings_proximity": { "type": ["number", "null"], "minimum": 0, "maximum": 100 }
-            }
-          },
-
-          "signal_weights_applied": {
-            "type": "object",
-            "description": "The regime-specific weights used for this scoring run",
-            "properties": {
-              "momentum":           { "type": "number" },
-              "relative_strength":  { "type": "number" },
-              "volume_anomaly":     { "type": "number" },
-              "sector_leadership":  { "type": "number" },
-              "news_velocity":      { "type": "number" },
-              "earnings_proximity": { "type": "number" }
-            }
-          },
-
-          "regime_at_screening": {
+          "conviction": {
             "type": "string",
-            "description": "Regime active at the time this ticker was scored"
+            "enum": ["HIGH", "MEDIUM", "LOW"],
+            "description": "Conviction level derived from composite_score"
           },
-
           "reason_codes": {
             "type": "array",
-            "description": "Codes explaining why this ticker passed screening",
-            "items": {
-              "type": "string",
-              "enum": [
-                "MOMENTUM_BREAKOUT",
-                "MOMENTUM_STRONG",
-                "RS_MARKET_LEADER",
-                "RS_SECTOR_TOP_QUARTILE",
-                "VOLUME_SURGE",
-                "VOLUME_ABOVE_AVERAGE",
-                "SECTOR_LEADER",
-                "NEWS_ACCELERATION",
-                "EARNINGS_CATALYST_IMMINENT",
-                "EARNINGS_CATALYST_WINDOW",
-                "MULTI_SIGNAL_CONFLUENCE"
-              ]
-            }
+            "items": { "type": "string" },
+            "description": "Short codes explaining why the ticker was shortlisted"
           },
-
           "flags": {
             "type": "array",
-            "description": "Concerns for Layer 2 to investigate. A flag does not disqualify a ticker.",
-            "items": {
-              "type": "string",
-              "enum": [
-                "FLAG_OVERBOUGHT_RSI",
-                "FLAG_HIGH_VOL_DOWN_DAY",
-                "FLAG_NEGATIVE_NEWS",
-                "FLAG_WEAK_SECTOR",
-                "FLAG_LOW_SOURCE_QUALITY",
-                "FLAG_EARNINGS_GAP_RISK"
-              ]
-            }
+            "items": { "type": "string" },
+            "description": "Investigation flags for Stage 02 (e.g. earnings_proximity)"
           },
-
-          "priority": {
+          "rank": {
             "type": "integer",
-            "minimum": 1,
-            "maximum": 20,
-            "description": "Rank within shortlist. 1 = highest composite score."
+            "description": "Rank within the shortlist (1 = highest composite score)"
+          },
+          "signal_scores": {
+            "type": ["object", "null"],
+            "description": "Individual signal scores used to compute the composite. Null values indicate missing data.",
+            "properties": {
+              "business_quality":      { "type": ["number", "null"] },
+              "valuation_vs_growth":   { "type": ["number", "null"] },
+              "historical_discount":   { "type": ["number", "null"] },
+              "earnings_quality":      { "type": ["number", "null"] },
+              "entry_vs_fundamentals": { "type": ["number", "null"] },
+              "binary_event_risk":     { "type": ["number", "null"] }
+            },
+            "additionalProperties": false
           }
         }
-      }
-    },
-
-    "shortlist_count": {
-      "type": "integer",
-      "description": "Number of tickers in the shortlist"
-    },
-
-    "metadata": {
-      "type": "object",
-      "properties": {
-        "regime_description":      { "type": "string" },
-        "regime_weights":          { "type": "object" },
-        "fallback_threshold_used": { "type": "boolean" },
-        "screening_duration_ms":   { "type": "integer" },
-        "warnings":                { "type": "array", "items": { "type": "string" } }
       }
     }
   }

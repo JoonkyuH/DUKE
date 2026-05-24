@@ -18,10 +18,12 @@ from pathlib import Path
 _HERE      = Path(__file__).resolve().parent
 _REPO_ROOT = _HERE.parent.parent
 sys.path.insert(0, str(_HERE))
+sys.path.insert(0, str(_REPO_ROOT))
 sys.path.insert(0, str(_REPO_ROOT / "pipeline" / "02_research" / "acquisition"))
 
 from scorer import score_packet
 from ir_discovery import get_company_name
+from common.brief_adapter import build_evidence_packet
 
 # ── directories ───────────────────────────────────────────────────────────────
 _PROCESSED_DIR = _REPO_ROOT / "data" / "processed"
@@ -66,44 +68,31 @@ def _find_screening_entry(ticker: str, brief_date: str) -> dict:
 
 # ── packet builder ────────────────────────────────────────────────────────────
 
-def _normalize(item: dict) -> dict:
-    """Return a copy of the evidence item with direction lowercased.
-    Stage 02 emits BULLISH/BEARISH/NEUTRAL; evidence_scorer expects lowercase."""
-    if isinstance(item.get("direction"), str):
-        return {**item, "direction": item["direction"].lower()}
-    return item
-
-
-def _to_risk_factor(item: dict) -> dict:
-    """Wrap a filing_quote into the {description, probability, impact} shape
-    that _extract_primary_risks() expects."""
-    level = _SIG_MAP.get(str(item.get("significance", "")).upper(), "medium")
-    return {
-        "description": item.get("quote_text", ""),
-        "probability": level,
-        "impact":      level,
-    }
-
-
 def _build_packet(brief: dict, ticker: str, date: str, screening_entry: dict) -> dict:
-    mgmt_items   = [_normalize(i) for i in brief.get("management_quotes", [])]
-    filing_items = [_normalize(i) for i in brief.get("filing_quotes", [])]
+    company_name = get_company_name(ticker)
+    scoring_stub = {
+        "ticker":           ticker,
+        "company_name":     company_name,
+        "packet_reference": f"{ticker}_{date}",
+    }
+    packet = build_evidence_packet(brief, scoring_stub)
 
-    risk_factors = [
-        _to_risk_factor(item)
-        for item in brief.get("filing_quotes", [])
-        if item.get("category") == "risk_factors"
-    ]
+    # Honour significance-based risk probability/impact for filing_quote risk factors.
+    # build_evidence_packet defaults both to "medium"; upgrade here using _SIG_MAP.
+    for item in brief.get("filing_quotes", []):
+        if item.get("category") == "risk_factors":
+            level = _SIG_MAP.get(str(item.get("significance", "")).upper(), "medium")
+            for rf in packet["risk_factors"]:
+                if rf.get("description") == item.get("quote_text", ""):
+                    rf["probability"] = level
+                    rf["impact"]      = level
+                    break
 
-    return {
+    # Stage 04-specific fields not part of the shared packet
+    packet.update({
         "ticker":       ticker,
-        "company_name": get_company_name(ticker),
+        "company_name": company_name,
         "packet_id":    f"{ticker}_{date}",
-        "evidence_items": mgmt_items + filing_items,
-        "contradictions": brief.get("uncertainties", []),
-        "catalyst_map":   [],
-        "thesis_invalidation_conditions": [],
-        "risk_factors":   risk_factors,
         "data_freshness": {},
         "fundamentals":   {},
         "screening_reason_codes": screening_entry.get("reason_codes", []),
@@ -115,7 +104,8 @@ def _build_packet(brief: dict, ticker: str, date: str, screening_entry: dict) ->
             "data_freshness":                 "not_available",
             "screening_score": "available" if screening_entry else "not_available",
         },
-    }
+    })
+    return packet
 
 
 # ── save ──────────────────────────────────────────────────────────────────────

@@ -80,13 +80,31 @@ def _load_shortlist(date_str: str) -> dict | None:
 
 
 def _extract_price_data(shortlist: dict | None, ticker: str) -> dict | None:
+    # Try per-ticker raw file written by run_screening.py (Fix 4)
+    raw_dir = _REPO_ROOT / "data" / "screening" / "raw"
+    if raw_dir.is_dir():
+        # Find the most recent raw file for this ticker
+        raw_files = sorted(raw_dir.glob(f"{ticker}_*.json"))
+        if raw_files:
+            try:
+                with open(raw_files[-1]) as f:
+                    raw = json.load(f)
+                pd: dict = {}
+                pd.update(raw.get("price_data") or {})
+                pd.update(raw.get("extended_data") or {})
+                if pd:
+                    return pd
+            except Exception:
+                pass
+
+    # Fall back to shortlist file (older runs without per-ticker files)
     if not shortlist:
         return None
     tickers = shortlist.get("tickers", [])
     if isinstance(tickers, list):
         for entry in tickers:
             if entry.get("ticker") == ticker:
-                pd: dict = {}
+                pd = {}
                 pd.update(entry.get("price_data") or {})
                 pd.update(entry.get("extended_data") or {})
                 return pd or None

@@ -27,10 +27,13 @@ from pathlib import Path
 
 # ── path setup so stage-internal imports resolve ──────────────────────────────
 _THIS_DIR = Path(__file__).resolve().parent
+_REPO_ROOT = _THIS_DIR.parent.parent
 sys.path.insert(0, str(_THIS_DIR))
+sys.path.insert(0, str(_REPO_ROOT))
 
 from position_builder import build_bull_brief, build_bear_brief  # noqa: E402
 from debate_recorder import record_debate                         # noqa: E402
+from common.brief_adapter import build_evidence_packet           # noqa: E402
 
 try:
     import anthropic
@@ -74,95 +77,8 @@ def _load_brief(ticker: str, date_str: str | None) -> tuple[dict, Path]:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _build_packet(brief: dict, scoring: dict) -> dict:
-    """
-    Build an EvidencePacket-compatible dict from the analyst brief.
-
-    The analyst brief stores evidence in four typed lists (management_quotes,
-    filing_quotes, external_bull_evidence, external_bear_evidence).
-    position_builder and record_debate expect a flat evidence_items list.
-    This bridges the two formats by assigning evidence_ids and normalising
-    field names so the debate layer can operate without knowing which stage
-    produced the brief.
-    """
-    items: list[dict] = []
-    n = 0
-
-    def _next_id() -> str:
-        nonlocal n
-        n += 1
-        return f"EV-{n:03d}"
-
-    for q in brief.get("management_quotes", []):
-        items.append({
-            "evidence_id":          _next_id(),
-            "direction":            q.get("direction", "NEUTRAL").lower(),
-            "reliability":          q.get("reliability", 0.70),
-            "category":             q.get("category", "guidance"),
-            "quote_text":           q.get("quote_text", ""),
-            "source_url":           q.get("source_url", ""),
-            "filing_date":          q.get("fiscal_quarter", ""),
-            "speaker":              q.get("speaker", ""),
-            "filing_section_label": q.get("document_subtype", ""),
-            "item_class":           "management_quote",
-        })
-
-    for q in brief.get("filing_quotes", []):
-        items.append({
-            "evidence_id":          _next_id(),
-            "direction":            q.get("direction", "NEUTRAL").lower(),
-            "reliability":          q.get("reliability", 0.85),
-            "category":             q.get("category", "filing"),
-            "quote_text":           q.get("quote_text", ""),
-            "source_url":           q.get("source_url", ""),
-            "filing_date":          q.get("filing_date", ""),
-            "speaker":              q.get("speaker", ""),
-            "filing_section_label": q.get("filing_section", ""),
-            "item_class":           "filing_quote",
-        })
-
-    for e in brief.get("external_bull_evidence", []):
-        items.append({
-            "evidence_id": _next_id(),
-            "direction":   "bullish",
-            "reliability": e.get("reliability", 0.60),
-            "category":    "external_research",
-            "quote_text":  e.get("snippet", e.get("title", "")),
-            "source_url":  e.get("url", ""),
-            "filing_date": e.get("date", ""),
-            "speaker":     "",
-            "filing_section_label": "",
-            "item_class":  "external_bull",
-        })
-
-    for e in brief.get("external_bear_evidence", []):
-        items.append({
-            "evidence_id": _next_id(),
-            "direction":   "bearish",
-            "reliability": e.get("reliability", 0.60),
-            "category":    "external_research",
-            "quote_text":  e.get("snippet", e.get("title", "")),
-            "source_url":  e.get("url", ""),
-            "filing_date": e.get("date", ""),
-            "speaker":     "",
-            "filing_section_label": "",
-            "item_class":  "external_bear",
-        })
-
-    return {
-        "ticker":                        brief.get("ticker", scoring.get("ticker", "")),
-        "company_name":                  scoring.get("company_name", ""),
-        "sector":                        brief.get("metadata", {}).get("sector", ""),
-        "packet_id":                     scoring.get("packet_reference", ""),
-        "investment_archetype":          brief.get("screening_archetype", ""),
-        "evidence_items":                items,
-        # Optional fields read by position_builder — empty when not in brief
-        "catalyst_map":                  [],
-        "thesis_invalidation_conditions": [],
-        "risk_factors":                  [],
-        "contradictions":                [],
-        "screening_flags":               [],
-        "summary":                       {},
-    }
+    """Delegate to the shared brief adapter in common/."""
+    return build_evidence_packet(brief, scoring)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

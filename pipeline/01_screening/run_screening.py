@@ -113,13 +113,16 @@ def _cell(v) -> str:
     return f"{v:5.1f}" if v is not None else "    —"
 
 
-def _save_output(rows: list, out: dict, universe_size: int) -> Path:
+def _save_output(rows: list, out: dict, universe_size: int, raw_records: list) -> Path:
     repo_root = Path(__file__).resolve().parent.parent.parent
     out_dir = repo_root / "data" / "screening"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     today = datetime.now(timezone.utc).strftime("%Y%m%d")
     out_path = out_dir / f"shortlist_{today}.json"
+
+    # Build a lookup for raw records so Fix 4 can write per-ticker price data
+    raw_by_ticker = {rec["ticker"]: rec for rec in raw_records}
 
     passing = [r for r in rows if r["passed"]]
     payload = {
@@ -136,6 +139,7 @@ def _save_output(rows: list, out: dict, universe_size: int) -> Path:
                 "reason_codes": r["reason_codes"],
                 "flags": r["flags"],
                 "rank": r["priority"],
+                "signal_scores": r["sigs"],
             }
             for r in passing
         ],
@@ -143,6 +147,21 @@ def _save_output(rows: list, out: dict, universe_size: int) -> Path:
 
     with open(out_path, "w") as f:
         json.dump(payload, f, indent=2)
+
+    # Write per-ticker raw price/extended data for Stage 06 technical context
+    raw_dir = out_dir / "raw"
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    for r in passing:
+        ticker = r["ticker"]
+        rec = raw_by_ticker.get(ticker, {})
+        ticker_raw = {
+            "ticker":        ticker,
+            "price_data":    rec.get("price_data") or {},
+            "extended_data": rec.get("extended_data") or {},
+        }
+        raw_path = raw_dir / f"{ticker}_{today}.json"
+        with open(raw_path, "w") as f:
+            json.dump(ticker_raw, f, indent=2)
 
     return out_path
 
@@ -360,7 +379,7 @@ def main():
             print(f"    {t:<8}  {err}")
 
     # Save shortlist to disk
-    saved_path = _save_output(rows, out, len(tickers))
+    saved_path = _save_output(rows, out, len(tickers), raw_records)
     print()
     print(f"  Saved → {saved_path}")
 
