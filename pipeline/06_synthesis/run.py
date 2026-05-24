@@ -190,10 +190,10 @@ def _format_evidence_for_risk_officer(analyst_brief: dict) -> str:
             lines.append(f'  [{speaker} | {cat} | {sig} | {dirn}]')
             lines.append(f'  "{text}"')
 
-    RISK_SECTIONS = {"risk", "mda", "risk_factor"}
+    RISK_SECTIONS = {"risk", "mda", "md&a", "risk_factor"}
     risk_filing = [
         q for q in analyst_brief.get("filing_quotes", [])
-        if (q.get("category", "") == "risk_factors"
+        if (q.get("category", "") in {"risk_factors", "guidance", "tone_shift"}
             or any(
                 rs in str(q.get("filing_section_label", "")).lower()
                 for rs in RISK_SECTIONS
@@ -220,13 +220,9 @@ def _format_evidence_for_risk_officer(analyst_brief: dict) -> str:
             src = e.get("source", "")
             lines.append(f'  [{src}] "{snippet}"')
 
-    BULL_RISK_CATS = {"competitive_positioning", "demand_commentary"}
-    bull_ev = [
-        e for e in analyst_brief.get("external_bull_evidence", [])
-        if e.get("category", "") in BULL_RISK_CATS
-    ]
+    bull_ev = analyst_brief.get("external_bull_evidence", [])
     if bull_ev:
-        lines.append("\nEXTERNAL BULL EVIDENCE (competitive/demand):")
+        lines.append("\nEXTERNAL BULL EVIDENCE:")
         for e in bull_ev:
             snippet = (
                 e.get("snippet") or e.get("quote_text") or e.get("title") or ""
