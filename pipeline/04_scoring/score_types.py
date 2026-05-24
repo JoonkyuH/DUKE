@@ -80,9 +80,11 @@ class ConfidencePenaltyBreakdown:
     binary_catalyst_penalty:  float   # From HIGH-impact BINARY catalysts
     stale_data_penalty:       float   # From stale_fields in data_freshness
     thin_evidence_penalty:    float   # If directional items < minimum threshold
+    coverage_penalty:         float   # From missing or sparse management quotes
     total_penalty:            float
     bonuses:                  float
     final_confidence:         float
+    management_quote_count:   int = 0  # Count used to compute coverage_penalty
 
 
 @dataclass

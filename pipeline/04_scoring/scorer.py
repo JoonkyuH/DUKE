@@ -363,6 +363,8 @@ def _make_confidence_note(cf: "ConfidencePenaltyBreakdown") -> str:
             penalty_detail.append(f"stale data −{cf.stale_data_penalty:.1f}")
         if cf.thin_evidence_penalty:
             penalty_detail.append(f"thin evidence −{cf.thin_evidence_penalty:.1f}")
+        if cf.coverage_penalty:
+            penalty_detail.append(f"mgmt coverage −{cf.coverage_penalty:.1f}")
         parts.append("penalties: " + ", ".join(penalty_detail))
     if cf.bonuses > 0:
         parts.append(f"bonuses +{cf.bonuses:.1f}")

@@ -142,9 +142,13 @@ def _print_summary(result, packet: dict, ticker: str, out_path: Path) -> None:
     print(f"  Raw DTS (pre-screening):  {result.raw_directional_thesis_score:>+7.1f}  (excl. risk disclosures)")
     print(f"  Screening Adjustment:     {sadj:>+7.2f}  ((screening_score−50)×0.30)")
     print(f"  DTS (adjusted):           {result.directional_thesis_score:>+7.1f}  (used for conviction)")
-    print(f"  Risk Burden Score:        {result.risk_burden_score:>7.1f}  (disclosed risk weight)")
+    spec = meta.get("risk_specificity_breakdown", {})
+    spec_note = f"  (specific={spec.get('specific',0)} generic={spec.get('generic',0)} untagged={spec.get('untagged',0)})"
+    print(f"  Risk Burden Score:        {result.risk_burden_score:>7.1f}{spec_note}")
     print(f"  Evidence Score (=DTS):    {result.evidence_score:>+7.1f}  (backward compat)")
-    print(f"  Confidence Score:         {result.confidence_score:>7.1f}  (quality + volume)")
+    cb = result.confidence_breakdown
+    cov_note = f"  (mgmt quotes: {cb.management_quote_count}, coverage penalty: -{cb.coverage_penalty:.0f})"
+    print(f"  Confidence Score:         {result.confidence_score:>7.1f}{cov_note}")
     print()
     ceiling_note = "  [ceiling applied]" if meta.get("conviction_ceiling_applied") else ""
     print(f"  Conviction:       {result.conviction.value}{ceiling_note}")

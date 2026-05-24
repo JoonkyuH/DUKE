@@ -74,12 +74,14 @@ def score_confidence(
     binary_catalyst_penalty = _binary_catalyst_penalty(catalyst_map)
     stale_data_penalty      = _stale_data_penalty(data_freshness)
     thin_evidence_penalty   = 15.0 if n < MIN_DIRECTIONAL_ITEMS else 0.0
+    mgmt_count, coverage_penalty = _coverage_penalty(evidence_items)
 
     total_penalty = (
         contradiction_penalty
         + binary_catalyst_penalty
         + stale_data_penalty
         + thin_evidence_penalty
+        + coverage_penalty
     )
 
     # ── Bonuses ────────────────────────────────────────────────────────────────
@@ -95,9 +97,11 @@ def score_confidence(
         binary_catalyst_penalty=round(binary_catalyst_penalty, 1),
         stale_data_penalty=round(stale_data_penalty, 1),
         thin_evidence_penalty=round(thin_evidence_penalty, 1),
+        coverage_penalty=round(coverage_penalty, 1),
         total_penalty=round(total_penalty, 1),
         bonuses=round(bonuses, 1),
         final_confidence=round(final, 1),
+        management_quote_count=mgmt_count,
     )
 
 
@@ -128,6 +132,27 @@ def _binary_catalyst_penalty(catalyst_map: List[dict]) -> float:
 def _stale_data_penalty(data_freshness: dict) -> float:
     stale_fields = data_freshness.get("stale_fields", [])
     return min(len(stale_fields) * 4.0, 16.0)
+
+
+def _coverage_penalty(evidence_items: List[dict]) -> tuple:
+    """
+    Return (management_quote_count, penalty) based on management quote coverage.
+    Management quotes are the highest-signal source; their absence materially
+    reduces confidence in the evidence base.
+    """
+    mgmt_count = sum(
+        1 for item in evidence_items
+        if item.get("item_class") == "management_quote"
+    )
+    if mgmt_count == 0:
+        penalty = 20.0   # severe — no management voice at all
+    elif mgmt_count <= 2:
+        penalty = 10.0   # weak — insufficient management signal
+    elif mgmt_count <= 4:
+        penalty =  5.0   # moderate — limited management signal
+    else:
+        penalty =  0.0   # adequate coverage
+    return mgmt_count, penalty
 
 
 def _compute_bonuses(
