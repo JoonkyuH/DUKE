@@ -40,7 +40,7 @@ from signal_scorer import (
     score_entry_vs_fundamentals,
     score_binary_event_risk,
 )
-from economic_profile_classifier import classify
+from economic_profile_classifier import classify, is_commodity_cyclical
 
 log = logging.getLogger(__name__)
 
@@ -144,6 +144,13 @@ def _score_record(record: dict) -> tuple:
 
     top_score, top_arch, top_sigs = candidates[0]
     archetype = "either" if (top_score - candidates[1][0]) <= 1.0 else top_arch
+
+    # Commodity-cyclical override (mirrors screener.run_screening): energy
+    # price-takers are never compounders - force the deep_value archetype.
+    if is_commodity_cyclical(economic_profile):
+        archetype = "deep_value"
+        top_sigs  = sigs_dv
+        top_score = _composite(sigs_dv, DEEP_VALUE_WEIGHTS)
 
     display = {k: (round(v, 1) if v is not None else None) for k, v in top_sigs.items()}
     return round(top_score, 1), display, archetype

@@ -12,6 +12,7 @@ a flag still passed screening; the flag tells Stage 02 what to scrutinize.
 import logging
 from typing import List, Tuple
 from signal_scorer import SignalScores
+from economic_profile_classifier import get_disabled_signals, is_commodity_cyclical
 
 log = logging.getLogger("reason_codes")
 
@@ -61,7 +62,10 @@ FLAG_NEGATIVE_FCF        = "FLAG_NEGATIVE_FCF"         # TTM FCF is negative
 FLAG_REVENUE_DECLINING   = "FLAG_REVENUE_DECLINING"    # Revenue growth YoY ≤ 0%
 FLAG_HIGH_PFCF           = "FLAG_HIGH_PFCF"            # P/FCF > 60× (expensive on cash basis)
 
+FLAG_CYCLICAL_PEAK_RISK  = "FLAG_CYCLICAL_PEAK_RISK"   # commodity-cyclical profile at peak-cycle FCF
+
 FLAG_DESCRIPTIONS = {
+    FLAG_CYCLICAL_PEAK_RISK: "Commodity-cyclical business (energy E&P/integrated/midstream) generating peak-cycle FCF - current cash flow reflects elevated commodity prices, not durable earnings power. Do not extrapolate.",
     FLAG_BINARY_EVENT_RISK:  "Earnings within 14 days — gap risk is elevated. Assess setup quality vs event risk.",
     FLAG_FCF_BELOW_EARNINGS: "FCF < 0.6× net income — reported earnings may be inflated by accruals. Verify cash flow statement.",
     FLAG_DECLINING_MARGINS:  "Gross margin declining > 2pp over 4 quarters — pricing power or cost pressure. Identify cause.",
@@ -75,6 +79,13 @@ FLAG_DESCRIPTIONS = {
 # ─────────────────────────────────────────────
 # ASSIGNMENT LOGIC
 # ─────────────────────────────────────────────
+
+_DISABLED_SIGNAL_CODES = {
+    "net_cash":     {NET_CASH_FORTRESS, FLAG_HIGH_LEVERAGE},
+    "gross_margin": {HIGH_GROSS_MARGIN, EXPANDING_MARGINS, FLAG_DECLINING_MARGINS},
+    "fcf_margin":   {STRONG_FCF, FLAG_NEGATIVE_FCF},
+}
+
 
 def assign_reason_codes(
     scores:  SignalScores,
@@ -197,5 +208,22 @@ def assign_reason_codes(
     # Expensive on FCF basis
     if pfcf_ratio is not None and pfcf_ratio > 60:
         flags.append(FLAG_HIGH_PFCF)
+
+    # ── Profile-aware adjustments ─────────────
+    economic_profile = record.get("classification", {}).get("economic_profile", "unknown")
+
+    # Commodity-cyclical peak-cycle warning: a price-taker generating a high
+    # FCF margin is almost certainly riding elevated commodity prices.
+    if is_commodity_cyclical(economic_profile) and fcf_margin is not None and fcf_margin > 15:
+        flags.append(FLAG_CYCLICAL_PEAK_RISK)
+
+    # Suppress codes/flags tied to signals structurally disabled for this profile.
+    disabled = get_disabled_signals(economic_profile)
+    if disabled:
+        suppressed = set()
+        for sig in disabled:
+            suppressed |= _DISABLED_SIGNAL_CODES.get(sig, set())
+        codes = [c for c in codes if c not in suppressed]
+        flags = [f for f in flags if f not in suppressed]
 
     return codes, flags

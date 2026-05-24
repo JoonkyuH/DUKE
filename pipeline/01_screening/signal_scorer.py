@@ -346,8 +346,9 @@ def score_business_quality(metrics: dict) -> Optional[float]:
             elif fcf_margin > 0:            score += 3
             # ≤ 0: 0 pts (cash burning)
 
-    # Net cash as % of market cap (20 pts)
-    if net_cash_pct is not None:
+    # Net cash as % of market cap (20 pts) - skip if disabled for this profile
+    # (banks/insurers carry deposits/float as operating liabilities, not leverage)
+    if "net_cash" not in disabled and net_cash_pct is not None:
         if net_cash_pct > 10:       score += 20   # Fortress balance sheet
         elif net_cash_pct > 0:      score += 14   # Net cash
         elif net_cash_pct > -15:    score += 8    # Modest net debt

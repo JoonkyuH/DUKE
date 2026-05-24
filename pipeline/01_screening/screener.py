@@ -34,7 +34,7 @@ from signal_scorer import (
     score_binary_event_risk,
     build_mispricing_hypothesis,
 )
-from economic_profile_classifier import classify
+from economic_profile_classifier import classify, is_commodity_cyclical
 from regime_classifier import RegimeProfile, MarketRegime, classify_regime
 from reason_codes import assign_reason_codes
 
@@ -274,6 +274,16 @@ def run_screening(
         scores          = top_scores
         composite       = top_score
         winning_weights = top_weights
+
+        # Commodity-cyclical override: energy E&P / integrated / midstream are
+        # commodity price-takers. Peak-cycle FCF can make them top the compounder
+        # archetype, which is structurally wrong - they have no durable
+        # compounding. Force the deep_value archetype and its score/weights.
+        if is_commodity_cyclical(economic_profile):
+            archetype       = "deep_value"
+            scores          = scores_dv
+            composite       = comp_dv
+            winning_weights = DEEP_VALUE_WEIGHTS
 
         # Stash metrics on record for reason_codes.py access
         record["fundamental_metrics"] = metrics

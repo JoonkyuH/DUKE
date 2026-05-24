@@ -114,18 +114,24 @@
     }
   },
 
+  "commodity_cyclical_profiles": ["energy_upstream", "integrated_energy", "energy_midstream"],
+
   "special_handling": {
     "banking": {
-      "disabled_signals": ["gross_margin", "fcf_margin"],
-      "note": "NIM and ROE are primary metrics. Standard margin analysis structurally invalid."
+      "disabled_signals": ["gross_margin", "fcf_margin", "net_cash"],
+      "note": "NIM and ROE are primary metrics. Standard margin analysis structurally invalid. net_cash disabled: customer deposits are operating liabilities, not leverage, so cash-minus-debt is meaningless for banks."
     },
     "insurance": {
-      "disabled_signals": ["gross_margin", "fcf_margin"],
-      "note": "Combined ratio is primary metric. Standard margin analysis structurally invalid."
+      "disabled_signals": ["gross_margin", "fcf_margin", "net_cash"],
+      "note": "Combined ratio is primary metric. Standard margin analysis structurally invalid. net_cash disabled: float and reserves are operating liabilities, not leverage."
     },
     "reit": {
       "disabled_signals": ["fcf_margin"],
       "note": "FFO is primary metric. FCF margin analysis misleading for REITs."
+    },
+    "energy_upstream": {
+      "disabled_signals": ["gross_margin"],
+      "note": "EDGAR gross profit for E&P excludes DD&A and depletion (the largest cost of an upstream producer), so reported gross margin is structurally inflated and not comparable across industries."
     }
   },
 

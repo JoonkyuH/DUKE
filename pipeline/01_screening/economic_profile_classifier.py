@@ -323,3 +323,17 @@ def get_disabled_signals(economic_profile: str) -> list:
     _reload_if_stale()
     special = _profiles_data.get("special_handling", {})
     return special.get(economic_profile, {}).get("disabled_signals", [])
+
+
+def is_commodity_cyclical(economic_profile: str) -> bool:
+    """
+    Return True if the profile is a commodity price-taker (energy upstream,
+    integrated, or midstream). These businesses cannot be long-term compounders:
+    cash flows are driven by a commodity price the company does not control, so
+    peak-cycle FCF must never be scored as durable compounding.
+
+    Sourced from economic_profiles.json -> commodity_cyclical_profiles.
+    """
+    _reload_if_stale()
+    cyclical = _profiles_data.get("commodity_cyclical_profiles", [])
+    return economic_profile in cyclical
