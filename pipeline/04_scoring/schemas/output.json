@@ -30,7 +30,21 @@
       "type": "number",
       "minimum": -100,
       "maximum": 100,
-      "description": "Net directional balance of evidence. (bull_weight - bear_weight) / (bull_weight + bear_weight) * 100. NEUTRAL and BINARY items excluded from direction; tracked separately."
+      "description": "Backward-compat alias for directional_thesis_score. Set equal to directional_thesis_score."
+    },
+
+    "directional_thesis_score": {
+      "type": "number",
+      "minimum": -100,
+      "maximum": 100,
+      "description": "Net directional balance excluding disclosed_risk items (risk_factors, litigation, regulatory). Measures investment thesis strength independent of risk checklist."
+    },
+
+    "risk_burden_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Structural risk burden from disclosed_risk items only. Formula: min(100, count * avg_reliability * 20). 0 = no disclosed risks; 100 = maximum burden."
     },
 
     "confidence_score": {

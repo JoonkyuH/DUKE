@@ -62,11 +62,13 @@ def build_bull_brief(packet: dict, scoring: dict) -> dict:
         "sector":       packet.get("sector"),
 
         "scoring_baseline": {
-            "evidence_score":   scoring.get("evidence_score"),
-            "confidence_score": scoring.get("confidence_score"),
-            "conviction":       scoring.get("conviction"),
-            "recommendation":   scoring.get("recommendation"),
-            "position_sizing":  scoring.get("position_sizing"),
+            "evidence_score":            scoring.get("evidence_score"),
+            "directional_thesis_score":  scoring.get("directional_thesis_score"),
+            "risk_burden_score":         scoring.get("risk_burden_score"),
+            "confidence_score":          scoring.get("confidence_score"),
+            "conviction":                scoring.get("conviction"),
+            "recommendation":            scoring.get("recommendation"),
+            "position_sizing":           scoring.get("position_sizing"),
         },
 
         "supporting_evidence":   _format_evidence(bull_items),
@@ -137,10 +139,12 @@ def build_bear_brief(packet: dict, scoring: dict) -> dict:
         "sector":       packet.get("sector"),
 
         "scoring_baseline": {
-            "evidence_score":   scoring.get("evidence_score"),
-            "confidence_score": scoring.get("confidence_score"),
-            "conviction":       scoring.get("conviction"),
-            "recommendation":   scoring.get("recommendation"),
+            "evidence_score":            scoring.get("evidence_score"),
+            "directional_thesis_score":  scoring.get("directional_thesis_score"),
+            "risk_burden_score":         scoring.get("risk_burden_score"),
+            "confidence_score":          scoring.get("confidence_score"),
+            "conviction":                scoring.get("conviction"),
+            "recommendation":            scoring.get("recommendation"),
         },
 
         "supporting_evidence":              _format_evidence(bear_items),

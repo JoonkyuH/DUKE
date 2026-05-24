@@ -30,7 +30,7 @@ from score_types import (
     InvalidationStatus,
     InvalidationReport,
 )
-from evidence_scorer import score_evidence
+from evidence_scorer import score_evidence, score_evidence_split
 from confidence_scorer import score_confidence
 from invalidation_checker import check_invalidation
 
@@ -98,6 +98,7 @@ def score_packet(packet: dict) -> ScoringOutput:
 
     # ── Step 2: Evidence score ─────────────────────────────────────────────────
     ev_breakdown = score_evidence(evidence_items)
+    split        = score_evidence_split(evidence_items)
 
     # ── Step 3: Confidence score ───────────────────────────────────────────────
     conf_breakdown = score_confidence(
@@ -109,7 +110,9 @@ def score_packet(packet: dict) -> ScoringOutput:
         fundamentals=fundamentals,
     )
 
-    evidence_score   = ev_breakdown.net_score
+    # evidence_score = directional_thesis_score for backward compat; conviction
+    # thresholds now operate on the directional score, not the blended score.
+    evidence_score   = split["directional_thesis_score"]
     confidence_score = conf_breakdown.final_confidence
 
     # ── Step 4: Conviction ─────────────────────────────────────────────────────
@@ -148,14 +151,19 @@ def score_packet(packet: dict) -> ScoringOutput:
         primary_risks=primary_risks,
         screening_score=screening_score,
         screening_reason_codes=reason_codes,
+        directional_thesis_score=split["directional_thesis_score"],
+        risk_burden_score=split["risk_burden_score"],
         evidence_score_note=_make_evidence_note(ev_breakdown),
         confidence_score_note=_make_confidence_note(conf_breakdown),
         metadata={
-            "evidence_item_count": len(evidence_items),
-            "contradiction_count": len(contradictions),
-            "catalyst_count":      len(catalyst_map),
-            "tic_count":           len(tics),
-            "risk_factor_count":   len(risk_factors),
+            "evidence_item_count":      len(evidence_items),
+            "contradiction_count":      len(contradictions),
+            "catalyst_count":           len(catalyst_map),
+            "tic_count":                len(tics),
+            "risk_factor_count":        len(risk_factors),
+            "directional_items_count":  split["directional_items_count"],
+            "risk_items_count":         split["risk_items_count"],
+            "disclosed_risk_items":     split["risk_items"],
         },
     )
 

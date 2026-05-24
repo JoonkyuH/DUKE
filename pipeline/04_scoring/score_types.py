@@ -122,6 +122,11 @@ class ScoringOutput:
     screening_score:       float
     screening_reason_codes: List[str]
 
+    # Split scores (v1.2+): directional thesis vs structural risk burden
+    # evidence_score is kept equal to directional_thesis_score for backward compat.
+    directional_thesis_score: float = 0.0   # excludes disclosed_risk items
+    risk_burden_score:        float = 0.0   # disclosed_risk items only
+
     # Plain-English explanation of what drove each score (displayed to investor)
     evidence_score_note:   str = ""
     confidence_score_note: str = ""

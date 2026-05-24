@@ -67,6 +67,17 @@ def _load_debate(ticker: str, date_str: str | None) -> tuple[dict, str]:
     return data, date_tag
 
 
+def _load_scoring(ticker: str, date_str: str | None) -> dict:
+    base    = str(_REPO_ROOT / "data" / "scored")
+    pattern = f"{base}/{ticker}_score_{date_str or '*'}.json"
+    try:
+        path = _find_latest(pattern)
+        with open(path) as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
+
+
 def _load_shortlist(date_str: str) -> dict | None:
     base = str(_REPO_ROOT / "data" / "screening")
     for pattern in (
@@ -128,17 +139,20 @@ def _load_prompt(name: str) -> str:
 # RISK OFFICER BRIEF
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _build_risk_brief(debate_record: dict) -> dict:
+def _build_risk_brief(debate_record: dict, scoring: dict) -> dict:
     """
-    Assemble the Risk Officer's input from the debate record.
+    Assemble the Risk Officer's input from the debate record and scoring output.
 
     thesis_invalidation_conditions, risk_factors, and catalyst_map are empty
     in this run because Stage 03 EvidencePacket is not yet wired through.
     The Risk Officer prompt instructs the model to note coverage gaps.
     """
+    disclosed_risk_items = scoring.get("metadata", {}).get("disclosed_risk_items", [])
     return {
         "ticker":       debate_record.get("ticker"),
         "company_name": debate_record.get("company_name"),
+        "risk_burden_score":     scoring.get("risk_burden_score", 0.0),
+        "disclosed_risk_items":  disclosed_risk_items,
         "debate_record": {
             "debate_id":               debate_record.get("debate_id"),
             "outcome":                 debate_record.get("outcome"),
@@ -383,6 +397,12 @@ def main() -> None:
     cf0 = debate_record.get("debate_confidence_score") or 0.0
     print(f"  scores:         ev={ev0:+.1f}  conf={cf0:.1f}")
 
+    # ── Load scoring output (for risk_burden_score + disclosed_risk_items) ────
+    scoring = _load_scoring(args.ticker, args.date)
+    rbs = scoring.get("risk_burden_score", 0.0)
+    n_risk = scoring.get("metadata", {}).get("risk_items_count", "n/a")
+    print(f"  risk_burden:    {rbs:.1f}  ({n_risk} disclosed risk items)")
+
     # ── Load price context (optional) ────────────────────────────────────────
     shortlist  = _load_shortlist(date_tag)
     price_data = _extract_price_data(shortlist, args.ticker)
@@ -391,7 +411,7 @@ def main() -> None:
     # ── Risk Officer ──────────────────────────────────────────────────────────
     print("\nRisk Officer assessment")
     risk_system = _load_prompt("risk_officer.md")
-    risk_brief  = _build_risk_brief(debate_record)
+    risk_brief  = _build_risk_brief(debate_record, scoring)
     risk_raw    = _call_analyst(client, _RISK_MODEL, risk_system, risk_brief, "Risk Officer", max_tokens=_RISK_MAX_TOKENS)
 
     if risk_raw:
