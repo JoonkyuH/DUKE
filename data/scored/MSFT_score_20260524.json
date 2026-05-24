@@ -1,11 +1,11 @@
 {
-  "score_id": "SC-MSFT-20260524-0401-8587",
+  "score_id": "SC-MSFT-20260524-1725-8F14",
   "packet_reference": "MSFT_20260524",
   "ticker": "MSFT",
   "company_name": "MICROSOFT CORP",
-  "scored_at": "2026-05-24T04:01:22.534931+00:00",
+  "scored_at": "2026-05-24T17:25:06.863225+00:00",
   "evidence_score": -3.6050000000000004,
-  "confidence_score": 94.0,
+  "confidence_score": 86.0,
   "conviction": "watch",
   "recommendation": "watch_neutral",
   "position_sizing": "none",
@@ -22,13 +22,13 @@
   "confidence_breakdown": {
     "base_confidence": 89.0,
     "contradiction_penalty": 0.0,
-    "binary_catalyst_penalty": 0.0,
+    "binary_catalyst_penalty": 8.0,
     "stale_data_penalty": 0.0,
     "thin_evidence_penalty": 0.0,
     "coverage_penalty": 0.0,
-    "total_penalty": 0.0,
+    "total_penalty": 8.0,
     "bonuses": 5.0,
-    "final_confidence": 94.0,
+    "final_confidence": 86.0,
     "management_quote_count": 8
   },
   "invalidation_report": {
@@ -55,12 +55,12 @@
   "directional_thesis_score": -3.6050000000000004,
   "risk_burden_score": 100.0,
   "evidence_score_note": "24 directional items; bull weight 4.32 vs bear 17.56 \u2192 net -60.5",
-  "confidence_score_note": "base 89.0  /  bonuses +5.0  \u2192  94.0",
+  "confidence_score_note": "base 89.0  /  penalties: binary catalyst \u22128.0  /  bonuses +5.0  \u2192  86.0",
   "metadata": {
     "evidence_item_count": 24,
-    "contradiction_count": 0,
-    "catalyst_count": 0,
-    "tic_count": 0,
+    "contradiction_count": 3,
+    "catalyst_count": 5,
+    "tic_count": 4,
     "risk_factor_count": 3,
     "directional_items_count": 13,
     "risk_items_count": 11,
@@ -234,13 +234,13 @@
     "risk_burden_cap_reason": "",
     "position_sizing_before_cap": null
   },
-  "generated_at": "2026-05-24T04:01:22.535069+00:00",
+  "generated_at": "2026-05-24T17:25:06.863440+00:00",
   "analyst_brief_date": "20260524",
   "screening_score_used": 56.65,
   "data_availability": {
     "fundamentals": "not_available",
-    "catalyst_map": "not_available",
-    "thesis_invalidation_conditions": "not_available",
+    "catalyst_map": "available",
+    "thesis_invalidation_conditions": "available",
     "data_freshness": "not_available",
     "screening_score": "available"
   }

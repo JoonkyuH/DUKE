@@ -15,8 +15,11 @@ but are excluded from the directional net_score. This keeps the evidence score
 focused on direction while letting confidence scoring penalize uncertainty.
 """
 
+import logging
 from typing import List, Dict, Any
 from score_types import EvidenceScoreBreakdown
+
+log = logging.getLogger("evidence_scorer")
 
 
 # Management has an optimism bias — bearish signals from management are
@@ -159,6 +162,20 @@ def score_evidence_split(evidence_items: List[dict]) -> Dict[str, Any]:
             bull_w += eff_weight
         elif direction == "bearish":
             bear_w += eff_weight
+        elif (
+            direction == "neutral"
+            and item_class == "management_quote"
+            and str(item.get("significance") or "").upper() == "HIGH"
+            and item.get("category") == "guidance"
+        ):
+            # HIGH-significance guidance with neutral tone is a mild bearish signal —
+            # management could have been bullish but chose neutral language.
+            mild_bear = eff_weight * 0.08
+            bear_w += mild_bear
+            log.debug(
+                "%s: NEUTRAL HIGH guidance → mild bear signal (eff_weight=%.3f)",
+                item.get("ticker", "?"), mild_bear,
+            )
 
     directional_sum = bull_w + bear_w
     if directional_sum == 0.0:

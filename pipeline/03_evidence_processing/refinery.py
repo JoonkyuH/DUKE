@@ -6,11 +6,21 @@ Entry point:
     build_analyst_brief(packet: dict) -> dict
 
 Reads a Stage-02 evidence packet and produces a structured analyst brief
-ready for the debate analysts in Stage 05.  All logic is deterministic —
-no LLM calls.
+ready for the debate analysts in Stage 05. Includes one LLM call at the
+end to synthesize catalyst_map, thesis_invalidation_conditions, and
+uncertainties from the compressed evidence.
 """
 
+import json
+import logging
+import sys
 from datetime import datetime, timezone
+from pathlib import Path
+
+log = logging.getLogger("refinery")
+
+_PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
+_REPO_ROOT   = Path(__file__).resolve().parent.parent.parent
 
 from scorer import (
     load_weights,
@@ -135,6 +145,135 @@ def _build_source_limitations(packet: dict, transcript_status: str) -> list:
 
 
 # ─────────────────────────────────────────────
+# SYNTHESIS (LLM call)
+# ─────────────────────────────────────────────
+
+_SIG_ORDER = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
+_EMPTY_SYNTHESIS = {
+    "catalyst_map": [],
+    "thesis_invalidation_conditions": [],
+    "uncertainties": [],
+}
+
+
+def _synthesize_structured_fields(brief: dict, ticker: str) -> dict:
+    """
+    Generate catalyst_map, TICs, and uncertainties from the compressed brief evidence.
+    Makes one LLM call using prompts/synthesis.md. Returns empty lists on any failure.
+    """
+    if str(_REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(_REPO_ROOT))
+
+    try:
+        from common.llm import get_client
+        client = get_client("synthesis")
+    except Exception as exc:
+        log.warning("%s: LLM client unavailable for synthesis: %s", ticker, exc)
+        return _EMPTY_SYNTHESIS
+
+    prompt_path = _PROMPTS_DIR / "synthesis.md"
+    try:
+        prompt_template = prompt_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        log.warning("%s: synthesis.md not found at %s", ticker, prompt_path)
+        return _EMPTY_SYNTHESIS
+
+    # Build focused evidence summary for the prompt
+    lines = []
+
+    mgmt_qs = sorted(
+        brief.get("management_quotes", []),
+        key=lambda q: _SIG_ORDER.get(str(q.get("significance") or "").upper(), 3),
+    )[:5]
+    if mgmt_qs:
+        lines.append("MANAGEMENT QUOTES:")
+        for q in mgmt_qs:
+            speaker = q.get("speaker", "Management")
+            text    = (q.get("quote_text") or "").replace("\n", " ")
+            cat     = q.get("category", "")
+            sig     = q.get("significance", "")
+            dirn    = q.get("direction", "")
+            lines.append(f'  [{speaker}] "{text}" ({cat}, {sig}, {dirn})')
+
+    filing_qs = sorted(
+        brief.get("filing_quotes", []),
+        key=lambda q: _SIG_ORDER.get(str(q.get("significance") or "").upper(), 3),
+    )[:5]
+    if filing_qs:
+        lines.append("\nSEC FILING QUOTES:")
+        for q in filing_qs:
+            source = q.get("filing_section_label") or "SEC Filing"
+            text   = (q.get("quote_text") or "").replace("\n", " ")
+            cat    = q.get("category", "")
+            sig    = q.get("significance", "")
+            dirn   = q.get("direction", "")
+            lines.append(f'  [{source}] "{text}" ({cat}, {sig}, {dirn})')
+
+    bull_ev = brief.get("external_bull_evidence", [])
+    if bull_ev:
+        lines.append("\nEXTERNAL BULL EVIDENCE:")
+        for e in bull_ev:
+            snippet = (e.get("snippet") or e.get("quote_text") or e.get("title") or "").replace("\n", " ")
+            lines.append(f'  [BULL] "{snippet}"')
+
+    bear_ev = brief.get("external_bear_evidence", [])
+    if bear_ev:
+        lines.append("\nEXTERNAL BEAR EVIDENCE:")
+        for e in bear_ev:
+            snippet = (e.get("snippet") or e.get("quote_text") or e.get("title") or "").replace("\n", " ")
+            lines.append(f'  [BEAR] "{snippet}"')
+
+    evidence_summary = "\n".join(lines)
+    archetype        = brief.get("screening_archetype", "")
+
+    prompt = (
+        prompt_template
+        .replace("{ticker}", ticker)
+        .replace("{archetype}", archetype)
+        .replace("{evidence_summary}", evidence_summary)
+    )
+
+    try:
+        raw = client.structured_generate(
+            prompt=prompt,
+            system=(
+                "You are a senior financial analyst producing structured investment research. "
+                "Return ONLY valid JSON matching the specified schema. No preamble or markdown."
+            ),
+        )
+    except Exception as exc:
+        log.warning("%s: synthesis LLM call failed: %s", ticker, exc)
+        return _EMPTY_SYNTHESIS
+
+    # Unwrap response
+    if isinstance(raw, dict):
+        result = raw
+    elif isinstance(raw, str):
+        try:
+            result = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            log.warning("%s: synthesis JSON parse failed: %s", ticker, exc)
+            return _EMPTY_SYNTHESIS
+    else:
+        log.warning("%s: unexpected synthesis response type: %s", ticker, type(raw))
+        return _EMPTY_SYNTHESIS
+
+    out = {
+        "catalyst_map":                   result.get("catalyst_map", []),
+        "thesis_invalidation_conditions": result.get("thesis_invalidation_conditions", []),
+        "uncertainties":                  result.get("uncertainties", []),
+    }
+    log.info(
+        "%s: synthesis complete — %d catalysts, %d TICs, %d uncertainties",
+        ticker,
+        len(out["catalyst_map"]),
+        len(out["thesis_invalidation_conditions"]),
+        len(out["uncertainties"]),
+    )
+    return out
+
+
+# ─────────────────────────────────────────────
 # MAIN ORCHESTRATOR
 # ─────────────────────────────────────────────
 
@@ -224,9 +363,11 @@ def build_analyst_brief(packet: dict) -> dict:
     fq  = packet.get("fiscal_quarter") or ""
     fiscal_period = f"{fy} {fq}".strip() or packet.get("calendar_period") or ""
 
+    ticker = packet.get("ticker", "")
+
     # ── Assemble brief ──────────────────────
     brief = {
-        "ticker":             packet.get("ticker", ""),
+        "ticker":             ticker,
         "screening_archetype": packet.get("screening_archetype", ""),
         "generated_at":       datetime.now(timezone.utc).isoformat(),
         "fiscal_period":      fiscal_period,
@@ -248,5 +389,11 @@ def build_analyst_brief(packet: dict) -> dict:
             "scoring_version":           weights.get("version", ""),
         },
     }
+
+    # ── Synthesis (LLM) ─────────────────────
+    synthesis = _synthesize_structured_fields(brief, ticker)
+    brief["catalyst_map"]                   = synthesis["catalyst_map"]
+    brief["thesis_invalidation_conditions"] = synthesis["thesis_invalidation_conditions"]
+    brief["uncertainties"]                  = synthesis["uncertainties"]
 
     return brief

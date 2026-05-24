@@ -99,10 +99,10 @@ def _build_packet(brief: dict, ticker: str, date: str, screening_entry: dict) ->
         "screening_score":        float(screening_entry.get("composite_score", 0.0)),
         "data_availability": {
             "fundamentals":                   "not_available",
-            "catalyst_map":                   "not_available",
-            "thesis_invalidation_conditions": "not_available",
+            "catalyst_map":                   "available" if packet.get("catalyst_map") else "not_available",
+            "thesis_invalidation_conditions": "available" if packet.get("thesis_invalidation_conditions") else "not_available",
             "data_freshness":                 "not_available",
-            "screening_score": "available" if screening_entry else "not_available",
+            "screening_score":                "available" if screening_entry else "not_available",
         },
     })
     return packet
@@ -176,8 +176,7 @@ def _print_summary(result, packet: dict, ticker: str, out_path: Path) -> None:
         print(f"    {k:<34}  {v}")
     print()
     print("  Note: scores reflect evidence balance only.")
-    print("  Fundamentals, catalyst_map, and TICs are")
-    print("  placeholders — will be wired in V1.5.")
+    print("  Fundamentals are not yet wired (V1.5).")
     print()
     print(f"  Output: {out_path.relative_to(_REPO_ROOT)}")
     print()

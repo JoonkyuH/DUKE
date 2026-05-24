@@ -1,7 +1,7 @@
 {
   "ticker": "NVDA",
   "screening_archetype": "long_term_compounder",
-  "generated_at": "2026-05-24T16:49:32.624506+00:00",
+  "generated_at": "2026-05-24T17:15:17.314529+00:00",
   "fiscal_period": "FY2027 Q1",
   "scoring_version": "1.1.0",
   "coverage_report": {
@@ -726,12 +726,96 @@
       "evidence_nature": "external_claim"
     }
   ],
-  "uncertainties": [],
+  "uncertainties": [
+    {
+      "question": "To what extent will hyperscale customers' internal chip development (e.g., Google TPUs, Amazon Trainium, Microsoft Maia) displace Nvidia GPU demand over the next 2–3 years, and at what pace does this substitution risk become material to revenue?",
+      "impact": "high",
+      "resolution": "Disclosure of hyperscale CapEx mix between internal silicon and third-party GPU procurement in earnings calls, or analyst day presentations from Google, Amazon, and Microsoft detailing internal chip capacity versus Nvidia dependency"
+    },
+    {
+      "question": "Will the Rubin platform ramp execute without significant yield or production complexity issues, given MD&A warnings about architecture complexity causing potential revenue volatility, quality issues, and cost overruns?",
+      "impact": "high",
+      "resolution": "First concrete production and shipment data for Rubin in H2 fiscal 2027 earnings reports, including gross margin trends and any inventory provision disclosures specific to the Rubin platform"
+    },
+    {
+      "question": "How much of Nvidia's $18.6 billion in investments in private AI companies and infrastructure funds represents circular demand (i.e., investees purchasing Nvidia products), and what is the revenue sustainability if those investments are not continually recycled into compute purchases?",
+      "impact": "medium",
+      "resolution": "Greater disclosure in future SEC filings or investor days quantifying revenue derived from entities in which Nvidia holds equity stakes, and management commentary on potential conflicts of interest or demand circularity"
+    }
+  ],
   "source_limitations": [],
   "metadata": {
     "total_evidence_considered": 168,
     "total_evidence_in_brief": 24,
     "evidence_excluded_by_budget": 124,
     "scoring_version": "1.1.0"
-  }
+  },
+  "catalyst_map": [
+    {
+      "catalyst": "Vera Rubin platform ramp in H2 fiscal 2027, expected to exceed Grace Blackwell adoption with all frontier model companies committing from launch",
+      "timeline": "medium_term",
+      "direction": "bull",
+      "expected_impact": "high",
+      "evidence_basis": "Jensen Wong: 'Vera Rubin is going to be even more successful than Grace Blackwell at this point. Every single frontier model company will jump on Vera Rubin from the get go.' and MD&A: 'We expect our Rubin platform to start shipping in the second half of fiscal year 2027.'",
+      "days_away": null
+    },
+    {
+      "catalyst": "Massive share repurchase program expansion — $80 billion additional authorization approved May 2026 on top of $38.5 billion remaining, signaling management confidence in cash generation",
+      "timeline": "imminent",
+      "direction": "bull",
+      "expected_impact": "medium",
+      "evidence_basis": "MD&A: 'On May 18, 2026, our Board of Directors approved an additional $80.0 billion in share repurchase authorization, without expiration.'",
+      "days_away": null
+    },
+    {
+      "catalyst": "Continued hyperscale CapEx expansion toward $1–4 trillion driving Nvidia compute demand growth, with Anthropic partnership securing significant capacity deployments in 2025–2026",
+      "timeline": "near_term",
+      "direction": "bull",
+      "expected_impact": "high",
+      "evidence_basis": "Jensen Wong: 'The CapEx is at a trillion dollars, and it's growing towards the three to four.' and 'The amount of capacity that we're going to bring online for Anthropic this year and next year is going to be quite significant.'",
+      "days_away": null
+    },
+    {
+      "catalyst": "Supply constraints in Gaming segment persisting into fiscal Q1 2027 and beyond, potentially dragging on overall revenue mix and segment growth",
+      "timeline": "near_term",
+      "direction": "bear",
+      "expected_impact": "medium",
+      "evidence_basis": "Risk Factors: 'We expect supply constraints to be a headwind to Gaming in the first quarter of fiscal year 2027 and beyond.'",
+      "days_away": null
+    },
+    {
+      "catalyst": "Tech giants (Google, others) accelerating development of proprietary AI chips, representing a structural competitive threat to Nvidia's data center dominance",
+      "timeline": "medium_term",
+      "direction": "bear",
+      "expected_impact": "high",
+      "evidence_basis": "Bear evidence: 'Nvidia faces its biggest threat yet as tech giants build their own AI chips' referencing Google's chief scientist and internal chip development programs.",
+      "days_away": null
+    }
+  ],
+  "thesis_invalidation_conditions": [
+    {
+      "condition": "Hyperscale customers (Google, Microsoft, Amazon, Meta) materially reduce AI infrastructure CapEx or shift a significant portion of compute workloads to internally developed chips, causing Nvidia data center revenue growth to decelerate sharply below hyperscale CapEx growth rates",
+      "signal": "Quarterly data center revenue growth falling below 20% YoY while hyperscale CapEx continues to grow, or public announcements of large-scale internal chip deployment replacing Nvidia GPU clusters",
+      "severity": "critical",
+      "timeframe": "year"
+    },
+    {
+      "condition": "Vera Rubin platform suffers material production delays or yield failures, pushing shipment timelines well beyond H2 fiscal 2027 and causing frontier model companies to defer or cancel orders",
+      "signal": "MD&A disclosures of increased inventory provisions, production yield issues, or management guidance revisions explicitly citing Rubin platform execution challenges",
+      "severity": "critical",
+      "timeframe": "year"
+    },
+    {
+      "condition": "Gross margins decline materially and persistently below 70%, suggesting pricing power erosion or structurally higher costs tied to next-generation platform complexity",
+      "signal": "Consecutive quarters of gross margin compression with management attributing decline to competitive pricing pressure rather than one-time inventory charges",
+      "severity": "major",
+      "timeframe": "quarter"
+    },
+    {
+      "condition": "Regulatory action that restricts Nvidia's ability to sell advanced chips to key international markets (beyond existing H20 export controls) or blocks strategic investments",
+      "signal": "New export control rulemakings targeting Blackwell/Rubin architectures or formal government investigations into Nvidia's market position and chip sales practices",
+      "severity": "major",
+      "timeframe": "year"
+    }
+  ]
 }

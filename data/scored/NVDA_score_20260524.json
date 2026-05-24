@@ -1,9 +1,9 @@
 {
-  "score_id": "SC-NVDA-20260524-1649-149B",
+  "score_id": "SC-NVDA-20260524-1719-4E27",
   "packet_reference": "NVDA_20260524",
   "ticker": "NVDA",
   "company_name": "NVIDIA CORP",
-  "scored_at": "2026-05-24T16:49:53.697494+00:00",
+  "scored_at": "2026-05-24T17:19:22.592464+00:00",
   "evidence_score": 68.457,
   "confidence_score": 98.7,
   "conviction": "high",
@@ -61,9 +61,9 @@
   "confidence_score_note": "base 88.7  /  bonuses +10.0  \u2192  98.7",
   "metadata": {
     "evidence_item_count": 24,
-    "contradiction_count": 0,
-    "catalyst_count": 0,
-    "tic_count": 0,
+    "contradiction_count": 3,
+    "catalyst_count": 5,
+    "tic_count": 4,
     "risk_factor_count": 3,
     "directional_items_count": 20,
     "risk_items_count": 3,
@@ -125,13 +125,13 @@
     "risk_burden_cap_reason": "",
     "position_sizing_before_cap": null
   },
-  "generated_at": "2026-05-24T16:49:53.697583+00:00",
+  "generated_at": "2026-05-24T17:19:22.592557+00:00",
   "analyst_brief_date": "20260524",
   "screening_score_used": 78.19,
   "data_availability": {
     "fundamentals": "not_available",
-    "catalyst_map": "not_available",
-    "thesis_invalidation_conditions": "not_available",
+    "catalyst_map": "available",
+    "thesis_invalidation_conditions": "available",
     "data_freshness": "not_available",
     "screening_score": "available"
   }

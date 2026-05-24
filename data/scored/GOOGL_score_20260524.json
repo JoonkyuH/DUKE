@@ -1,14 +1,14 @@
 {
-  "score_id": "SC-GOOGL-20260524-1649-8B03",
+  "score_id": "SC-GOOGL-20260524-1720-2E6F",
   "packet_reference": "GOOGL_20260524",
   "ticker": "GOOGL",
   "company_name": "Alphabet Inc.",
-  "scored_at": "2026-05-24T16:49:48.106861+00:00",
-  "evidence_score": 43.1,
-  "confidence_score": 92.9,
-  "conviction": "medium",
-  "recommendation": "moderate_conviction_enter",
-  "position_sizing": "half",
+  "scored_at": "2026-05-24T17:20:07.749065+00:00",
+  "evidence_score": 61.322,
+  "confidence_score": 84.9,
+  "conviction": "high",
+  "recommendation": "strong_conviction_enter",
+  "position_sizing": "full",
   "evidence_breakdown": {
     "bull_weight": 11.065,
     "bear_weight": 4.83,
@@ -22,13 +22,13 @@
   "confidence_breakdown": {
     "base_confidence": 87.9,
     "contradiction_penalty": 0.0,
-    "binary_catalyst_penalty": 0.0,
+    "binary_catalyst_penalty": 8.0,
     "stale_data_penalty": 0.0,
     "thin_evidence_penalty": 0.0,
     "coverage_penalty": 0.0,
-    "total_penalty": 0.0,
+    "total_penalty": 8.0,
     "bonuses": 5.0,
-    "final_confidence": 92.9,
+    "final_confidence": 84.9,
     "management_quote_count": 8
   },
   "invalidation_report": {
@@ -44,18 +44,23 @@
     "As of March 31, 2026, we had material purchase commitments and other contractual obligations totaling $332.4 billion, of which $138.0 billion was short-term. These purchase commitments primarily relate to costs for technical infrastructure and inventory through long-term supply agreements and open purchase orders.",
     "We are monitoring ongoing developments surrounding geopolitical tension, international trade, and the macroeconomic environment. As a result, we may experience direct and indirect effects on our business, operations, and financial results. Our past results may not be indicative of our future performance, and our financial results may differ materially from historical trends."
   ],
-  "screening_score": 0.0,
-  "screening_reason_codes": [],
+  "screening_score": 60.74,
+  "screening_reason_codes": [
+    "STRONG_REVENUE_GROWTH",
+    "HIGH_GROSS_MARGIN",
+    "EXPANDING_MARGINS",
+    "UNDERVALUED_PEG"
+  ],
   "raw_directional_thesis_score": 58.1,
-  "directional_thesis_score": 43.1,
+  "directional_thesis_score": 61.322,
   "risk_burden_score": 44.6,
   "evidence_score_note": "21 directional items; bull weight 11.06 vs bear 4.83 \u2192 net +39.2",
-  "confidence_score_note": "base 87.9  /  bonuses +5.0  \u2192  92.9",
+  "confidence_score_note": "base 87.9  /  penalties: binary catalyst \u22128.0  /  bonuses +5.0  \u2192  84.9",
   "metadata": {
     "evidence_item_count": 24,
-    "contradiction_count": 0,
-    "catalyst_count": 0,
-    "tic_count": 0,
+    "contradiction_count": 3,
+    "catalyst_count": 5,
+    "tic_count": 4,
     "risk_factor_count": 3,
     "directional_items_count": 19,
     "risk_items_count": 3,
@@ -110,21 +115,21 @@
       "generic": 1,
       "untagged": 0
     },
-    "screening_adjustment_applied": -15.0,
+    "screening_adjustment_applied": 3.22,
     "mgmt_coverage_conviction_cap": false,
     "conviction_ceiling_applied": false,
     "risk_burden_cap_applied": false,
     "risk_burden_cap_reason": "",
     "position_sizing_before_cap": null
   },
-  "generated_at": "2026-05-24T16:49:48.106940+00:00",
+  "generated_at": "2026-05-24T17:20:07.749211+00:00",
   "analyst_brief_date": "20260524",
-  "screening_score_used": 0.0,
+  "screening_score_used": 60.74,
   "data_availability": {
     "fundamentals": "not_available",
-    "catalyst_map": "not_available",
-    "thesis_invalidation_conditions": "not_available",
+    "catalyst_map": "available",
+    "thesis_invalidation_conditions": "available",
     "data_freshness": "not_available",
-    "screening_score": "not_available"
+    "screening_score": "available"
   }
 }

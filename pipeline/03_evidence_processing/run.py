@@ -18,6 +18,7 @@ _RAW_DIR  = _REPO / "data" / "raw"
 _OUT_DIR  = _REPO / "data" / "processed"
 
 sys.path.insert(0, str(_HERE))   # so scorer / ranker / refinery import cleanly
+sys.path.insert(0, str(_REPO))   # so common.llm is importable from refinery
 from refinery import build_analyst_brief
 
 

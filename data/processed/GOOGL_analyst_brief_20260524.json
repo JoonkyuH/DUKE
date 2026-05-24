@@ -1,7 +1,7 @@
 {
   "ticker": "GOOGL",
   "screening_archetype": "long_term_compounder",
-  "generated_at": "2026-05-24T16:49:25.434378+00:00",
+  "generated_at": "2026-05-24T17:19:31.216730+00:00",
   "fiscal_period": "FY2026 Q1",
   "scoring_version": "1.1.0",
   "coverage_report": {
@@ -727,12 +727,96 @@
       "evidence_nature": "external_claim"
     }
   ],
-  "uncertainties": [],
+  "uncertainties": [
+    {
+      "question": "How lumpy and predictable will TPU hardware revenues be, given management's explicit warning that 'revenues from TPU hardware sales will fluctuate from quarter to quarter, depending on when TPUs are shipped to customers,' and whether the $240 billion cloud backlog will be monetized on schedule?",
+      "impact": "high",
+      "resolution": "Quarterly disclosures of TPU shipment progress, backlog drawdown rates, and explicit revenue recognition updates from Google Cloud management in future earnings calls"
+    },
+    {
+      "question": "What is the nature and strategic rationale of the $40 billion private company investment commitment ($10 billion capital plus $30 billion contingent on milestones) disclosed in March 2026, and how does it affect balance sheet flexibility and capital allocation priorities?",
+      "impact": "high",
+      "resolution": "Public disclosure or SEC filing identifying the private company and the specific operational/financial milestones that trigger the contingent $30 billion, along with management commentary on strategic fit"
+    },
+    {
+      "question": "Can Google Cloud sustain its 63% growth rate and expand operating margins while simultaneously absorbing $29.5 billion Wiz integration costs, rising TPU deployment complexity, and the significant ongoing CapEx burden?",
+      "impact": "medium",
+      "resolution": "Two to three consecutive quarters of Google Cloud segment operating margin trend data post-Wiz acquisition and post-TPU hardware delivery commencement, disclosed in segment-level financial reporting"
+    }
+  ],
   "source_limitations": [],
   "metadata": {
     "total_evidence_considered": 219,
     "total_evidence_in_brief": 24,
     "evidence_excluded_by_budget": 175,
     "scoring_version": "1.1.0"
-  }
+  },
+  "catalyst_map": [
+    {
+      "catalyst": "Initial TPU hardware revenue recognition from on-premises customer deployments begins in 2026, with the vast majority of revenues from these multi-gigawatt agreements to be realized in 2027",
+      "timeline": "medium_term",
+      "direction": "bull",
+      "expected_impact": "high",
+      "evidence_basis": "Anat Ashkenazi guidance: 'We expect to begin recognizing a small percent of the revenues from these agreements later this year, with the vast majority of revenues to be realized in 2027.' and MD&A: 'Google Cloud has entered into a limited number of agreements to supply multiple gigawatts of TPU hardware...'",
+      "days_away": null
+    },
+    {
+      "catalyst": "Google Cloud continued hypergrowth acceleration with 63% YoY growth to $20 billion in Q1 2026, supporting thesis of AI-driven cloud monetization inflection",
+      "timeline": "near_term",
+      "direction": "bull",
+      "expected_impact": "high",
+      "evidence_basis": "External bull evidence: 'Alphabet Q1 2026 revenue hit $109.9 billion, up 22% year over year and the fastest pace in two years. Google Cloud grew 63% to $20 billion'",
+      "days_away": null
+    },
+    {
+      "catalyst": "Wiz acquisition integration into Google Cloud segment unlocks expanded cloud security addressable market following $29.5 billion deal close in March 2026",
+      "timeline": "medium_term",
+      "direction": "bull",
+      "expected_impact": "medium",
+      "evidence_basis": "MD&A: 'On March 11, 2026, we completed our acquisition of Wiz for $29.5 billion...Following the close of the acquisition, the financial results are included in our consolidated financial statements within the Google Cloud segment.'",
+      "days_away": null
+    },
+    {
+      "catalyst": "Significantly increased 2027 CapEx guidance signals management conviction in AI opportunity capture, but raises near-term margin compression risk",
+      "timeline": "medium_term",
+      "direction": "binary",
+      "expected_impact": "high",
+      "evidence_basis": "Anat Ashkenazi: 'we expect our 2027 capex to significantly increase compared to 2026' and updated full-year 2026 CapEx guidance range of $180 to $190 billion",
+      "days_away": null
+    },
+    {
+      "catalyst": "Google Search losing market share to competitors creates risk to core advertising revenue that underpins the compounder thesis",
+      "timeline": "medium_term",
+      "direction": "bear",
+      "expected_impact": "high",
+      "evidence_basis": "External bear evidence: 'Alphabet's Google Search has been losing market share to competitors. From April 2023 to April 2024, Google lost 1.9% of all search inquiries, while Microsoft's...'",
+      "days_away": null
+    }
+  ],
+  "thesis_invalidation_conditions": [
+    {
+      "condition": "Sustained, accelerating loss of Google Search market share to AI-native competitors (e.g., Microsoft Copilot, Perplexity) leading to structurally declining Search and Ads revenue growth",
+      "signal": "Sequential deceleration in Search advertising revenue growth across two or more consecutive quarters, or search query volume data showing Google share falling below 88% globally",
+      "severity": "critical",
+      "timeframe": "year"
+    },
+    {
+      "condition": "Google Cloud growth decelerates materially from its current 63% trajectory without evidence that TPU hardware revenues and backlog monetization are compensating, suggesting AI monetization is not materializing",
+      "signal": "Cloud segment revenue growth falling below 30% YoY for a reporting quarter while operating margins fail to expand, indicating loss of competitive positioning in AI infrastructure",
+      "severity": "major",
+      "timeframe": "quarter"
+    },
+    {
+      "condition": "Escalating CapEx commitments ($180–$190 billion in 2026, with 2027 'significantly' higher) fail to generate commensurate revenue and free cash flow growth, causing ROIC compression that undermines the compounder thesis",
+      "signal": "Free cash flow yield declining materially year-over-year despite revenue growth, or management acknowledging delays in TPU backlog revenue recognition beyond 2027",
+      "severity": "major",
+      "timeframe": "year"
+    },
+    {
+      "condition": "Regulatory action or antitrust ruling that structurally impairs Google's Search advertising monopoly or forces business separation",
+      "signal": "Court ruling or consent decree requiring behavioral or structural remedies in Search distribution agreements or advertising technology practices",
+      "severity": "critical",
+      "timeframe": "year"
+    }
+  ]
 }
