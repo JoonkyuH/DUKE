@@ -52,6 +52,16 @@ _EARNINGS_RE   = re.compile(r'earnings|results|quarterly|Q[1-4]', re.I)
 _YT_RE         = re.compile(r'(?:youtube\.com/watch\?.*?v=|youtu\.be/)([A-Za-z0-9_-]{11})')
 _IX_STRIP      = re.compile(r'^/ix\?doc=', re.I)
 
+# URL path signals that identify an earnings event/webcast page vs a plain press release
+_EARNINGS_EVENT_PATH_RE = re.compile(
+    r'event|events|earnings-call|earnings_call|webcast|call-details|call_details',
+    re.I
+)
+
+# Transcript cache TTL: earnings happen every ~90 days; re-fetch after 85 days
+# so a bad initial fetch doesn't persist for more than one quarter.
+_TRANSCRIPT_CACHE_TTL_DAYS = 85
+
 # Earnings content keywords — must match ≥2 for a document to be accepted
 _EARNINGS_CONTENT_KW = re.compile(
     r'\b(revenue|quarter|earnings|guidance|growth|margin)\b', re.I
@@ -371,44 +381,15 @@ def _is_index_page(url: str, ir_url: Optional[str]) -> bool:
     """Return True if the URL is the known IR quarterly results landing/index page."""
     if not ir_url:
         return False
-    # Normalise trailing slashes for comparison
     return url.rstrip("/") == ir_url.rstrip("/")
 
 
-def _try_perplexity_transcript(
-    ir_url: Optional[str],
-    ticker: str,
-    company_name: str,
-) -> Optional[tuple]:
-    """
-    Query Perplexity Sonar for a direct transcript or earnings release URL.
-    Returns (raw_text, source_url, source_type) or None.
-
-    source_type is one of:
-      "ir_transcript_pdf"  — PDF that passes earnings content validation (>=2 000 chars)
-      "ir_press_release"   — HTML article that passes earnings content validation (>=2 000 chars)
-
-    Rejection reasons logged:
-      rejected_landing_page           — URL matches known IR index/quarterly-results page
-      rejected_too_short              — stripped text < 2 000 chars
-      rejected_not_pdf_for_transcript — URL claims PDF but extraction failed or too short
-      rejected_failed_earnings_validation — text does not pass _is_earnings_content()
-    """
-    api_key = os.environ.get("PERPLEXITY_API_KEY")
-    if not api_key:
-        log.debug("PERPLEXITY_API_KEY not set — skipping 1A for %s", ticker)
-        return None
-
-    ir_hint = f"from official investor relations site {ir_url}" if ir_url else ""
-    query   = (
-        f"most recent earnings call transcript PDF download link for "
-        f"{company_name} {ticker} {ir_hint}"
-    )
+def _perplexity_call(query: str, api_key: str, ticker: str) -> list:
+    """Make one Perplexity Sonar call; return search_results list or []."""
     payload = json.dumps({
         "model":    "sonar",
         "messages": [{"role": "user", "content": query}],
     }).encode()
-
     req = urllib.request.Request(
         _PERPLEXITY_URL,
         data=payload,
@@ -423,13 +404,33 @@ def _try_perplexity_transcript(
             data = json.loads(r.read())
     except Exception as exc:
         log.warning("Perplexity request failed for %s: %s", ticker, exc)
-        return None
-
-    search_results = data.get("search_results") or []
-    if not search_results:
+        return []
+    results = data.get("search_results") or []
+    if not results:
         log.debug("No search_results from Perplexity for %s", ticker)
-        return None
+    return results
 
+
+def _accept_transcript_results(
+    search_results: list,
+    ir_url: Optional[str],
+    ticker: str,
+) -> Optional[tuple]:
+    """
+    Iterate Perplexity results; return (raw_text, url, source_type) for the
+    first URL that passes all acceptance checks, or None.
+
+    source_type is one of:
+      "ir_transcript_pdf"   — PDF that passes earnings content validation
+      "ir_earnings_event"   — HTML event/webcast page on the official IR domain
+      "ir_press_release"    — any other accepted HTML on the official IR domain
+
+    Rejection reasons logged:
+      rejected_landing_page               — URL is the IR index/quarterly-results page
+      rejected_too_short                  — stripped text < 2 000 chars
+      rejected_not_pdf_for_transcript     — PDF extraction failed or too short
+      rejected_failed_earnings_validation — text does not pass _is_earnings_content()
+    """
     for result in search_results:
         url     = (result.get("url") or "").strip()
         title   = (result.get("name") or result.get("title") or "").lower()
@@ -482,7 +483,7 @@ def _try_perplexity_transcript(
             log.info("1A: accepted ir_transcript_pdf for %s → %s", ticker, url)
             return text, url, "ir_transcript_pdf"
 
-        # ── HTML path — only accepted as press release, never as transcript ──
+        # ── HTML path ─────────────────────────────────────────────────
         html = raw.decode("utf-8", errors="replace")
         text = _strip_html(html)
 
@@ -498,8 +499,74 @@ def _try_perplexity_transcript(
             log.debug("1A: domain not allowed (HTML): %s", url)
             continue
 
+        # Fix 1B: classify as ir_earnings_event when URL path signals an event page
+        url_path = urllib.parse.urlparse(url).path
+        if _EARNINGS_EVENT_PATH_RE.search(url_path) and _is_official_host(url, ir_url):
+            log.info("1A: accepted ir_earnings_event for %s → %s", ticker, url)
+            return text, url, "ir_earnings_event"
+
         log.info("1A: accepted ir_press_release for %s → %s", ticker, url)
         return text, url, "ir_press_release"
+
+    return None
+
+
+def _try_perplexity_transcript(
+    ir_url: Optional[str],
+    ticker: str,
+    company_name: str,
+    fiscal_year: str = "",
+    fiscal_quarter: str = "",
+) -> Optional[tuple]:
+    """
+    Query Perplexity Sonar for a direct transcript or earnings release URL.
+    Returns (raw_text, source_url, source_type) or None.
+
+    Makes up to two Perplexity calls:
+      1. Primary broad query — transcript, event page, or earnings release
+      2. Targeted fallback — fires only when the primary returned the IR landing page
+         and nothing else useful; uses fiscal period + IR domain as context
+    """
+    api_key = os.environ.get("PERPLEXITY_API_KEY")
+    if not api_key:
+        log.debug("PERPLEXITY_API_KEY not set — skipping 1A for %s", ticker)
+        return None
+
+    ir_hint = f"from official investor relations site {ir_url}" if ir_url else ""
+
+    # Fix 1A: broader query — not PDF-exclusive; includes event pages and releases
+    primary_query = (
+        f"most recent earnings call transcript, earnings event page, or earnings release "
+        f"for {company_name} ({ticker}) {ir_hint}"
+    ).strip()
+
+    search_results = _perplexity_call(primary_query, api_key, ticker)
+    if not search_results:
+        return None
+
+    out = _accept_transcript_results(search_results, ir_url, ticker)
+    if out:
+        return out
+
+    # Fix 1C: if primary returned only the IR landing page, retry with a more
+    # targeted query using fiscal period and IR domain for tighter context.
+    found_landing_page = ir_url and any(
+        _is_index_page((r.get("url") or "").strip(), ir_url)
+        for r in search_results
+        if (r.get("url") or "").strip()
+    )
+    if found_landing_page and (fiscal_quarter or fiscal_year):
+        yr         = fiscal_year.replace("FY", "") if fiscal_year else ""
+        ir_domain  = _root_domain(ir_url) if ir_url else ""
+        fallback_q = (
+            f"{company_name} {ticker} {fiscal_quarter} {yr} "
+            f"earnings call event page investor relations {ir_domain}"
+        ).strip()
+        log.info("1A: primary returned landing page — retrying with targeted query for %s", ticker)
+        retry_results = _perplexity_call(fallback_q, api_key, ticker)
+        out = _accept_transcript_results(retry_results, ir_url, ticker)
+        if out:
+            return out
 
     log.debug("1A: no valid transcript URL found via Perplexity for %s", ticker)
     return None
@@ -853,13 +920,17 @@ def _source_reliability(source_type: str) -> float:
         "sec_8k_exhibit":                 0.95,
         "sec_8k_exhibit_press_release":   0.95,
         "ir_press_release":               0.90,
+        "ir_earnings_event":              0.90,
         "fmp_transcript":                 0.85,
         "youtube_transcript":             0.70,
     }.get(source_type, 0.75)
 
 
 def _document_subtype(source_type: str) -> str:
-    if source_type in ("sec_8k_exhibit", "sec_8k_exhibit_press_release", "ir_press_release"):
+    if source_type in (
+        "sec_8k_exhibit", "sec_8k_exhibit_press_release",
+        "ir_press_release", "ir_earnings_event",
+    ):
         return "earnings_press_release"
     if source_type in ("ir_transcript_pdf", "fmp_transcript"):
         return "earnings_transcript"
@@ -886,22 +957,39 @@ def fetch_transcript(ticker: str) -> Optional[dict]:
     # ── Cache check ──────────────────────────
     cached = _cache_get(ticker, fiscal_year, fiscal_quarter)
     if cached:
-        log.info("%s: transcript cache hit (%s %s)", ticker, fiscal_year, fiscal_quarter)
-        st = cached["source_type"]
-        return {
-            "ticker":           cached["ticker"],
-            "source_type":      st,
-            "source_url":       cached["source_url"],
-            "raw_text":         cached["raw_text"],
-            "fiscal_year":      cached["fiscal_year"],
-            "fiscal_quarter":   cached["fiscal_quarter"],
-            "calendar_period":  cached["calendar_period"],
-            "reported_date":    cached["reported_date"],
-            "reliability":      _source_reliability(st),
-            "discovered_by":    "cache",
-            "document_subtype": _document_subtype(st),
-            "source_priority":  "official_company_material",
-        }
+        try:
+            age_days = (
+                datetime.now(timezone.utc)
+                - datetime.fromisoformat(cached["fetched_at"])
+            ).days
+        except Exception:
+            age_days = 0
+
+        if age_days < _TRANSCRIPT_CACHE_TTL_DAYS:
+            log.info(
+                "%s: transcript cache hit (%s %s, age=%dd)",
+                ticker, fiscal_year, fiscal_quarter, age_days,
+            )
+            st = cached["source_type"]
+            return {
+                "ticker":           cached["ticker"],
+                "source_type":      st,
+                "source_url":       cached["source_url"],
+                "raw_text":         cached["raw_text"],
+                "fiscal_year":      cached["fiscal_year"],
+                "fiscal_quarter":   cached["fiscal_quarter"],
+                "calendar_period":  cached["calendar_period"],
+                "reported_date":    cached["reported_date"],
+                "reliability":      _source_reliability(st),
+                "discovered_by":    "cache",
+                "document_subtype": _document_subtype(st),
+                "source_priority":  "official_company_material",
+            }
+
+        log.info(
+            "%s: transcript cache stale (age=%dd ≥ %d) — re-fetching",
+            ticker, age_days, _TRANSCRIPT_CACHE_TTL_DAYS,
+        )
 
     ir_url       = get_ir_url(ticker)
     company_name = get_company_name(ticker)
@@ -913,7 +1001,7 @@ def fetch_transcript(ticker: str) -> Optional[dict]:
 
     # 1A — Perplexity direct discovery
     log.info("%s: [1A] Perplexity transcript discovery …", ticker)
-    out = _try_perplexity_transcript(ir_url, ticker, company_name)
+    out = _try_perplexity_transcript(ir_url, ticker, company_name, fiscal_year, fiscal_quarter)
     if out:
         result_text, source_url, source_type = out
         discovered_by = "perplexity"
