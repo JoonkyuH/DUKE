@@ -1,0 +1,129 @@
+{
+  "scoring_adjustment_version": "v1",
+  "damodaran_reference": "January 2026",
+  "baseline_profile": "platform_technology",
+  "notes": "Multipliers applied to absolute signal thresholds. Ratio-based signals (PEG, P/FCF) are NOT adjusted.",
+
+  "adjustments": {
+    "platform_technology": {
+      "gross_margin_multiplier": 1.00,
+      "revenue_growth_multiplier": 1.00,
+      "fcf_margin_multiplier": 1.00
+    },
+    "semiconductor_platform": {
+      "gross_margin_multiplier": 1.00,
+      "revenue_growth_multiplier": 1.00,
+      "fcf_margin_multiplier": 0.95
+    },
+    "enterprise_software": {
+      "gross_margin_multiplier": 1.00,
+      "revenue_growth_multiplier": 0.90,
+      "fcf_margin_multiplier": 1.00
+    },
+    "consumer_technology_ecosystem": {
+      "gross_margin_multiplier": 0.85,
+      "revenue_growth_multiplier": 0.75,
+      "fcf_margin_multiplier": 0.90
+    },
+    "consumer_electronics": {
+      "gross_margin_multiplier": 0.65,
+      "revenue_growth_multiplier": 0.65,
+      "fcf_margin_multiplier": 0.70
+    },
+    "digital_media": {
+      "gross_margin_multiplier": 0.70,
+      "revenue_growth_multiplier": 0.70,
+      "fcf_margin_multiplier": 0.65
+    },
+    "traditional_telecom": {
+      "gross_margin_multiplier": 0.40,
+      "revenue_growth_multiplier": 0.40,
+      "fcf_margin_multiplier": 0.50
+    },
+    "pharma_innovator": {
+      "gross_margin_multiplier": 0.70,
+      "revenue_growth_multiplier": 0.65,
+      "fcf_margin_multiplier": 0.70
+    },
+    "biotech": {
+      "gross_margin_multiplier": 0.75,
+      "revenue_growth_multiplier": 0.80,
+      "fcf_margin_multiplier": 0.40
+    },
+    "medtech_device": {
+      "gross_margin_multiplier": 0.65,
+      "revenue_growth_multiplier": 0.60,
+      "fcf_margin_multiplier": 0.65
+    },
+    "consumer_staples_brand": {
+      "gross_margin_multiplier": 0.55,
+      "revenue_growth_multiplier": 0.45,
+      "fcf_margin_multiplier": 0.60
+    },
+    "retail_discretionary": {
+      "gross_margin_multiplier": 0.50,
+      "revenue_growth_multiplier": 0.55,
+      "fcf_margin_multiplier": 0.55
+    },
+    "industrial_manufacturer": {
+      "gross_margin_multiplier": 0.55,
+      "revenue_growth_multiplier": 0.55,
+      "fcf_margin_multiplier": 0.55
+    },
+    "aerospace_defense": {
+      "gross_margin_multiplier": 0.50,
+      "revenue_growth_multiplier": 0.55,
+      "fcf_margin_multiplier": 0.60
+    },
+    "energy_upstream": {
+      "gross_margin_multiplier": 0.55,
+      "revenue_growth_multiplier": 0.50,
+      "fcf_margin_multiplier": 0.55
+    },
+    "integrated_energy": {
+      "gross_margin_multiplier": 0.50,
+      "revenue_growth_multiplier": 0.45,
+      "fcf_margin_multiplier": 0.55
+    },
+    "energy_midstream": {
+      "gross_margin_multiplier": 0.50,
+      "revenue_growth_multiplier": 0.40,
+      "fcf_margin_multiplier": 0.60
+    },
+    "utility_regulated": {
+      "gross_margin_multiplier": 0.45,
+      "revenue_growth_multiplier": 0.40,
+      "fcf_margin_multiplier": 0.45
+    },
+    "reit": {
+      "gross_margin_multiplier": 0.45,
+      "revenue_growth_multiplier": 0.40,
+      "fcf_margin_multiplier": 0.50
+    },
+    "payments_network": {
+      "gross_margin_multiplier": 0.90,
+      "revenue_growth_multiplier": 0.80,
+      "fcf_margin_multiplier": 0.95
+    },
+    "asset_management": {
+      "gross_margin_multiplier": 0.75,
+      "revenue_growth_multiplier": 0.65,
+      "fcf_margin_multiplier": 0.80
+    },
+    "banking": {
+      "gross_margin_multiplier": null,
+      "revenue_growth_multiplier": 0.50,
+      "fcf_margin_multiplier": null
+    },
+    "insurance": {
+      "gross_margin_multiplier": null,
+      "revenue_growth_multiplier": 0.45,
+      "fcf_margin_multiplier": null
+    },
+    "unknown": {
+      "gross_margin_multiplier": 1.00,
+      "revenue_growth_multiplier": 1.00,
+      "fcf_margin_multiplier": 1.00
+    }
+  }
+}

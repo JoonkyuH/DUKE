@@ -34,8 +34,8 @@ from signal_scorer import (
     score_earnings_quality,
     score_entry_vs_fundamentals,
     score_binary_event_risk,
-    _get_sector_multiplier,
 )
+from economic_profile_classifier import classify
 
 
 # ─────────────────────────────────────────────
@@ -57,11 +57,11 @@ def _score_record(record: dict) -> tuple:
     Compute composite score, per-signal scores, and archetype for a raw record.
     Runs both compounder and deep value passes; returns the higher composite.
     """
-    fund_d      = record.get("fundamental_data", {})
-    price_d     = record.get("price_data", {})
-    ext_d       = record.get("extended_data", {})
-    earnings_d  = record.get("earnings_data", {})
-    sector_name = record.get("sector_name", "Unknown")
+    ticker     = record.get("ticker", "")
+    fund_d     = record.get("fundamental_data", {})
+    price_d    = record.get("price_data", {})
+    ext_d      = record.get("extended_data", {})
+    earnings_d = record.get("earnings_data", {})
 
     market_d = {
         "market_cap":    ext_d.get("market_cap"),
@@ -70,7 +70,21 @@ def _score_record(record: dict) -> tuple:
         "week_52_low":   ext_d.get("week_52_low"),
     }
 
-    metrics = compute_fundamental_metrics(fund_d, market_d, sector=sector_name) if fund_d else {}
+    classification   = classify(ticker)
+    economic_profile = classification["economic_profile"]
+    if fund_d:
+        metrics = compute_fundamental_metrics(
+            fund_d, market_d, economic_profile=economic_profile
+        )
+        if classification["classification_method"] == "unknown":
+            classification = classify(ticker, metrics)
+            economic_profile = classification["economic_profile"]
+            metrics["economic_profile"] = economic_profile
+    else:
+        metrics = {}
+
+    # Store classification on record so the main loop can display it
+    record["classification"] = classification
 
     bq = score_business_quality(metrics)
     hd = score_historical_discount(metrics)
@@ -250,30 +264,34 @@ def main():
             comp  = entry["composite_score"]
             sigs  = entry["signal_scores"]
             rows.append({
-                "ticker":       t,
-                "composite":    comp,
-                "sigs":         sigs,
-                "passed":       True,
-                "priority":     entry["priority"],
-                "archetype":    entry["screening_archetype"],
-                "reason_codes": entry["reason_codes"],
-                "flags":        entry["flags"],
-                "hypothesis":   entry["mispricing_hypothesis"],
-                "sector_name":  rec.get("sector_name", "Unknown"),
+                "ticker":         t,
+                "composite":      comp,
+                "sigs":           sigs,
+                "passed":         True,
+                "priority":       entry["priority"],
+                "archetype":      entry["screening_archetype"],
+                "classification": entry.get("classification", {}),
+                "reason_codes":   entry["reason_codes"],
+                "flags":          entry["flags"],
+                "hypothesis":     entry["mispricing_hypothesis"],
+                "sector_name":    rec.get("sector_name", "Unknown"),
+                "industry":       rec.get("industry", "Unknown"),
             })
         else:
             comp, sigs, archetype = _score_record(rec)
             rows.append({
-                "ticker":       t,
-                "composite":    comp,
-                "sigs":         sigs,
-                "passed":       False,
-                "priority":     None,
-                "archetype":    archetype,
-                "reason_codes": [],
-                "flags":        [],
-                "hypothesis":   "",
-                "sector_name":  rec.get("sector_name", "Unknown"),
+                "ticker":         t,
+                "composite":      comp,
+                "sigs":           sigs,
+                "passed":         False,
+                "priority":       None,
+                "archetype":      archetype,
+                "classification": rec.get("classification", {}),
+                "reason_codes":   [],
+                "flags":          [],
+                "hypothesis":     "",
+                "sector_name":    rec.get("sector_name", "Unknown"),
+                "industry":       rec.get("industry", "Unknown"),
             })
 
     # Sort: passing tickers by priority, then failing by composite desc
@@ -336,6 +354,18 @@ def main():
     print("  (BQ=Business Quality  VG=Valuation vs Growth  HD=Historical Discount")
     print("   EQ=Earnings Quality  EF=Entry vs Fundamentals  BR=Binary Event Risk)")
 
+    # Economic profile classification audit
+    print()
+    print(f"  {'TICKER':<8}  {'PROFILE':<30}  {'METHOD':<20}  {'CONF':>5}")
+    print(f"  {'──────':<8}  {'───────':<30}  {'──────':<20}  {'────':>5}")
+    for r in rows:
+        clf    = r.get("classification", {})
+        pname  = clf.get("economic_profile", "—")[:30]
+        method = clf.get("classification_method", "—")[:20]
+        conf   = clf.get("classification_confidence")
+        cstr   = f"{conf:.0%}" if conf is not None else "   —"
+        print(f"  {r['ticker']:<8}  {pname:<30}  {method:<20}  {cstr:>5}")
+
     # Reason codes (passing only)
     if n_pass:
         print()
@@ -361,10 +391,15 @@ def main():
         for r in rows:
             if not r["passed"] or not r["hypothesis"]:
                 continue
+            clf      = r.get("classification", {})
+            profile  = clf.get("economic_profile", "unknown")
+            method   = clf.get("classification_method", "unknown")
+            conf     = clf.get("classification_confidence", 0.0)
             sector_n = r.get("sector_name", "Unknown")
-            m, src = _get_sector_multiplier(sector_n, "revenue_growth")
+            industry = r.get("industry", "Unknown")
             print(f"\n    [{r['ticker']}]")
-            print(f"    Sector: {sector_n} | Threshold multiplier: {m:.2f}x ({src})")
+            print(f"    Sector: {sector_n} / {industry}")
+            print(f"    Economic profile: {profile}  ({method}, confidence {conf:.0%})")
             # Word-wrap at ~70 chars
             words = r["hypothesis"].split()
             line = "    "

@@ -1,0 +1,226 @@
+{
+  "profile_taxonomy_version": "v1",
+  "classification_source": "manual_v1",
+  "damodaran_reference": "January 2026",
+  "notes": "GICS sector = reporting classification. Economic profile = analytical normalization bucket. Review annually.",
+
+  "ticker_overrides": {
+    "AAPL": {
+      "profile": "consumer_technology_ecosystem",
+      "rationale": "GICS industry Consumer Electronics understates AAPL economics. Services segment (~25% revenue, ~70% gross margin) drives blended margin expansion and ecosystem lock-in. Not comparable to pure consumer hardware.",
+      "classification_source": "manual_v1",
+      "review_date": "2026-01"
+    },
+    "SPOT": {
+      "profile": "digital_media",
+      "rationale": "GICS industry Internet Content & Information would map to platform_technology, but Spotify's economics are content/streaming — gross margins ~30%, content costs dominate. Closer to digital_media than platform.",
+      "classification_source": "manual_v1",
+      "review_date": "2026-01"
+    },
+    "DIS": {
+      "profile": "digital_media",
+      "rationale": "Disney is a conglomerate (parks + streaming + licensing). Entertainment GICS industry maps to digital_media which is the closest fit for V1. Review in V2 for conglomerate-specific profile.",
+      "classification_source": "manual_v1",
+      "review_date": "2026-01"
+    },
+    "AXP": {
+      "profile": "banking",
+      "rationale": "AmEx is closer to banking than payments_network — it carries credit risk on its own balance sheet unlike Visa/Mastercard which are pure networks.",
+      "classification_source": "manual_v1",
+      "review_date": "2026-01"
+    },
+    "GE": {
+      "profile": "aerospace_defense",
+      "rationale": "Post-spinoff GE Aerospace is a pure aviation engine and defense company. Aerospace & Defense GICS industry string correctly maps here.",
+      "classification_source": "manual_v1",
+      "review_date": "2026-01"
+    }
+  },
+
+  "gics_industry_patterns": {
+    "Semiconductors":                      "semiconductor_platform",
+    "Internet Content & Information":      "platform_technology",
+    "Software - Infrastructure":           "enterprise_software",
+    "Software - Application":              "enterprise_software",
+    "Credit Services":                     "payments_network",
+    "Consumer Electronics":                "consumer_electronics",
+    "Drug Manufacturers - General":        "pharma_innovator",
+    "Medical Devices":                     "medtech_device",
+    "Entertainment":                       "digital_media",
+    "Telecom Services":                    "traditional_telecom",
+    "Utilities - Regulated Electric":      "utility_regulated",
+    "Utilities - Regulated Gas":           "utility_regulated",
+    "Utilities - Regulated Water":         "utility_regulated",
+    "Utilities - Diversified":             "utility_regulated",
+    "Oil & Gas E&P":                       "energy_upstream",
+    "Oil & Gas Integrated":                "integrated_energy",
+    "Oil & Gas Midstream":                 "energy_midstream",
+    "Oil & Gas Refining & Marketing":      "integrated_energy",
+    "REIT - Industrial":                   "reit",
+    "REIT - Retail":                       "reit",
+    "REIT - Residential":                  "reit",
+    "REIT - Specialty":                    "reit",
+    "REIT - Office":                       "reit",
+    "REIT - Healthcare Facilities":        "reit",
+    "REIT - Hotel & Motel":               "reit",
+    "REIT - Diversified":                  "reit",
+    "Asset Management":                    "asset_management",
+    "Capital Markets":                     "asset_management",
+    "Banks - Diversified":                 "banking",
+    "Banks - Regional":                    "banking",
+    "Insurance - Diversified":             "insurance",
+    "Insurance - Life":                    "insurance",
+    "Insurance - Property & Casualty":     "insurance",
+    "Insurance - Specialty":               "insurance",
+    "Aerospace & Defense":                 "aerospace_defense",
+    "Farm & Heavy Construction Machinery": "industrial_manufacturer",
+    "Specialty Industrial Machinery":      "industrial_manufacturer",
+    "Electrical Equipment & Parts":        "industrial_manufacturer",
+    "Industrial Conglomerates":            "industrial_manufacturer",
+    "Discount Stores":                     "retail_discretionary",
+    "Home Improvement Retail":             "retail_discretionary",
+    "Specialty Retail":                    "retail_discretionary",
+    "Footwear & Accessories":              "retail_discretionary",
+    "Restaurants":                         "consumer_staples_brand",
+    "Beverages - Non-Alcoholic":           "consumer_staples_brand",
+    "Beverages - Alcoholic":              "consumer_staples_brand",
+    "Household & Personal Products":       "consumer_staples_brand",
+    "Packaged Foods":                      "consumer_staples_brand",
+    "Tobacco":                             "consumer_staples_brand"
+  },
+
+  "financial_signature_fallback": {
+    "platform_technology": {
+      "gross_margin_min": 0.58,
+      "revenue_growth_min": 0.15,
+      "fcf_margin_min": 0.10
+    },
+    "enterprise_software": {
+      "gross_margin_min": 0.60,
+      "revenue_growth_min": 0.08,
+      "fcf_margin_min": 0.12
+    },
+    "semiconductor_platform": {
+      "gross_margin_min": 0.45,
+      "revenue_growth_min": 0.10
+    },
+    "industrial_manufacturer": {
+      "gross_margin_max": 0.40,
+      "revenue_growth_max": 0.12
+    },
+    "utility_regulated": {
+      "revenue_growth_max": 0.06,
+      "gross_margin_max": 0.55
+    }
+  },
+
+  "special_handling": {
+    "banking": {
+      "disabled_signals": ["gross_margin", "fcf_margin"],
+      "note": "NIM and ROE are primary metrics. Standard margin analysis structurally invalid."
+    },
+    "insurance": {
+      "disabled_signals": ["gross_margin", "fcf_margin"],
+      "note": "Combined ratio is primary metric. Standard margin analysis structurally invalid."
+    },
+    "reit": {
+      "disabled_signals": ["fcf_margin"],
+      "note": "FFO is primary metric. FCF margin analysis misleading for REITs."
+    }
+  },
+
+  "profiles": {
+    "platform_technology": {
+      "description": "Network effects, software-like scaling, high gross margins. GICS often misclassifies as Communication Services.",
+      "examples": ["GOOGL", "META"]
+    },
+    "semiconductor_platform": {
+      "description": "Chip design with platform lock-in. High gross margins, cyclical but moaty.",
+      "examples": ["NVDA", "AMD", "AVGO"]
+    },
+    "enterprise_software": {
+      "description": "B2B software with sticky revenue, high gross margins, moderate growth.",
+      "examples": ["MSFT", "CRM", "ORCL"]
+    },
+    "consumer_technology_ecosystem": {
+      "description": "Hardware entry point, services margin engine, ecosystem lock-in moat. AAPL model specifically.",
+      "examples": ["AAPL"]
+    },
+    "consumer_electronics": {
+      "description": "Pure or predominantly hardware consumer electronics. Lower margins, more cyclical.",
+      "examples": ["SONY", "LOGI"]
+    },
+    "digital_media": {
+      "description": "Content and streaming. Subscriber growth alongside margins.",
+      "examples": ["NFLX", "SPOT", "DIS"]
+    },
+    "traditional_telecom": {
+      "description": "Low growth, high capex, utility-like economics.",
+      "examples": ["T", "VZ", "CMCSA", "TMUS"]
+    },
+    "pharma_innovator": {
+      "description": "High gross margins, R&D-heavy, patent cliff risk.",
+      "examples": ["LLY", "MRK", "JNJ"]
+    },
+    "medtech_device": {
+      "description": "Medical devices. Mid gross margins, recurring procedure revenue.",
+      "examples": ["MDT"]
+    },
+    "consumer_staples_brand": {
+      "description": "Branded consumer staples with pricing power and stable margins.",
+      "examples": ["COST", "SBUX"]
+    },
+    "retail_discretionary": {
+      "description": "Consumer discretionary retail. Cyclical, moderate margins.",
+      "examples": ["HD", "NKE"]
+    },
+    "industrial_manufacturer": {
+      "description": "Industrial manufacturing. Mid margins, capex heavy, GDP-linked growth.",
+      "examples": ["CAT", "GE"]
+    },
+    "aerospace_defense": {
+      "description": "Aerospace and defense. Government contracts, predictable revenue.",
+      "examples": ["GE"]
+    },
+    "energy_upstream": {
+      "description": "Pure upstream oil and gas E&P. Commodity-driven.",
+      "examples": ["COP"]
+    },
+    "integrated_energy": {
+      "description": "Integrated oil and gas. Upstream + downstream + retail.",
+      "examples": ["XOM", "CVX"]
+    },
+    "energy_midstream": {
+      "description": "Pipeline and midstream. Toll road economics.",
+      "examples": ["KMI"]
+    },
+    "utility_regulated": {
+      "description": "Regulated utility. Regulated returns, capex-heavy.",
+      "examples": ["NEE", "DUK"]
+    },
+    "reit": {
+      "description": "Real estate investment trust. FFO-based economics.",
+      "examples": ["PLD", "AMT"]
+    },
+    "payments_network": {
+      "description": "Card network and payments infrastructure. Extremely high margins, asset-light.",
+      "examples": ["V", "MA"]
+    },
+    "asset_management": {
+      "description": "Fee-based asset management. High margins, AUM-driven.",
+      "examples": ["BLK", "GS"]
+    },
+    "banking": {
+      "description": "Commercial and investment banking. NIM-driven.",
+      "examples": ["JPM", "BAC", "AXP"]
+    },
+    "insurance": {
+      "description": "Insurance. Combined ratio is primary metric.",
+      "examples": []
+    },
+    "unknown": {
+      "description": "Profile could not be determined. Neutral multipliers applied. Review required.",
+      "examples": []
+    }
+  }
+}

@@ -33,9 +33,8 @@ from signal_scorer import (
     score_entry_vs_fundamentals,
     score_binary_event_risk,
     build_mispricing_hypothesis,
-    reset_sector_sample,
-    add_to_sector_sample,
 )
+from economic_profile_classifier import classify
 from regime_classifier import RegimeProfile, MarketRegime, classify_regime
 from reason_codes import assign_reason_codes
 
@@ -91,6 +90,7 @@ class ShortlistEntry:
     signal_weights_applied:  dict
     regime_at_screening:     str
     screening_archetype:     str         # "long_term_compounder" | "deep_value" | "either"
+    classification:          dict        # full economic_profile_classifier output
     reason_codes:            List[str]
     flags:                   List[str]
     mispricing_hypothesis:   str
@@ -185,8 +185,6 @@ def run_screening(
     """
     start_ms = time.monotonic()
 
-    reset_sector_sample()
-
     # ── Step 1: Classify regime ──────────────
     regime   = classify_regime(regime_indicators)
     warnings: List[str] = []
@@ -209,7 +207,25 @@ def run_screening(
             "week_52_low":   ext_d.get("week_52_low"),
         }
 
-        metrics = compute_fundamental_metrics(fund_d, market_d, sector=sector_name) if fund_d else {}
+        # Classify first with no metrics (ticker_override / gics_pattern paths)
+        # then inject the result into metrics so scoring functions can read it.
+        classification = classify(ticker)
+        economic_profile = classification["economic_profile"]
+
+        if fund_d:
+            metrics = compute_fundamental_metrics(
+                fund_d, market_d, economic_profile=economic_profile
+            )
+            # Re-classify with metrics available (enables financial_signature path)
+            if classification["classification_method"] == "unknown":
+                classification = classify(ticker, metrics)
+                economic_profile = classification["economic_profile"]
+                metrics["economic_profile"] = economic_profile
+        else:
+            metrics = {}
+
+        # Stash full classification on record for display in run_screening.py
+        record["classification"] = classification
 
         # ── Signals shared across all three archetypes ─────────────
         bq = score_business_quality(metrics)
@@ -259,15 +275,6 @@ def run_screening(
         composite       = top_score
         winning_weights = top_weights
 
-        # Accumulate sector sample for self-computed multipliers in future runs
-        if metrics:
-            add_to_sector_sample(
-                sector_name,
-                metrics.get("gm_ann"),
-                metrics.get("rev_growth"),
-                metrics.get("fcf_margin"),
-            )
-
         # Stash metrics on record for reason_codes.py access
         record["fundamental_metrics"] = metrics
 
@@ -294,6 +301,7 @@ def run_screening(
             signal_weights_applied=dict(winning_weights),
             regime_at_screening=regime.regime.value,
             screening_archetype=archetype,
+            classification=record.get("classification", {}),
             reason_codes=reason_codes,
             flags=flags,
             mispricing_hypothesis=hypothesis,
