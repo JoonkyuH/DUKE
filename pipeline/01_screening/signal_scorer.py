@@ -92,6 +92,18 @@ def _yoy(curr: Optional[float], prev: Optional[float]) -> Optional[float]:
     return (curr - prev) / abs(prev) * 100
 
 
+def _latest_annual_fy(metric: dict) -> Optional[int]:
+    """Return the fiscal year integer of the most recent annual entry, or None."""
+    annual = metric.get("annual", [])
+    if not annual:
+        return None
+    latest = max(annual, key=lambda x: x.get("end", ""))
+    try:
+        return int(latest.get("period", "").replace("FY", "").strip())
+    except (ValueError, AttributeError):
+        return None
+
+
 # ─────────────────────────────────────────────
 # METRICS COMPUTATION (single pass per ticker)
 # ─────────────────────────────────────────────
@@ -139,11 +151,38 @@ def compute_fundamental_metrics(
     gm_trend = (gm_q0 - gm_q3) if (gm_q0 is not None and gm_q3 is not None) else None
     gm_ann   = _margin(_ann(gp, 0), rev_ann0)      # most recent annual
 
+    # ── Period alignment guard: revenue vs gross_profit ──
+    rev_fy = _latest_annual_fy(fund_d.get("revenue", {}))
+    gp_fy  = _latest_annual_fy(fund_d.get("gross_profit", {}))
+    if (rev_fy is not None
+            and gp_fy is not None
+            and abs(rev_fy - gp_fy) > 1):
+        log.warning(
+            "PERIOD MISMATCH: revenue is FY%s but gross_profit is FY%s — "
+            "setting gm_ann and gm_trend to None to prevent corrupted "
+            "gross margin calculation",
+            rev_fy, gp_fy,
+        )
+        gm_ann   = None
+        gm_trend = None
+
     # ── FCF ──────────────────────────────────
     fcf_ttm  = _ttm(fcf)
     fcf_ann0 = _ann(fcf, 0)
     fcf_ann1 = _ann(fcf, 1)
     fcf_margin = _margin(fcf_ttm, rev_ttm)
+
+    # ── Period alignment guard: revenue vs free_cash_flow ──
+    fcf_fy = _latest_annual_fy(fund_d.get("free_cash_flow", {}))
+    if (rev_fy is not None
+            and fcf_fy is not None
+            and abs(fcf_fy - rev_fy) > 1):
+        log.warning(
+            "PERIOD MISMATCH: revenue is FY%s but free_cash_flow is FY%s — "
+            "setting fcf_margin to None",
+            rev_fy, fcf_fy,
+        )
+        fcf_margin = None
 
     # ── Net income ───────────────────────────
     ni_ttm  = _ttm(ni)

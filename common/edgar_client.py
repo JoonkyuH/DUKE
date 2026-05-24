@@ -18,10 +18,13 @@ Values are in USD (or shares for shares_outstanding).
 """
 
 import json
+import logging
+import sqlite3
 import time
 import urllib.request
 import urllib.error
-from datetime import date
+from datetime import date, datetime
+from pathlib import Path
 from typing import Optional
 
 _TICKER_MAP_URL = "https://www.sec.gov/files/company_tickers.json"
@@ -30,7 +33,14 @@ _HEADERS        = {"User-Agent": "DUKE-research contact@duke-research.ai"}
 
 _ticker_cache: dict = {}   # ticker → zero-padded CIK str, populated on first call
 _facts_cache:  dict = {}   # CIK → raw companyfacts JSON; populated on first fetch per ticker
-_MIN_RECENT_END = "2020-01-01"  # concepts with no entry this recent are considered absent
+
+log = logging.getLogger(__name__)
+
+_EDGAR_DB_PATH = (
+    Path(__file__).resolve().parent.parent
+    / "pipeline" / "02_research"
+    / "acquisition" / "cache" / "duke_cache.db"
+)
 
 
 # ─────────────────────────────────────────────
@@ -86,18 +96,52 @@ def _is_standalone(entry: dict) -> bool:
 # EXTRACTION
 # ─────────────────────────────────────────────
 
-def _entries(facts: dict, *concepts: str, unit: str = "USD") -> list:
+def _entries(facts: dict, *concepts: str) -> list:
     """
-    Return the first concept's full entry list that has at least one recent filing
-    (end >= _MIN_RECENT_END). This prevents stale fallback concepts — e.g. 'Revenues'
-    having only 2016-2018 data for companies that switched to the longer GAAP tag —
-    from blocking the correct current concept from being selected.
+    Return the entries list for the best matching concept from the SEC companyfacts blob.
+
+    Selection: among concepts with any entry after 2023-01-01, pick the one whose
+    most recent entry (max end date) is latest. This ensures that when a company
+    switches XBRL concepts (e.g. Revenues → RevenueFromContractWithCustomer), the
+    current concept wins rather than the stale legacy concept.
+
+    Falls back to the first non-empty concept if no concept has entries after 2023-01-01,
+    and logs a warning so mismatches surface in the run log.
     """
+    MIN_RECENT = "2023-01-01"
+
+    best_concept     = None
+    best_latest_end  = ""
+    fallback_concept = None
+
     us_gaap = facts.get("facts", {}).get("us-gaap", {})
-    for name in concepts:
-        vals = us_gaap.get(name, {}).get("units", {}).get(unit, [])
-        if any(e.get("end", "") >= _MIN_RECENT_END for e in vals):
-            return vals
+
+    for concept in concepts:
+        data    = us_gaap.get(concept, {})
+        units   = data.get("units", {})
+        entries = units.get("USD") or units.get("shares") or []
+        if not entries:
+            continue
+
+        latest_end = max((e.get("end", "") for e in entries), default="")
+
+        if fallback_concept is None:
+            fallback_concept = entries
+
+        if latest_end >= MIN_RECENT:
+            if latest_end > best_latest_end:
+                best_latest_end = latest_end
+                best_concept    = entries
+
+    if best_concept is not None:
+        return best_concept
+    if fallback_concept is not None:
+        log.warning(
+            "No concept with data after %s found for concepts %s — "
+            "using fallback (latest end: %s)",
+            MIN_RECENT, concepts, best_latest_end,
+        )
+        return fallback_concept
     return []
 
 
@@ -268,6 +312,66 @@ def _gross_profit_from_cogs(revenue: dict, cogs: dict) -> dict:
 
 
 # ─────────────────────────────────────────────
+# EDGAR SNAPSHOT CACHE (SQLite, 7-day TTL)
+# ─────────────────────────────────────────────
+
+_CREATE_CACHE_TABLE = """
+    CREATE TABLE IF NOT EXISTS edgar_snapshot_cache (
+        ticker     TEXT PRIMARY KEY,
+        cik        TEXT,
+        snapshot   TEXT,
+        fetched_at TEXT,
+        schema_ver INTEGER DEFAULT 1
+    )
+"""
+
+
+def _load_edgar_snapshot(ticker: str) -> dict | None:
+    """Return cached companyfacts dict if present and < 7 days old, else None."""
+    try:
+        con = sqlite3.connect(_EDGAR_DB_PATH)
+        con.execute(_CREATE_CACHE_TABLE)
+        row = con.execute(
+            """
+            SELECT snapshot, fetched_at FROM edgar_snapshot_cache
+            WHERE ticker = ? AND fetched_at > datetime('now', '-7 days')
+            """,
+            (ticker.upper(),),
+        ).fetchone()
+        con.close()
+        if row:
+            snapshot_json, fetched_at = row
+            try:
+                age_days = (datetime.utcnow() - datetime.fromisoformat(fetched_at)).days
+            except Exception:
+                age_days = "?"
+            log.info("%s: EDGAR snapshot cache hit (age: %sd)", ticker.upper(), age_days)
+            return json.loads(snapshot_json)
+    except Exception as exc:
+        log.warning("EDGAR disk cache read failed for %s: %s", ticker.upper(), exc)
+    return None
+
+
+def _save_edgar_snapshot(ticker: str, cik: str, facts: dict) -> None:
+    """Persist companyfacts dict to disk cache."""
+    try:
+        con = sqlite3.connect(_EDGAR_DB_PATH)
+        con.execute(_CREATE_CACHE_TABLE)
+        con.execute(
+            """
+            INSERT OR REPLACE INTO edgar_snapshot_cache
+                (ticker, cik, snapshot, fetched_at, schema_ver)
+            VALUES (?, ?, ?, datetime('now'), 1)
+            """,
+            (ticker.upper(), cik, json.dumps(facts)),
+        )
+        con.commit()
+        con.close()
+    except Exception as exc:
+        log.warning("EDGAR disk cache write failed for %s: %s", ticker.upper(), exc)
+
+
+# ─────────────────────────────────────────────
 # PUBLIC ENTRY POINT
 # ─────────────────────────────────────────────
 
@@ -285,15 +389,22 @@ def fetch_financials(ticker: str, as_of: str | None = None) -> dict:
     """
     cik_str = _cik(ticker)
     if cik_str not in _facts_cache:
-        time.sleep(0.15)    # polite rate-limiting; EDGAR allows 10 req/sec
-        _facts_cache[cik_str] = _get(_FACTS_URL.format(cik=cik_str))
+        snapshot = _load_edgar_snapshot(ticker)
+        if snapshot is not None:
+            _facts_cache[cik_str] = snapshot
+        else:
+            time.sleep(0.15)    # polite rate-limiting; EDGAR allows 10 req/sec
+            raw = _get(_FACTS_URL.format(cik=cik_str))
+            log.info("%s: EDGAR fetched fresh from SEC", ticker.upper())
+            _save_edgar_snapshot(ticker, cik_str, raw)
+            _facts_cache[cik_str] = raw
     facts = _facts_cache[cik_str]
 
     def usd(*concepts):
-        return _entries(facts, *concepts, unit="USD")
+        return _entries(facts, *concepts)
 
     def shares(*concepts):
-        return _entries(facts, *concepts, unit="shares")
+        return _entries(facts, *concepts)
 
     def ex(raw, **kw):
         return _extract(raw, as_of=as_of, **kw)
