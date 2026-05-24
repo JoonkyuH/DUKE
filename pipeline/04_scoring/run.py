@@ -137,14 +137,24 @@ def _print_summary(result, packet: dict, ticker: str, out_path: Path) -> None:
     print(f"  DUKE Stage 04 — Quantitative Scoring  |  {ticker}")
     print(sep)
     print()
-    print(f"  Directional Thesis Score: {result.directional_thesis_score:>+7.1f}  (excl. risk disclosures)")
+    meta = result.metadata
+    sadj = meta.get("screening_adjustment_applied", 0.0)
+    print(f"  Raw DTS (pre-screening):  {result.raw_directional_thesis_score:>+7.1f}  (excl. risk disclosures)")
+    print(f"  Screening Adjustment:     {sadj:>+7.2f}  ((screening_score−50)×0.30)")
+    print(f"  DTS (adjusted):           {result.directional_thesis_score:>+7.1f}  (used for conviction)")
     print(f"  Risk Burden Score:        {result.risk_burden_score:>7.1f}  (disclosed risk weight)")
     print(f"  Evidence Score (=DTS):    {result.evidence_score:>+7.1f}  (backward compat)")
     print(f"  Confidence Score:         {result.confidence_score:>7.1f}  (quality + volume)")
     print()
-    print(f"  Conviction:       {result.conviction.value}")
+    ceiling_note = "  [ceiling applied]" if meta.get("conviction_ceiling_applied") else ""
+    print(f"  Conviction:       {result.conviction.value}{ceiling_note}")
     print(f"  Recommendation:   {result.recommendation.value}")
-    print(f"  Position Sizing:  {result.position_sizing.value}")
+    cap_note = ""
+    if meta.get("risk_burden_cap_applied"):
+        cap_note = f"  [capped from {meta['position_sizing_before_cap']}]"
+    elif meta.get("risk_burden_cap_reason"):
+        cap_note = "  [noted, no change]"
+    print(f"  Position Sizing:  {result.position_sizing.value}{cap_note}")
     print()
     sc    = packet["screening_score"]
     codes = packet["screening_reason_codes"]

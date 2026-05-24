@@ -33,11 +33,18 @@
       "description": "Backward-compat alias for directional_thesis_score. Set equal to directional_thesis_score."
     },
 
+    "raw_directional_thesis_score": {
+      "type": "number",
+      "minimum": -100,
+      "maximum": 100,
+      "description": "DTS before screening score adjustment. Stored for traceability."
+    },
+
     "directional_thesis_score": {
       "type": "number",
       "minimum": -100,
       "maximum": 100,
-      "description": "Net directional balance excluding disclosed_risk items (risk_factors, litigation, regulatory). Measures investment thesis strength independent of risk checklist."
+      "description": "Net directional balance excluding disclosed_risk items, adjusted by screening score: (screening_score - 50) * 0.30. Used for conviction thresholds."
     },
 
     "risk_burden_score": {

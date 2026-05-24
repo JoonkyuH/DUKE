@@ -110,16 +110,26 @@ def score_packet(packet: dict) -> ScoringOutput:
         fundamentals=fundamentals,
     )
 
-    # evidence_score = directional_thesis_score for backward compat; conviction
-    # thresholds now operate on the directional score, not the blended score.
-    evidence_score   = split["directional_thesis_score"]
-    confidence_score = conf_breakdown.final_confidence
+    # evidence_score = screening-adjusted DTS for backward compat; conviction
+    # thresholds operate on this adjusted score.
+    raw_dts              = split["directional_thesis_score"]
+    screening_adjustment = (screening_score - 50.0) * 0.30
+    evidence_score       = max(-100.0, min(100.0, raw_dts + screening_adjustment))
+    confidence_score     = conf_breakdown.final_confidence
 
     # ── Step 4: Conviction ─────────────────────────────────────────────────────
+    risk_burden_score = split["risk_burden_score"]
+
     if inv_report.status == InvalidationStatus.FATAL:
         conviction = ConvictionLevel.INSUFFICIENT
     else:
         conviction = _determine_conviction(evidence_score, confidence_score)
+
+    # Risk burden conviction ceiling: extreme structural risk caps bull conviction
+    conviction_ceiling_applied = False
+    if risk_burden_score >= 90.0 and conviction == ConvictionLevel.HIGH:
+        conviction = ConvictionLevel.MEDIUM
+        conviction_ceiling_applied = True
 
     # ── Step 5: Recommendation ─────────────────────────────────────────────────
     recommendation = _determine_recommendation(
@@ -130,6 +140,26 @@ def score_packet(packet: dict) -> ScoringOutput:
     position_sizing = _determine_position_sizing(
         conviction, inv_report, catalyst_map
     )
+
+    # Risk burden position sizing cap (applied after all other sizing logic)
+    sizing_before_cap = position_sizing
+    risk_burden_cap_applied  = False
+    risk_burden_cap_reason   = ""
+    if risk_burden_score >= 90.0:
+        cap = PositionSizing.QUARTER
+        if _size_exceeds(position_sizing, cap):
+            position_sizing         = cap
+            risk_burden_cap_applied = True
+            risk_burden_cap_reason  = f"risk_burden_score {risk_burden_score:.1f} >= 90 threshold"
+    elif risk_burden_score >= 75.0:
+        cap = PositionSizing.HALF
+        if _size_exceeds(position_sizing, cap):
+            position_sizing         = cap
+            risk_burden_cap_applied = True
+            risk_burden_cap_reason  = f"risk_burden_score {risk_burden_score:.1f} >= 75 threshold"
+    elif risk_burden_score >= 60.0:
+        cap = PositionSizing.FULL
+        risk_burden_cap_reason = f"risk_burden_score {risk_burden_score:.1f} >= 60 threshold (no sizing change)"
 
     # ── Step 7: Primary risks ──────────────────────────────────────────────────
     primary_risks = _extract_primary_risks(risk_factors)
@@ -151,8 +181,9 @@ def score_packet(packet: dict) -> ScoringOutput:
         primary_risks=primary_risks,
         screening_score=screening_score,
         screening_reason_codes=reason_codes,
-        directional_thesis_score=split["directional_thesis_score"],
-        risk_burden_score=split["risk_burden_score"],
+        raw_directional_thesis_score=raw_dts,
+        directional_thesis_score=evidence_score,
+        risk_burden_score=risk_burden_score,
         evidence_score_note=_make_evidence_note(ev_breakdown),
         confidence_score_note=_make_confidence_note(conf_breakdown),
         metadata={
@@ -164,6 +195,11 @@ def score_packet(packet: dict) -> ScoringOutput:
             "directional_items_count":  split["directional_items_count"],
             "risk_items_count":         split["risk_items_count"],
             "disclosed_risk_items":     split["risk_items"],
+            "screening_adjustment_applied":  round(screening_adjustment, 2),
+            "conviction_ceiling_applied":    conviction_ceiling_applied,
+            "risk_burden_cap_applied":       risk_burden_cap_applied,
+            "risk_burden_cap_reason":        risk_burden_cap_reason,
+            "position_sizing_before_cap":    sizing_before_cap.value if risk_burden_cap_applied else None,
         },
     )
 
@@ -249,6 +285,11 @@ _BASE_SIZING = {
 def _downgrade(sizing: PositionSizing) -> PositionSizing:
     idx = _SIZE_ORDER.index(sizing)
     return _SIZE_ORDER[min(idx + 1, len(_SIZE_ORDER) - 1)]
+
+
+def _size_exceeds(current: PositionSizing, cap: PositionSizing) -> bool:
+    """Return True if current sizing is larger than the cap (lower index = bigger)."""
+    return _SIZE_ORDER.index(current) < _SIZE_ORDER.index(cap)
 
 
 def _determine_position_sizing(

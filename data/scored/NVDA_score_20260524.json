@@ -1,10 +1,10 @@
 {
-  "score_id": "SC-NVDA-20260524-0136-1756",
+  "score_id": "SC-NVDA-20260524-0217-7ABB",
   "packet_reference": "NVDA_20260524",
   "ticker": "NVDA",
   "company_name": "NVIDIA CORP",
-  "scored_at": "2026-05-24T01:36:37.469539+00:00",
-  "evidence_score": 25.8,
+  "scored_at": "2026-05-24T02:17:12.938831+00:00",
+  "evidence_score": 33.285000000000004,
   "confidence_score": 96.9,
   "conviction": "low",
   "recommendation": "watch_positive",
@@ -52,7 +52,8 @@
     "REVENUE_ACCELERATION",
     "MULTI_SIGNAL_CONFLUENCE"
   ],
-  "directional_thesis_score": 25.8,
+  "raw_directional_thesis_score": 25.8,
+  "directional_thesis_score": 33.285000000000004,
   "risk_burden_score": 76.0,
   "evidence_score_note": "19 directional items; bull weight 6.95 vs bear 7.90 \u2192 net -6.4",
   "confidence_score_note": "base 86.9  /  bonuses +10.0  \u2192  96.9",
@@ -117,9 +118,14 @@
         "item_class": "filing_quote",
         "evidence_nature": "disclosed_risk"
       }
-    ]
+    ],
+    "screening_adjustment_applied": 7.49,
+    "conviction_ceiling_applied": false,
+    "risk_burden_cap_applied": false,
+    "risk_burden_cap_reason": "",
+    "position_sizing_before_cap": null
   },
-  "generated_at": "2026-05-24T01:36:37.469702+00:00",
+  "generated_at": "2026-05-24T02:17:12.939052+00:00",
   "analyst_brief_date": "20260524",
   "screening_score_used": 74.95,
   "data_availability": {
