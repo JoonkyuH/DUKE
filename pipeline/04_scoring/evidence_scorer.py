@@ -27,6 +27,15 @@ _MGMT_DIRECTION_MULTIPLIERS = {
     "neutral": 1.00,
 }
 
+# External bear queries are adversarially framed ("risks against", "competitive threat")
+# while bull queries are framed more neutrally ("positive developments", "moat").
+# Apply a small asymmetric adjustment so the 4+4 split doesn't systematically
+# over-weight bear evidence from adversarially-constructed queries.
+_EXTERNAL_QUERY_MULTIPLIERS = {
+    "external_bull": 1.10,  # slight boost — bull queries are less adversarially framed
+    "external_bear": 0.90,  # slight discount — bear queries are adversarially framed
+}
+
 
 def _mgmt_multiplier(item: dict) -> float:
     """Return direction multiplier for management_quote items; 1.0 for all others."""
@@ -57,7 +66,11 @@ def score_evidence(evidence_items: List[dict]) -> EvidenceScoreBreakdown:
     for item in evidence_items:
         rel        = float(item.get("reliability", 0.0))
         direction  = str(item.get("direction") or "neutral").lower()
-        eff_weight = rel * _mgmt_multiplier(item)
+        item_class = item.get("item_class", "")
+        if item_class in _EXTERNAL_QUERY_MULTIPLIERS:
+            eff_weight = rel * _EXTERNAL_QUERY_MULTIPLIERS[item_class]
+        else:
+            eff_weight = rel * _mgmt_multiplier(item)
 
         if rel >= 0.70:
             high_rel_count += 1
@@ -126,15 +139,21 @@ def score_evidence_split(evidence_items: List[dict]) -> Dict[str, Any]:
         if e.get("evidence_nature") == "disclosed_risk"
     ]
 
-    # Directional thesis score — same formula as score_evidence(), with mgmt multipliers
+    # Directional thesis score — same formula as score_evidence(), with mgmt and
+    # external query asymmetry multipliers applied.
     bull_w = bear_w = 0.0
-    has_mgmt = False
+    has_mgmt     = False
+    has_external = False
     for item in thesis_items:
         rel        = float(item.get("reliability", 0.0))
         direction  = str(item.get("direction") or "neutral").lower()
-        multiplier = _mgmt_multiplier(item)
-        eff_weight = rel * multiplier
-        if item.get("item_class") == "management_quote":
+        item_class = item.get("item_class", "")
+        if item_class in _EXTERNAL_QUERY_MULTIPLIERS:
+            eff_weight   = rel * _EXTERNAL_QUERY_MULTIPLIERS[item_class]
+            has_external = True
+        else:
+            eff_weight = rel * _mgmt_multiplier(item)
+        if item_class == "management_quote":
             has_mgmt = True
         if direction == "bullish":
             bull_w += eff_weight
@@ -178,6 +197,7 @@ def score_evidence_split(evidence_items: List[dict]) -> Dict[str, Any]:
         ),
         "risk_items_count":                 len(risk_items),
         "risk_items":                       risk_items,
-        "mgmt_direction_adjustment_applied": has_mgmt,
-        "risk_specificity_breakdown":       spec_counts,
+        "mgmt_direction_adjustment_applied":    has_mgmt,
+        "external_asymmetry_adjustment_applied": has_external,
+        "risk_specificity_breakdown":           spec_counts,
     }
