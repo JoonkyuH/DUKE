@@ -1,5 +1,5 @@
 name: quote_extractor
-version: "1.0.0"
+version: "1.1.0"
 description: >
   Extracts structured, attributed executive quotes from earnings documents.
   Returns a JSON array of quote objects with category, direction, and significance.
@@ -27,6 +27,10 @@ prompt: |
     - category_confidence: float 0.0–1.0 — how confident are you that this quote belongs in the assigned category versus another category? 1.0 = certain, 0.5 = ambiguous
     - direction: BULLISH, BEARISH, or NEUTRAL
     - significance: HIGH, MEDIUM, or LOW
+    - specificity: "generic" or "specific"
+        generic: broad statements without quantified commitments — e.g. "we face competitive pressures", "macroeconomic conditions may affect demand", "forward-looking statements involve risks and uncertainties"
+        specific: contains a number, named product, named market, named counterparty, or specific operational commitment — e.g. guidance numbers, named product launches, specific market share figures, named regulatory actions, dollar amounts
+        Default to "generic" when uncertain.
 
   Rules:
     - Extract all materially meaningful quotes. Do not force categories if no direct quote exists. Do not invent quotes to meet any count.
