@@ -88,6 +88,35 @@ def _atr(hist, period: int = 14) -> Optional[float]:
     return round(sum(tr_vals[-period:]) / period, 4)
 
 
+def fetch_next_earnings_date(ticker: str) -> Optional[int]:
+    """
+    Return days from today to the nearest future earnings date via yfinance calendar.
+    Returns None if no future date is available (e.g., earnings just passed or unknown).
+    Handles both datetime.date and datetime.datetime objects returned by yfinance.
+    """
+    try:
+        cal = yf.Ticker(ticker.upper()).calendar
+        if not isinstance(cal, dict):
+            return None
+        ed_val = cal.get("Earnings Date", [])
+        if not isinstance(ed_val, list):
+            ed_val = [ed_val]
+        today_d = date.today()
+        future = []
+        for d in ed_val:
+            if hasattr(d, "date"):
+                d = d.date()
+            if isinstance(d, date) and d > today_d:
+                future.append(d)
+        if not future:
+            return None
+        future.sort()
+        return (future[0] - today_d).days
+    except Exception:
+        log.warning("%s: fetch_next_earnings_date failed", ticker)
+        return None
+
+
 def fetch_market_data(ticker: str) -> dict:
     """
     Fetch market data for ticker and return a raw_signal_record dict.
@@ -212,6 +241,8 @@ def fetch_market_data(ticker: str) -> dict:
         pass
 
     # Strategy 2: calendar dict (no lxml needed)
+    # Normalize datetime.datetime → datetime.date before comparison; yfinance
+    # may return either type, and mixing them raises TypeError caught silently.
     if next_earnings_date is None:
         try:
             cal = t.calendar
@@ -219,10 +250,13 @@ def fetch_market_data(ticker: str) -> dict:
                 ed_val = cal.get("Earnings Date", [])
                 if not isinstance(ed_val, list):
                     ed_val = [ed_val]
-                future = sorted(
-                    d for d in ed_val
-                    if isinstance(d, date) and d > today_d
-                )
+                cal_dates = []
+                for d in ed_val:
+                    if hasattr(d, "date"):
+                        d = d.date()
+                    if isinstance(d, date):
+                        cal_dates.append(d)
+                future = sorted(d for d in cal_dates if d > today_d)
                 if future:
                     next_d             = future[0]
                     next_earnings_date = next_d.isoformat()
@@ -230,7 +264,7 @@ def fetch_market_data(ticker: str) -> dict:
                 # Past calendar dates → last earnings proxy
                 if last_earnings_date is None:
                     past = sorted(
-                        (d for d in ed_val if isinstance(d, date) and d <= today_d),
+                        (d for d in cal_dates if d <= today_d),
                         reverse=True,
                     )
                     if past:
