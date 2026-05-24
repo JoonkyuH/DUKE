@@ -19,6 +19,23 @@ from typing import List, Dict, Any
 from score_types import EvidenceScoreBreakdown
 
 
+# Management has an optimism bias — bearish signals from management are
+# understated and therefore more meaningful; bullish signals are expected.
+_MGMT_DIRECTION_MULTIPLIERS = {
+    "bullish": 0.85,
+    "bearish": 1.30,
+    "neutral": 1.00,
+}
+
+
+def _mgmt_multiplier(item: dict) -> float:
+    """Return direction multiplier for management_quote items; 1.0 for all others."""
+    if item.get("item_class") != "management_quote":
+        return 1.0
+    direction = str(item.get("direction") or "neutral").lower()
+    return _MGMT_DIRECTION_MULTIPLIERS.get(direction, 1.0)
+
+
 def score_evidence(evidence_items: List[dict]) -> EvidenceScoreBreakdown:
     """
     Compute a weighted net evidence score from a list of evidence item dicts.
@@ -38,20 +55,21 @@ def score_evidence(evidence_items: List[dict]) -> EvidenceScoreBreakdown:
     high_rel_count = 0
 
     for item in evidence_items:
-        rel       = float(item.get("reliability", 0.0))
-        direction = str(item.get("direction") or "neutral").lower()
+        rel        = float(item.get("reliability", 0.0))
+        direction  = str(item.get("direction") or "neutral").lower()
+        eff_weight = rel * _mgmt_multiplier(item)
 
         if rel >= 0.70:
             high_rel_count += 1
 
         if direction == "bullish":
-            bull_weight += rel
+            bull_weight += eff_weight
         elif direction == "bearish":
-            bear_weight += rel
+            bear_weight += eff_weight
         elif direction == "binary":
-            binary_weight += rel
+            binary_weight += eff_weight
         else:
-            neutral_weight += rel
+            neutral_weight += eff_weight
 
     total_weight    = bull_weight + bear_weight + neutral_weight + binary_weight
     directional_sum = bull_weight + bear_weight
@@ -108,15 +126,20 @@ def score_evidence_split(evidence_items: List[dict]) -> Dict[str, Any]:
         if e.get("evidence_nature") == "disclosed_risk"
     ]
 
-    # Directional thesis score — same formula as score_evidence()
+    # Directional thesis score — same formula as score_evidence(), with mgmt multipliers
     bull_w = bear_w = 0.0
+    has_mgmt = False
     for item in thesis_items:
-        rel = float(item.get("reliability", 0.0))
-        direction = str(item.get("direction") or "neutral").lower()
+        rel        = float(item.get("reliability", 0.0))
+        direction  = str(item.get("direction") or "neutral").lower()
+        multiplier = _mgmt_multiplier(item)
+        eff_weight = rel * multiplier
+        if item.get("item_class") == "management_quote":
+            has_mgmt = True
         if direction == "bullish":
-            bull_w += rel
+            bull_w += eff_weight
         elif direction == "bearish":
-            bear_w += rel
+            bear_w += eff_weight
 
     directional_sum = bull_w + bear_w
     if directional_sum == 0.0:
@@ -132,12 +155,13 @@ def score_evidence_split(evidence_items: List[dict]) -> Dict[str, Any]:
         rbs = 0.0
 
     return {
-        "directional_thesis_score": round(dts, 1),
-        "risk_burden_score":        round(rbs, 1),
-        "directional_items_count":  sum(
+        "directional_thesis_score":         round(dts, 1),
+        "risk_burden_score":                round(rbs, 1),
+        "directional_items_count":          sum(
             1 for e in thesis_items
             if str(e.get("direction") or "").lower() in ("bullish", "bearish")
         ),
-        "risk_items_count":         len(risk_items),
-        "risk_items":               risk_items,
+        "risk_items_count":                 len(risk_items),
+        "risk_items":                       risk_items,
+        "mgmt_direction_adjustment_applied": has_mgmt,
     }
