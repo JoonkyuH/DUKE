@@ -19,6 +19,7 @@ import json
 import logging
 import os
 import sqlite3
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
@@ -43,16 +44,15 @@ def _db() -> sqlite3.Connection:
 
 def _cache_write(ticker: str, item: dict) -> None:
     url = item.get("url", "")
-    key = hashlib.sha256(f"news:{ticker}:{url}".encode()).hexdigest()[:16]
     now = datetime.now(timezone.utc).isoformat()
     with _db() as con:
         con.execute(
             """INSERT OR REPLACE INTO discovery_cache
-               (id, ticker, query_type, url, title, date, snippet, fetched_at)
-               VALUES (?,?,?,?,?,?,?,?)""",
-            (key, ticker.upper(), "news",
-             url, item.get("title", ""), item.get("date", ""),
-             item.get("snippet", ""), now),
+               (ticker, url, title, date, snippet, query_types, fetched_at)
+               VALUES (?,?,?,?,?,?,?)""",
+            (ticker.upper(), url,
+             item.get("title", ""), item.get("date", ""),
+             item.get("snippet", ""), "news_discovery", now),
         )
 
 
@@ -77,10 +77,12 @@ def fetch_news(ticker: str, company_name: str) -> list:
         log.info("NEWSAPI_KEY not set — skipping news discovery for %s", ticker)
         return []
 
-    query  = f"{ticker} {company_name} earnings"
+    # Use ticker + first word of company name (e.g. "NVDA NVIDIA") — short
+    # queries are more reliable across NewsAPI tiers than full legal names.
+    company_short = company_name.split()[0] if company_name else ticker
+    query  = f"{ticker} {company_short}"
     params = urllib.parse.urlencode({
         "q":        query,
-        "apiKey":   api_key,
         "sortBy":   "publishedAt",
         "language": "en",
         "pageSize": _PAGE_SIZE,
@@ -88,12 +90,18 @@ def fetch_news(ticker: str, company_name: str) -> list:
     url = f"{_NEWSAPI_URL}?{params}"
 
     try:
-        req = urllib.request.Request(
-            url,
-            headers={"User-Agent": "DUKE-research contact@duke-research.ai"},
-        )
+        req = urllib.request.Request(url)
+        # add_unredirected_header preserves exact header-name case; the dict
+        # form passed to Request() normalizes keys via .capitalize() which
+        # produces "User-agent" (lowercase 'a') that some CDNs reject.
+        req.add_unredirected_header("User-Agent", "DUKE/1.0")
+        req.add_unredirected_header("Authorization", f"Bearer {api_key}")
         with urllib.request.urlopen(req, timeout=15) as r:
             data = json.loads(r.read())
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode(errors="replace")
+        log.warning("NewsAPI request failed for %s: HTTP %s — %s", ticker, exc.code, body)
+        return []
     except Exception as exc:
         log.warning("NewsAPI request failed for %s: %s", ticker, exc)
         return []

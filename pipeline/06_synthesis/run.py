@@ -38,10 +38,11 @@ try:
 except ImportError:
     sys.exit("anthropic SDK not installed — run: pip install anthropic")
 
-_RISK_MODEL  = "claude-sonnet-4-6"
-_CHIEF_MODEL = "claude-sonnet-4-6"
-_MAX_TOKENS  = 4096
-_REPO_ROOT   = _THIS_DIR.parent.parent
+_RISK_MODEL        = "claude-sonnet-4-6"
+_CHIEF_MODEL       = "claude-sonnet-4-6"
+_RISK_MAX_TOKENS   = 8192
+_CHIEF_MAX_TOKENS  = 4096
+_REPO_ROOT         = _THIS_DIR.parent.parent
 _PROMPTS_DIR = _REPO_ROOT / "pipeline" / "05_debate" / "prompts"
 
 
@@ -171,12 +172,29 @@ def _build_risk_brief(debate_record: dict) -> dict:
 # CLAUDE API
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _repair_truncated_json(raw: str) -> dict | None:
+    """
+    Salvage a truncated JSON object by finding the last complete top-level key
+    and closing the object there. Walks backwards through top-level comma
+    boundaries (`,\n  "`) and tries to close the object at each one.
+    """
+    import re
+    for match in reversed(list(re.finditer(r',\s*\n\s*"', raw))):
+        candidate = raw[:match.start()].rstrip() + "\n}"
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+    return None
+
+
 def _call_analyst(
     client: anthropic.Anthropic,
     model: str,
     system_prompt: str,
     user_content: dict,
     label: str,
+    max_tokens: int = _CHIEF_MAX_TOKENS,
 ) -> dict:
     user_msg = (
         "Here is your structured brief. Review it carefully and return a valid JSON object.\n\n"
@@ -185,7 +203,7 @@ def _call_analyst(
     print(f"  calling {label}...", flush=True)
     resp = client.messages.create(
         model=model,
-        max_tokens=_MAX_TOKENS,
+        max_tokens=max_tokens,
         system=system_prompt,
         messages=[{"role": "user", "content": user_msg}],
     )
@@ -200,6 +218,10 @@ def _call_analyst(
     try:
         return json.loads(raw)
     except json.JSONDecodeError as exc:
+        repaired = _repair_truncated_json(raw)
+        if repaired is not None:
+            print(f"  WARNING: {label} response truncated — repaired from partial JSON ({len(repaired)} keys recovered)")
+            return repaired
         print(f"  WARNING: {label} response is not valid JSON — {exc}")
         print(f"  raw (first 400 chars): {raw[:400]}")
         return {}
@@ -370,7 +392,7 @@ def main() -> None:
     print("\nRisk Officer assessment")
     risk_system = _load_prompt("risk_officer.md")
     risk_brief  = _build_risk_brief(debate_record)
-    risk_raw    = _call_analyst(client, _RISK_MODEL, risk_system, risk_brief, "Risk Officer")
+    risk_raw    = _call_analyst(client, _RISK_MODEL, risk_system, risk_brief, "Risk Officer", max_tokens=_RISK_MAX_TOKENS)
 
     if risk_raw:
         risk_assessment = risk_raw
