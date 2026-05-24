@@ -147,10 +147,25 @@ def score_evidence_split(evidence_items: List[dict]) -> Dict[str, Any]:
     else:
         dts = (bull_w - bear_w) / directional_sum * 100.0
 
-    # Risk burden score — count * avg_reliability * 20, capped at 100
+    # Risk burden score — sum(rel * specificity_weight) * 20, capped at 100
+    # specificity_weight: specific=1.0, generic=0.35, untagged=0.65 (backward compat)
+    spec_counts = {"specific": 0, "generic": 0, "untagged": 0}
     if risk_items:
-        avg_rel = sum(float(e.get("reliability", 0.0)) for e in risk_items) / len(risk_items)
-        rbs = min(100.0, len(risk_items) * avg_rel * 20)
+        weighted_sum = 0.0
+        for e in risk_items:
+            rel = float(e.get("reliability", 0.0))
+            spec = e.get("specificity")
+            if spec == "specific":
+                spec_weight = 1.00
+                spec_counts["specific"] += 1
+            elif spec == "generic":
+                spec_weight = 0.35
+                spec_counts["generic"] += 1
+            else:
+                spec_weight = 0.65
+                spec_counts["untagged"] += 1
+            weighted_sum += rel * spec_weight
+        rbs = min(100.0, weighted_sum * 20)
     else:
         rbs = 0.0
 
@@ -164,4 +179,5 @@ def score_evidence_split(evidence_items: List[dict]) -> Dict[str, Any]:
         "risk_items_count":                 len(risk_items),
         "risk_items":                       risk_items,
         "mgmt_direction_adjustment_applied": has_mgmt,
+        "risk_specificity_breakdown":       spec_counts,
     }

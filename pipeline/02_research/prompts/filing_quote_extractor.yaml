@@ -1,8 +1,8 @@
 name: filing_quote_extractor
-version: "1.0.0"
+version: "1.1.0"
 description: >
   Extracts significant statements from SEC filing passages (10-K, 10-Q, 8-K).
-  Returns a JSON array of quote objects with category, direction, and significance.
+  Returns a JSON array of quote objects with category, direction, significance, and specificity.
 prompt: |
   You are an expert financial analyst extracting significant statements from an SEC filing passage.
 
@@ -28,6 +28,20 @@ prompt: |
     - category_confidence: float 0.0–1.0 — how confident are you that this quote belongs in the assigned category versus another category? 1.0 = certain, 0.5 = ambiguous
     - direction: BULLISH, BEARISH, or NEUTRAL
     - significance: HIGH, MEDIUM, or LOW
+    - specificity: "generic" or "specific"
+      generic: boilerplate language that appears in virtually every public company 10-K.
+        Examples: "competition may harm our business", "macroeconomic conditions could
+        affect demand", "we may be unable to attract and retain key personnel",
+        "supply chain disruptions could impact operations", "changes in interest rates
+        may affect our results", "we face risks related to cybersecurity"
+      specific: company-specific, quantified, or operationally concrete content.
+        Examples: "we have no alternative supplier for component X", "$28.9B IRS tax
+        claim outstanding", "China revenue declined from 42% to 22% of total revenue",
+        "a single customer represents 35% of revenue", "we were foreclosed from
+        competing in the China market", "export license required for H20 shipments"
+      Default to "generic" when uncertain. Only use "specific" when the statement
+      contains a named counterparty, a dollar amount, a percentage, a named product,
+      or a named geographic market with direct operational impact on this company.
 
   Rules:
     - Extract only statements with investment relevance. Skip boilerplate legal disclaimers, table headers, and purely formatted data rows.

@@ -196,6 +196,7 @@ def score_packet(packet: dict) -> ScoringOutput:
             "risk_items_count":                  split["risk_items_count"],
             "disclosed_risk_items":              split["risk_items"],
             "mgmt_direction_adjustment_applied": split.get("mgmt_direction_adjustment_applied", False),
+            "risk_specificity_breakdown":        split.get("risk_specificity_breakdown", {}),
             "screening_adjustment_applied":  round(screening_adjustment, 2),
             "conviction_ceiling_applied":    conviction_ceiling_applied,
             "risk_burden_cap_applied":       risk_burden_cap_applied,
