@@ -77,15 +77,39 @@ Files:
 Classification order:
   1. ticker_override        (confidence 1.0)
   2. gics_industry pattern  (confidence 0.85)
-  3. financial_signature    (confidence 0.60)
-     added to classification_review_queue
+     gics_industry_patterns covers the full live
+     S&P 500 GICS industry vocabulary (~52 patterns).
+     ~12 strings deliberately left unmapped → unknown:
+       Gold, Copper, Steel, Agricultural Inputs,
+       Advertising Agencies, Grocery Stores,
+       Food Distribution, Medical Care Facilities,
+       Conglomerates, Information Technology Services,
+       Specialty Business Services. (76405ff)
+  3. financial_signature    (advisory only)
+     Does not assign a scoring-relevant profile.
+     Unmatched tickers → unknown with neutral
+     multipliers; result added to review queue.
   4. unknown                (confidence 0.0)
      neutral multipliers applied
+
+  Review queue deduplicates per ticker.
 
 Special handling:
   banking/insurance: gross_margin + fcf_margin
     disabled entirely
   reit: fcf_margin disabled
+
+### Investment Archetypes
+Stage 01 emits one of three archetypes:
+  long_term_compounder
+  quality_compounder
+  deep_value
+
+"either" has been removed. Ties resolve
+deterministically to the more conservative archetype
+(8dd74c1). Stage 05 bull, bear, and chief-analyst
+prompts define branches for all three archetypes
+(d0f0eb2).
 
 ### Transcript Waterfall
 Priority 0: EarningsCall API
@@ -178,18 +202,28 @@ Peak-cycle FCF makes it look like a compounder.
 EDGAR gross profit for E&P excludes DD&A/depletion.
 No energy cyclical economic profile handles this.
 
-COF scores #12 but NET_CASH_FORTRESS fires wrong.
-Banking companies carry deposits as liabilities but
-the net cash signal only checks long-term debt.
-Fix: add net_cash_pct to disabled signals for
-banking and insurance in economic_profiles.json.
-
-872 tickers in classification_review_queue after
-S&P 500 run. GICS pattern coverage needs expansion.
-Audit unknown/financial_signature classifications
-and add missing patterns to economic_profiles.json.
+File-handle leak: Stage 01 does not release
+file/DB handles between tickers. Worked around
+with `ulimit -n 8192` per-terminal. Must be fixed
+before any unattended/scheduled run.
 
 ### Pending
+SYF misclassification: GICS "Credit Services"
+maps to payments_network, but SYF is a consumer-
+credit lender. Needs a banking ticker_override
+(same pattern as COF).
+
+Electronic Components profile gap: APH, TEL, GLW
+route to unknown/neutral. The bucket warrants a
+dedicated economic profile.
+
+V1.5 — native financial-company signals: banking/
+insurer/REIT profiles currently work by disabling
+misleading signals rather than scoring native
+metrics (NIM, ROE, FFO, combined ratio). Candidate
+new profiles: health_insurer, it_services,
+commodity_cyclical.
+
 DUKE-16: Multi-period trend analysis
 DUKE-19: TAM share-gain and ROIC signals
 
@@ -210,10 +244,18 @@ ef09cdb  feat: Risk Officer + Chief Analyst evidence slices (DUKE-13, DUKE-15)
 c920a69  fix: MD&A filter + external bull filter
 4edd9e4  fix: per-ticker 30s timeout Stage 01
 2ec2f2b  fix: EDGAR concept selection + alignment + disk cache
+76405ff  fix: expand GICS pattern coverage, fail-safe classification fallback, dedupe review queue
+d0f0eb2  fix: add quality_compounder archetype branch to Stage 05 debate prompts
+8dd74c1  fix: resolve archetype ties to conservative archetype, remove "either"
 
 
 ## S&P 500 Screening Results (2026-05-24)
+[STALE — pre-fix snapshot; re-run pending]
 497 tickers screened, 20 passed, regime: risk_on_momentum
+Predates 76405ff (GICS expansion), 8dd74c1 (tie-
+resolution), and COF/SYF banking ticker_overrides.
+Archetypes marked * were "either" in this run;
+"either" no longer exists — will differ on re-run.
 
 Rank  Ticker  Score  Archetype             Notes
 1     EQT     83.1   long_term_compounder  NEEDS REVIEW: energy E&P peak cycle
@@ -227,7 +269,7 @@ Rank  Ticker  Score  Archetype             Notes
 9     INTU    75.4   deep_value
 10    BSX     75.4   quality_compounder
 11    VRT     74.9   long_term_compounder
-12    COF     74.7   either                NEEDS REVIEW: bank, NET_CASH_FORTRESS wrong
+12    COF     74.7   *                     banking ticker_override added post-run
 13    ADSK    73.4   quality_compounder
 14    FDS     73.3   quality_compounder
 15    SNPS    72.8   quality_compounder
@@ -235,10 +277,9 @@ Rank  Ticker  Score  Archetype             Notes
 17    RMD     72.5   quality_compounder    gross margin bug fixed (was 103%, now 59.4%)
 18    TYL     72.1   quality_compounder
 19    TTD     72.0   deep_value
-20    NOW     71.8   either
+20    NOW     71.8   *
 
-Note: Re-run Stage 01 with all fixes before
-running Stages 02-07 on shortlist.
+Re-run Stage 01 before running Stages 02-07.
 
 
 ## API Services
