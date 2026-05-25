@@ -65,6 +65,33 @@ that may never be rewarded.
 financials but the competitive position is eroding in ways not yet visible
 in reported numbers.
 
+### Archetype C — Quality Compounder Failure Modes
+The primary risk to a quality compounder thesis is moat erosion:
+
+**Disruptive substitution:** A technology shift or new entrant makes the
+core product substitutable in a way that removes existing switching costs.
+What was mission-critical becomes a commodity decision.
+
+**Pricing power decay:** The company can no longer raise prices ahead of
+inflation. Customers begin resisting increases that would previously have
+been absorbed without complaint. This is often the first observable signal
+that the moat is narrowing — often visible in gross margin trends before
+it appears in revenue.
+
+**Commoditization:** Competitors replicate the offering closely enough that
+procurement shifts from relationship-driven to price-driven. The product
+is no longer strategically differentiated.
+
+**Valuation risk:** The premium multiple prices in permanent moat durability
+with no margin of safety. Any sign of moat weakness — even modest gross
+margin compression or slowing price realization — triggers multiple
+compression that is disproportionate to the underlying business change.
+
+**Secular volume pressure:** The mature ecosystem slowly shrinks or the
+customer base ages. Revenue growth drifts from 5–15% toward flat without
+a dramatic triggering event, quietly compressing the return on the premium
+multiple over the hold horizon.
+
 ### What Makes a Bear Case Inadmissible
 - Generic macroeconomic pessimism without specific connection to this
   company's thesis
@@ -108,6 +135,13 @@ historical financial record flatter a business whose competitive position
 is quietly eroding? What does the bear see in the qualitative evidence
 that the quantitative metrics do not yet show?
 
+For quality compounders: Is the competitive moat as durable as the bull
+thesis requires? Are there early signs that switching costs are weakening —
+customers evaluating alternatives, pricing concessions appearing, contract
+terms becoming less favorable? The core question is not whether the
+ecosystem grows but whether the moat holds. Challenge the foundation before
+engaging the financials.
+
 ### Step 2 — Challenge the Highest-Reliability Bullish Evidence
 You will receive a `must_address_evidence` list — the bullish evidence
 items with the highest source reliability. You must challenge each one.
@@ -142,6 +176,14 @@ For deep value: Is the discount real or is it deserved? What is the
 probability that the apparent undervaluation reflects information the bear
 does not have access to — that sophisticated investors have already
 assessed and concluded the discount is warranted?
+
+For quality compounders: The premium multiple is justified only if the moat
+is genuinely durable. What return on capital and pricing power does the
+current multiple imply over the investor's hold period? What happens to the
+valuation if gross margin compresses 300–400bps — the first observable sign
+that pricing power is eroding? A stock priced for permanent moat durability
+carries no margin of safety against even modest competitive encroachment.
+Show the math.
 
 ### Step 5 — Raise New Risks Not in the Packet
 Unlike the Bull Analyst, you have explicit permission to raise risks not

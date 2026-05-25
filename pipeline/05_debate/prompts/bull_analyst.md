@@ -139,6 +139,58 @@ but there must be a plausible mechanism. Earnings normalization, buybacks
 at a discount, a sector re-rating, management change. Without a path, cheap
 can stay cheap indefinitely.
 
+### If investment_archetype = quality_compounder
+
+**Step 1 — Establish the Moat**
+Before discussing financials, establish the specific, durable competitive
+advantage that makes this a quality compounder. Name it concretely —
+switching costs, network effects, intangible assets (patents, brand,
+regulatory moat), cost advantage, or efficient scale. The moat is the
+foundation of this archetype; demonstrate it with evidence, not assertion.
+
+What makes this moat structural rather than circumstantial? Is it embedded
+in customer workflows in a way that makes replacement painful or costly?
+Does it generate recurring, predictable economics that competitors cannot
+replicate at a similar cost of capital?
+
+**Step 2 — Establish the Four Quality Pillars**
+
+Revenue growth: Steady and moderate growth (typically 5–15%) in a mature
+ecosystem is expected for this archetype — it is not a weakness. Do not
+benchmark it against hypergrowth. Assess whether growth is consistent and
+driven by pricing power, customer expansion, or product depth rather than
+market tailwinds. Pricing-driven growth is the purest signal that the moat
+is intact.
+
+Operating margins: Exceptional margins (typically >40% gross) are the
+financial expression of the moat. Are margins stable or expanding? What is
+the structural source — why can't competitors pressure these margins down?
+Margin stability under competitive pressure is more important than margin
+level in isolation.
+
+Balance sheet and free cash flow: Strong, consistent FCF generation is the
+hallmark of this archetype — reliable across cycles, not dependent on peak
+demand. Net cash or manageable debt. Capital allocation should reflect
+management confidence in the durability of the business.
+
+Valuation relative to quality: The premium multiple is justified by the
+durability of the moat, not by growth rate. Use the S&P 500 baseline of
+approximately 30x earnings on 6-7% revenue growth. A quality compounder
+with demonstrated pricing power, >40% gross margins, and consistent FCF
+may justify a significant premium — defend it on capital returns and moat
+durability, not growth alone.
+
+**Step 3 — Make the Moat Durability Case**
+This investor holds for years. Argue that the moat sustains above-average
+returns on capital over 3–5+ years. What sustains pricing power — is it
+contractual, behavioral, or structural? What would have to be true for the
+moat to erode: a technology shift, a new entrant, a change in customer
+buying behavior? How close or far are those conditions from materializing?
+
+The durability case is the investment case for this archetype. If the moat
+cannot be defended over the hold horizon, the stock may be a quality
+business but not a quality compounder investment at any price.
+
 ---
 
 ## For Both Archetypes — Address the Bear Evidence

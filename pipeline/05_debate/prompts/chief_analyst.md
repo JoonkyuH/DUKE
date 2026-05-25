@@ -216,7 +216,7 @@ Return a valid JSON object. No prose outside the JSON.
 {
   "analyst_role": "chief_analyst",
   "recommendation": "strong_conviction_enter | moderate_conviction_enter | watch | pass | blocked",
-  "investment_archetype_confirmed": "long_term_compounder | deep_value | does_not_fit",
+  "investment_archetype_confirmed": "long_term_compounder | quality_compounder | deep_value | does_not_fit",
   "final_evidence_score": 0.0,
   "final_confidence_score": 0.0,
   "executive_summary": "3-5 sentences. The recommendation and the single most important reason for it. Written for a human investor making a real decision. No hedging. No restating both sides. A clear view.",
