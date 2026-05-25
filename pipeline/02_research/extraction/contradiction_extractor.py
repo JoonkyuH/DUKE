@@ -175,6 +175,7 @@ def extract_contradictions(ticker: str, current: dict) -> list:
         if not change_type:
             continue
         current_quote = item.get("current_quote", "")
+        significance = item.get("significance", "MEDIUM")
         items.append({
             "evidence_id":    _evidence_id(ticker, source_url, current_quote),
             "change_type":    change_type,
@@ -182,7 +183,9 @@ def extract_contradictions(ticker: str, current: dict) -> list:
             "prior_quote":    item.get("prior_quote"),
             "category":       item.get("category", ""),
             "direction":      item.get("direction", "NEUTRAL"),
-            "significance":   item.get("significance", "MEDIUM"),
+            "significance":   significance,
+            "severity":       significance.lower(),
+            "resolution":     "unresolved",
             "explanation":    item.get("explanation", ""),
             "current_period": f"{fiscal_quarter} {fiscal_year}",
             "prior_period":   f"{prior_fq} {prior_fy}",

@@ -137,7 +137,8 @@ def build_evidence_packet(brief: dict, scoring: dict) -> dict:
         "catalyst_map":                   brief.get("catalyst_map", []),
         "thesis_invalidation_conditions": brief.get("thesis_invalidation_conditions", []),
         "risk_factors":                   risk_factors,
-        "contradictions":                 brief.get("uncertainties", []),
+        "contradictions":                 brief.get("contradictions", []),
+        "uncertainties":                  brief.get("uncertainties", []),
         "screening_flags":                [],
         "summary":                        {},
     }

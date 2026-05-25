@@ -379,6 +379,7 @@ def build_analyst_brief(packet: dict) -> dict:
         "filing_quotes":          result.filing_quotes,
         "external_bull_evidence": result.external_bull_evidence,
         "external_bear_evidence": result.external_bear_evidence,
+        "contradictions":         contradictions,
         "uncertainties":          result.uncertainties,
         "source_limitations":     result.source_limitations,
 
