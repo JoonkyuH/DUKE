@@ -168,10 +168,19 @@ Chief Analyst receives full compressed set:
   all 4 external bear
   output: evidence_challenge field
 
-Note: bull_rebuttal.md and bear_rebuttal.md exist
-but are NOT activated. Decision: single-round
-debate only. Chief Analyst performs evidence
-challenge instead.
+Stage 05 runs two rounds:
+  Round 1: Bull and Bear independent positions
+    (max_tokens=4096 each)
+  Round 2: Cross-feed rebuttals (activated)
+    Bull gets bear R1; Bear gets bull R1
+    max_tokens=16384 — rebuttals must respond
+    to every opposing argument
+    Down-only clamp enforced in code:
+      bull R2 score ≤ bull R1 score
+      bear R2 score ≥ bear R1 score (less negative)
+    Both clamped to [-10, +10]
+    R2 adjustments are informational only;
+    debate scores computed from R1 only.
 
 ### EDGAR Data Integrity (3 layers)
 Layer 1 - Concept selection (_entries() in edgar_client.py):

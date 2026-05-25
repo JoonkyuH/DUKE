@@ -12,10 +12,12 @@ Loads:
     data/processed/{TICKER}_analyst_brief_{date}.json   Stage 02/03 output
 
 Round 1: calls Bull and Bear Claude analysts independently, detects contentions,
-computes debate-adjusted scores, writes:
-    data/debate/{TICKER}_debate_{date}.json
+computes debate-adjusted scores.
 
-Round 2 (rebuttal) is stubbed — uncomment and wire in when ready.
+Round 2: Bull and Bear each read the opposing Round 1 position and respond.
+Rebuttal score adjustments are clamped to [-10, +10] and are down-only
+(bull cannot raise conviction above Round 1; bear cannot go more negative).
+Writes: data/debate/{TICKER}_debate_{date}.json
 """
 
 import argparse
@@ -40,8 +42,9 @@ try:
 except ImportError:
     sys.exit("anthropic SDK not installed — run: pip install anthropic")
 
-_MODEL      = "claude-sonnet-4-6"
-_MAX_TOKENS = 4096
+_MODEL          = "claude-sonnet-4-6"
+_MAX_TOKENS     = 4096   # Round 1: bull/bear independent positions
+_MAX_TOKENS_R2  = 16384  # Round 2: rebuttals must respond to every opposing argument
 _REPO_ROOT  = _THIS_DIR.parent.parent   # pipeline/05_debate/../../ = repo root
 
 
@@ -95,6 +98,7 @@ def _call_analyst(
     system_prompt: str,
     brief: dict,
     label: str,
+    max_tokens: int = _MAX_TOKENS,
 ) -> dict:
     user_msg = (
         "Here is your structured brief. Study it carefully before responding.\n\n"
@@ -103,7 +107,7 @@ def _call_analyst(
     print(f"  calling {label}...", flush=True)
     resp = client.messages.create(
         model=_MODEL,
-        max_tokens=_MAX_TOKENS,
+        max_tokens=max_tokens,
         system=system_prompt,
         messages=[{"role": "user", "content": user_msg}],
     )
@@ -230,30 +234,50 @@ def main() -> None:
     debate_dict["bear_position_raw"] = bear_pos
 
     # ── Round 2: Rebuttals ────────────────────────────────────────────────────
-    # TODO: uncomment when rebuttal prompts are finalised and tested.
-    #
-    # print("\nRound 2 — rebuttals")
-    # bull_rebuttal_system = _load_prompt("bull_rebuttal.md")
-    # bear_rebuttal_system = _load_prompt("bear_rebuttal.md")
-    #
-    # bull_r2_brief = {
-    #     "ticker":            args.ticker,
-    #     "investment_archetype": brief.get("screening_archetype", ""),
-    #     "scoring_baseline":  bull_brief["scoring_baseline"],
-    #     "your_round1_position": bull_pos,
-    #     "bear_round1_position": bear_pos,
-    # }
-    # bear_r2_brief = {
-    #     "ticker":            args.ticker,
-    #     "investment_archetype": brief.get("screening_archetype", ""),
-    #     "scoring_baseline":  bear_brief["scoring_baseline"],
-    #     "your_round1_position": bear_pos,
-    #     "bull_round1_position": bull_pos,
-    # }
-    # bull_r2 = _call_analyst(client, bull_rebuttal_system, bull_r2_brief, "Bull Rebuttal")
-    # bear_r2 = _call_analyst(client, bear_rebuttal_system, bear_r2_brief, "Bear Rebuttal")
-    # debate_dict["bull_rebuttal"] = bull_r2
-    # debate_dict["bear_rebuttal"] = bear_r2
+    print("\nRound 2 — rebuttals")
+    bull_rebuttal_system = _load_prompt("bull_rebuttal.md")
+    bear_rebuttal_system = _load_prompt("bear_rebuttal.md")
+
+    # Cross-feed: each analyst receives the other's Round 1 position.
+    bull_r2_brief = {
+        "ticker":               args.ticker,
+        "investment_archetype": brief.get("screening_archetype", ""),
+        "scoring_baseline":     bull_brief["scoring_baseline"],
+        "your_round1_position": bull_pos,
+        "bear_round1_position": bear_pos,
+    }
+    bear_r2_brief = {
+        "ticker":               args.ticker,
+        "investment_archetype": brief.get("screening_archetype", ""),
+        "scoring_baseline":     bear_brief["scoring_baseline"],
+        "your_round1_position": bear_pos,
+        "bull_round1_position": bull_pos,
+    }
+    bull_r2 = _call_analyst(client, bull_rebuttal_system, bull_r2_brief, "Bull Rebuttal", _MAX_TOKENS_R2)
+    bear_r2 = _call_analyst(client, bear_rebuttal_system, bear_r2_brief, "Bear Rebuttal", _MAX_TOKENS_R2)
+
+    # Enforce down-only conviction clamp in code (prompts also require this).
+    # Bull R2: cannot raise score_adjustment above Round 1 level.
+    # Bear R2: cannot lower score_adjustment below Round 1 level (more negative = more bearish).
+    # Both clamped to [-10, +10] — narrower than Round 1's [-15, +15].
+    bull_r1_score = float(bull_pos.get("score_adjustment", 0.0))
+    bull_r1_conf  = float(bull_pos.get("confidence_adjustment", 0.0))
+    bear_r1_score = float(bear_pos.get("score_adjustment", 0.0))
+    bear_r1_conf  = float(bear_pos.get("confidence_adjustment", 0.0))
+
+    bull_r2_score = max(-10.0, min(float(bull_r2.get("score_adjustment", 0.0)), 10.0))
+    bull_r2_conf  = max(-10.0, min(float(bull_r2.get("confidence_adjustment", 0.0)), 10.0))
+    bear_r2_score = max(-10.0, min(float(bear_r2.get("score_adjustment", 0.0)), 10.0))
+    bear_r2_conf  = max(-10.0, min(float(bear_r2.get("confidence_adjustment", 0.0)), 10.0))
+
+    bull_r2["score_adjustment"]      = min(bull_r2_score, bull_r1_score)
+    bull_r2["confidence_adjustment"] = min(bull_r2_conf,  bull_r1_conf)
+    bear_r2["score_adjustment"]      = max(bear_r2_score, bear_r1_score)
+    bear_r2["confidence_adjustment"] = max(bear_r2_conf,  bear_r1_conf)
+
+    debate_dict["bull_rebuttal"] = bull_r2
+    debate_dict["bear_rebuttal"] = bear_r2
+    debate_dict["metadata"]["round_2_complete"] = True
 
     # ── Write output ──────────────────────────────────────────────────────────
     date_tag = scoring.get("scored_at", "")[:10].replace("-", "") or args.date or "unknown"
