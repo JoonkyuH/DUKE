@@ -23,6 +23,12 @@
       "classification_source": "manual_v1",
       "review_date": "2026-01"
     },
+    "COF": {
+      "profile": "banking",
+      "rationale": "Capital One is a bank holding company - takes deposits, carries consumer-credit risk on its own balance sheet. GICS industry 'Credit Services' maps to payments_network, which is wrong: that profile is for pure networks (Visa/Mastercard) with no balance-sheet credit risk.",
+      "classification_source": "manual_v1",
+      "review_date": "2026-05"
+    },
     "AXP": {
       "profile": "banking",
       "rationale": "AmEx is closer to banking than payments_network — it carries credit risk on its own balance sheet unlike Visa/Mastercard which are pure networks.",

@@ -234,6 +234,21 @@ def compute_fundamental_metrics(
         implied_mktcap_high  = week_52_high / current_price * market_cap
         implied_pfcf_at_high = implied_mktcap_high / fcf_ttm
 
+    # ── Profile-aware signal nulling ──────────
+    # Metrics tied to a signal this economic profile marks structurally invalid
+    # are nulled here, at the single source. Every downstream consumer (the six
+    # scorers, reason_codes, build_mispricing_hypothesis) already handles None,
+    # so nulling once here keeps scores, reason codes and hypothesis text
+    # consistent instead of guarding each call site separately.
+    disabled = get_disabled_signals(economic_profile)
+    if "gross_margin" in disabled:
+        gm_q0 = gm_q3 = gm_trend = gm_ann = None
+    if "fcf_margin" in disabled:
+        fcf_margin = fcf_to_ni = pfcf_ratio = implied_pfcf_at_high = None
+        fcf_ttm = fcf_ann0 = fcf_ann1 = None
+    if "net_cash" in disabled:
+        net_cash = net_cash_pct = None
+
     return {
         # Revenue
         "rev_ttm":              rev_ttm,
