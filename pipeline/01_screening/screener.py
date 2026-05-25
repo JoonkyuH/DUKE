@@ -74,7 +74,7 @@ QUALITY_COMPOUNDER_WEIGHTS: dict = {
     "binary_event_risk":     0.03,
 }
 
-_ARCHETYPE_TIE_BAND = 1.0    # top two scores within this band → "either"
+_ARCHETYPE_TIE_BAND = 1.0    # top two scores within this band → conservative tiebreak
 
 
 # ─────────────────────────────────────────────
@@ -89,7 +89,7 @@ class ShortlistEntry:
     signal_scores:           dict
     signal_weights_applied:  dict
     regime_at_screening:     str
-    screening_archetype:     str         # "long_term_compounder" | "deep_value" | "either"
+    screening_archetype:     str         # "long_term_compounder" | "quality_compounder" | "deep_value"
     classification:          dict        # full economic_profile_classifier output
     reason_codes:            List[str]
     flags:                   List[str]
@@ -260,7 +260,14 @@ def run_screening(
         comp_qcomp = _compute_composite(scores_qcomp, QUALITY_COMPOUNDER_WEIGHTS)
 
         # ── Select winning archetype ───────────────────────────────
-        # Sort all three descending; if top two are within the tie band → "either".
+        # Sort all three descending. When the top two are within the tie band,
+        # resolve to the more conservative archetype rather than emitting an
+        # unresolvable "either". Conservatism order (most → least demanding of
+        # margin of safety): deep_value > quality_compounder > long_term_compounder.
+        # Mirrors the principle in deep_researcher.md: "when genuinely ambiguous,
+        # prefer deep_value — it is the more conservative classification."
+        _CONSERVATISM = {"deep_value": 0, "quality_compounder": 1, "long_term_compounder": 2}
+
         _candidates = sorted([
             (comp_comp,  "long_term_compounder", scores_comp,  COMPOUNDER_WEIGHTS),
             (comp_qcomp, "quality_compounder",   scores_qcomp, QUALITY_COMPOUNDER_WEIGHTS),
@@ -268,9 +275,15 @@ def run_screening(
         ], key=lambda x: x[0], reverse=True)
 
         top_score, top_arch, top_scores, top_weights = _candidates[0]
-        second_score = _candidates[1][0]
+        second_score, second_arch, second_scores, second_weights = _candidates[1]
 
-        archetype       = "either" if (top_score - second_score) <= _ARCHETYPE_TIE_BAND else top_arch
+        if (top_score - second_score) <= _ARCHETYPE_TIE_BAND:
+            if _CONSERVATISM[second_arch] < _CONSERVATISM[top_arch]:
+                top_arch    = second_arch
+                top_scores  = second_scores
+                top_weights = second_weights
+
+        archetype       = top_arch
         scores          = top_scores
         composite       = top_score
         winning_weights = top_weights

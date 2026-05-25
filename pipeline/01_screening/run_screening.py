@@ -28,6 +28,7 @@ from common.edgar_client import fetch_financials
 from screener import (
     run_screening as _screen,
     COMPOUNDER_WEIGHTS, QUALITY_COMPOUNDER_WEIGHTS, DEEP_VALUE_WEIGHTS,
+    _ARCHETYPE_TIE_BAND,
 )
 from signal_scorer import (
     compute_fundamental_metrics,
@@ -143,7 +144,13 @@ def _score_record(record: dict) -> tuple:
     ], key=lambda x: x[0], reverse=True)
 
     top_score, top_arch, top_sigs = candidates[0]
-    archetype = "either" if (top_score - candidates[1][0]) <= 1.0 else top_arch
+    _CONSERVATISM = {"deep_value": 0, "quality_compounder": 1, "long_term_compounder": 2}
+    if (top_score - candidates[1][0]) <= _ARCHETYPE_TIE_BAND:
+        second_arch, second_sigs = candidates[1][1], candidates[1][2]
+        if _CONSERVATISM[second_arch] < _CONSERVATISM[top_arch]:
+            top_arch = second_arch
+            top_sigs = second_sigs
+    archetype = top_arch
 
     # Commodity-cyclical override (mirrors screener.run_screening): energy
     # price-takers are never compounders - force the deep_value archetype.
@@ -351,7 +358,6 @@ def main():
         "long_term_compounder": "LT COMPOUNDER",
         "quality_compounder":   "QUALITY COMP",
         "deep_value":           "DEEP VALUE",
-        "either":               "EITHER",
     }
 
     # Summary table
