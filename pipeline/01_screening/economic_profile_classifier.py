@@ -115,6 +115,12 @@ def _read_gics_cache(ticker: str) -> Optional[tuple]:
 def _enqueue_review(ticker: str, method: str, profile: str, confidence: float) -> None:
     try:
         conn = _get_conn()
+        if conn.execute(
+            "SELECT 1 FROM classification_review_queue WHERE ticker = ?",
+            (ticker,),
+        ).fetchone():
+            conn.close()
+            return
         conn.execute(
             "INSERT INTO classification_review_queue "
             "(ticker, classification_method, economic_profile, classification_confidence, queued_at) "
@@ -260,27 +266,25 @@ def classify(ticker: str, metrics: Optional[dict] = None) -> dict:
             "raw_gics_industry":         gics_industry,
         }
 
-    # ── 3. Financial signature fallback ─────────────────────────────────────
+    # ── 3. Financial signature fallback (advisory only) ──────────────────────
+    # Logs the suggested profile and enqueues it for review, but does NOT use
+    # it for scoring. The ticker resolves to unknown with neutral multipliers.
+    # This prevents confidently-wrong classifications (e.g. UNH scoring as
+    # semiconductor_platform because its gross margin passes the threshold)
+    # from corrupting signal scores. Add the ticker's GICS industry string to
+    # gics_industry_patterns to resolve it correctly on the next run.
     if metrics:
-        profile = _financial_signature_match(metrics)
-        if profile:
+        sig_profile = _financial_signature_match(metrics)
+        if sig_profile:
             log.warning(
-                "%s: classified via financial signature fallback as %s "
-                "— add to gics_industry_patterns or ticker_overrides",
-                ticker, profile,
+                "%s: financial signature suggests %s "
+                "(GICS: %s / %s) — resolving to unknown. "
+                "Add to gics_industry_patterns to fix.",
+                ticker, sig_profile,
+                gics_sector or "unknown", gics_industry or "unknown",
             )
-            _enqueue_review(ticker, "financial_signature", profile, 0.60)
-            return {
-                "economic_profile":          profile,
-                "classification_method":     "financial_signature",
-                "classification_confidence": 0.60,
-                "classification_rationale":  (
-                    f"Financial signature matched {profile} "
-                    f"(GICS: {gics_sector or 'unknown'} / {gics_industry or 'unknown'})"
-                ),
-                "raw_gics_sector":           gics_sector,
-                "raw_gics_industry":         gics_industry,
-            }
+            _enqueue_review(ticker, "financial_signature", sig_profile, 0.60)
+            # Fall through to unknown — financial_signature is advisory only.
 
     # ── 4. Unknown ───────────────────────────────────────────────────────────
     log.warning(
