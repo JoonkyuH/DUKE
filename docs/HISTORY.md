@@ -76,6 +76,16 @@ Three separate EDGAR data integrity bugs:
    from the SEC API (~80KB per ticker × 500 tickers). The edgar_snapshot_cache
    table in duke_cache.db now caches at a 7-day TTL.
 
+**04260c0** — `fix: commodity-cyclical archetype override (EQT) + profile-aware reason codes (COF)`
+EQT (a natural-gas E&P) scored #1 on the S&P 500 because peak-cycle free cash
+flow made it appear compounder-like, and EDGAR gross profit for E&P names
+excludes depletion and DD&A — inflating both the gross margin signal and the
+FCF signal artificially. There was no economic profile that handled energy
+cyclicals correctly, so EQT passed every quality filter it encountered. This
+commit adds a commodity-cyclical archetype override so EQT-class names are
+classified and scored correctly. It also adds profile-aware reason codes and a
+net_cash signal correction for COF in Stage 01. EQT is no longer an open issue.
+
 ---
 
 ### 2026-05-24 Session
@@ -153,6 +163,14 @@ R1; Bear R2 score ≥ Bear R1, i.e. less negative) so rebuttals cannot inflate
 the Round 1 conviction basis. R2 scores are informational only; debate scores
 are computed from R1.
 
+This activation reverses an earlier deliberate decision (backlog item DUKE-13,
+2026-05-24) not to implement rebuttals — the original concern being that
+adaptive debaters optimizing across rounds shift the debate from independent
+evidence toward rhetoric. The reversal is provisional: rebuttal quality —
+whether R1→R2 score movement tracks evidence or merely compresses debate
+outcomes toward "balanced" — is to be evaluated against the first full
+20-ticker run.
+
 **4ea4c75** — `fix: anchor Chief Analyst to screened archetype; record archetype provenance in journal; document two-score distinction`
 Three related fixes in one commit:
 
@@ -186,10 +204,6 @@ Three related fixes in one commit:
 
 **Must fix before relying on shortlist**
 
-- EQT scores #1 on S&P 500 but is a natural gas E&P. Peak-cycle FCF makes it
-  appear compounder-like. EDGAR gross profit for E&P excludes DD&A/depletion.
-  No energy cyclical economic profile handles this correctly.
-
 - Stage 01 file-handle leak: Stage 01 does not release file/DB handles between
   tickers. Worked around with `ulimit -n 8192` per-terminal. Must be fixed
   before any unattended or scheduled run.
@@ -221,6 +235,12 @@ Three related fixes in one commit:
   currently work by disabling misleading signals (FCF margin, gross margin)
   rather than scoring native metrics (NIM, ROE, FFO, combined ratio). Candidate
   new profiles: health_insurer, it_services, commodity_cyclical.
+
+- Rebuttal activation (6d215ee) reverses the earlier DUKE-13 decision against
+  Round 2 rebuttals. Evaluate whether R1→R2 movement tracks evidence or merely
+  compresses debate outcomes toward "balanced" — assess against the first
+  20-ticker run. Related to the "all test-run debates resolved balanced" item
+  above.
 
 - DUKE-16: Multi-period trend analysis
 - DUKE-19: TAM share-gain and ROIC signals
