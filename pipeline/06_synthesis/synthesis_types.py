@@ -31,6 +31,7 @@ class PhilosophyFit(str, Enum):
 
 class InvestmentArchetype(str, Enum):
     LONG_TERM_COMPOUNDER = "long_term_compounder"
+    QUALITY_COMPOUNDER   = "quality_compounder"
     DEEP_VALUE           = "deep_value"
     DOES_NOT_FIT         = "does_not_fit"
 

@@ -2,12 +2,10 @@
 
 ## What is DUKE?
 
-DUKE ("Doesn't Usually Know Either") is a 7-stage
-multi-agent investment research pipeline built for
-the Li Family Office. It produces structured
-recommendation packets for human review — it is
-NOT a trading bot. Andrew Han is Director of
-Investments and the sole operator.
+DUKE ("Dynamic Unified Knowledge Entity") is a 7-stage
+multi-agent investment research pipeline for a concentrated
+equity portfolio. It produces structured recommendation
+packets for human review — it is not a trading bot.
 
 ## Pipeline Architecture
 
@@ -240,6 +238,24 @@ Electronic Components profile gap: APH, TEL, GLW
 route to unknown/neutral. The bucket warrants a
 dedicated economic profile.
 
+Contradiction channel: wired end-to-end (Stage 02 →
+03 → 04 → 05) but never validated with live data.
+Requires two consecutive Stage 02 runs on the same
+ticker — first run populates transcript_cache; second
+run diffs against it and produces contradictions.
+
+Test-run debate outcomes: all four test-run syntheses
+(CRM, NVDA, PODD, APH — 2026-05-26) resolved
+"balanced". May indicate debate scoring is
+systematically underpowered or that high-quality S&P
+500 names genuinely produce ambiguous evidence.
+Worth reviewing after 10+ ticker runs.
+
+Stage 04 fundamentals wiring deferred to V2: signal
+thresholds and economic profiles are live, but forward
+guidance-vs-consensus comparison needs a dedicated
+data source before Stage 04 can score it.
+
 V1.5 — native financial-company signals: banking/
 insurer/REIT profiles currently work by disabling
 misleading signals rather than scoring native
@@ -270,6 +286,11 @@ c920a69  fix: MD&A filter + external bull filter
 76405ff  fix: expand GICS pattern coverage, fail-safe classification fallback, dedupe review queue
 d0f0eb2  fix: add quality_compounder archetype branch to Stage 05 debate prompts
 8dd74c1  fix: resolve archetype ties to conservative archetype, remove "either"
+75e225d  docs: update CLAUDE.md — GICS, archetype, and tie-resolution fixes; refresh pending work
+da27c16  fix: route real Stage 02 contradictions through to scoring and debate
+546bdf4  fix: thread quality_compounder archetype through Stage 06 synthesis
+6d215ee  feat: activate Stage 05 Round 2 rebuttals — bull and bear now respond to each other
+4ea4c75  fix: anchor Chief Analyst to screened archetype; record archetype provenance in journal; document two-score distinction
 
 
 ## S&P 500 Screening Results (2026-05-24)
