@@ -182,6 +182,20 @@ Stage 05 runs two rounds:
     R2 adjustments are informational only;
     debate scores computed from R1 only.
 
+### Two-Score Distinction (Stage 05 vs Stage 06)
+Stage 05 produces mechanical evidence_score and
+confidence_score from the debate (signal weights,
+contention adjustments, clamp logic). Stage 06's
+Chief Analyst produces its own final_evidence_score
+and final_confidence_score — these are reasoned
+narrative numbers that reflect the full synthesis
+(debate outcome, risk officer flags, contention
+adjudications, philosophy fit). The two sets
+deliberately differ. The Chief Analyst's scores are
+the ones reflecting full synthesis and are used in
+Stage 07 and the journal record. Stage 05 scores
+are preserved in the debate record for traceability.
+
 ### EDGAR Data Integrity (3 layers)
 Layer 1 - Concept selection (_entries() in edgar_client.py):
   Selects concept with most recent data (max end

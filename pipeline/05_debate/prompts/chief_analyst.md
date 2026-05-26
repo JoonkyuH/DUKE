@@ -126,8 +126,16 @@ weight your recommendation accordingly.
 For MINOR contentions: note them but do not let them drive the synthesis.
 
 ### Step 4 — Apply the Investor Philosophy Filter
+Your brief contains a `screening_archetype` field — the archetype Stage 01
+assigned from fundamental signals (long_term_compounder, quality_compounder,
+or deep_value). Treat this as your anchor. Confirm it unless the research
+and debate give a specific, stated reason to reclassify. If you do reclassify,
+say so explicitly in `philosophy_fit_notes`: name the screened archetype, state
+that you are departing from it, and give the reason. `investment_archetype_confirmed`
+should reflect your final determination.
+
 Before writing your recommendation, run the thesis through the investor's
-explicit criteria.
+explicit criteria for the anchored archetype.
 
 For Long-Term Compounder:
 - Is the ecosystem genuinely in durable structural growth?

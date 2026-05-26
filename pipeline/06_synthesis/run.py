@@ -586,6 +586,7 @@ def main() -> None:
     chief_system = _load_prompt("chief_analyst.md")
     chief_brief  = synthesis_dict["chief_analyst_brief"]
     chief_brief["evidence_brief"] = _format_evidence_for_chief(analyst_brief)
+    chief_brief["screening_archetype"] = analyst_brief.get("screening_archetype", "unknown")
     chief_raw    = _call_analyst(client, _CHIEF_MODEL, chief_system, chief_brief, "Chief Analyst")
 
     chief_output = chief_raw if chief_raw else _chief_fallback(debate_record)
