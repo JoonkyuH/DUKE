@@ -1,146 +1,137 @@
-# DUKE ("Doesn't Usually Know Either") — Investment Intelligence Framework
+# DUKE — Dynamic Unified Knowledge Entity
 
-A multi-agent investment analysis system built around structured evidence,
-explicit uncertainty, and disciplined human review.
+A 7-stage multi-agent investment research pipeline for a concentrated equity
+portfolio.
 
-DUKE is not a trading bot. It does not execute trades, manage positions,
-or make investment decisions. It compresses research, surfaces contradictions,
-and produces structured recommendation packets that a human reviews before
-any capital is deployed.
+DUKE screens the S&P 500, runs shortlisted tickers through evidence
+acquisition, refinery, scoring, a multi-agent debate, and synthesis, and
+produces structured recommendation packets for human review. It is not a
+trading bot and does not execute orders.
 
 ---
 
-## Architecture
+## The Seven Stages
 
-DUKE processes investment opportunities through three analytical layers,
-each with a defined input contract and output schema.
+| Stage | Directory | Role | Output |
+|---|---|---|---|
+| 01 — Screening | `pipeline/01_screening/` | Scores fundamental quality signals across the S&P 500; applies regime weights; emits a shortlist with investment archetypes (`long_term_compounder`, `quality_compounder`, or `deep_value`) | `data/screening/shortlist_{date}.json` |
+| 02 — Research | `pipeline/02_research/` | Acquires earnings transcripts, SEC filings, and external evidence for a single ticker; extracts and validates structured quotes | `data/raw/{TICKER}_evidence_{date}.json` |
+| 03 — Refinery | `pipeline/03_evidence_processing/` | Compresses raw evidence into a ranked analyst brief; generates catalyst map, thesis-invalidation conditions, and uncertainties | `data/processed/{TICKER}_analyst_brief_{date}.json` |
+| 04 — Scoring | `pipeline/04_scoring/` | Computes Directional Thesis Score (DTS), Risk Burden Score (RBS), and confidence score from the analyst brief | `data/scored/{TICKER}_score_{date}.json` |
+| 05 — Debate | `pipeline/05_debate/` | Bull and Bear analysts build independent positions (Round 1), then respond to each other (Round 2); produces contentions, debate-adjusted scores, and an outcome | `data/debate/{TICKER}_debate_{date}.json` |
+| 06 — Synthesis | `pipeline/06_synthesis/` | Risk Officer reviews for blocking issues; Chief Analyst synthesizes the full debate record into a final recommendation with adjudicated contentions | `data/synthesis/{TICKER}_synthesis_{date}.json` |
+| 07 — Output | `pipeline/07_output/` | Displays the formatted recommendation and sizing guidance; prompts for investor decision inputs; writes the decision record | `data/journal/DEC-{TICKER}-{YYYYMMDD}.json` |
 
+---
+
+## How to Run
+
+There is no master orchestrator yet — stages run manually in sequence. Each
+stage reads the most recent output file for the given ticker; an optional
+`--date YYYYMMDD` flag (Stages 03–07) pins to a specific file.
+
+API keys must be in the environment. In any shell session that has not sourced
+`~/.zprofile`, prefix every command with `source ~/.zprofile &&` or the API
+calls will fail silently. See [API Keys](#api-keys-required) below.
+
+**Stage 01 — Screening**
 ```
-Raw Data Sources
-(TradingView · NewsAPI · SEC EDGAR · Perplexity · Grok)
-        │
-        ▼
-┌─────────────────────────────────┐
-│  LAYER 1 — Initial Screening    │  Scores 6 signals per ticker.
-│  layer1_screening/              │  Outputs: 5–20 ticker shortlist.
-└─────────────────────────────────┘
-        │  5–20 ticker shortlist
-        ▼
-┌─────────────────────────────────┐
-│  LAYER 2 — Deep Research        │  Builds structured evidence packet.
-│  layer2_research/               │  Outputs: Evidence packet per ticker.
-└─────────────────────────────────┘
-        │  Evidence packet per ticker
-        ▼
-┌─────────────────────────────────┐
-│  LAYER 3 — Scoring & Assessment │  Weights evidence, scores confidence,
-│  layer3_scoring/ (in progress)  │  checks invalidation conditions,
-└─────────────────────────────────┘  assesses portfolio fit.
-        │  Recommendation packet
-        ▼
-  Human Review & Decision
+cd pipeline/01_screening
+source ~/.zprofile && python3 run_screening.py --universe sp500
 ```
+`--universe sp500` fetches the live S&P 500 ticker list via the EarningsCall
+SDK. Individual tickers can be passed as positional arguments instead:
+`python3 run_screening.py NVDA AAPL MSFT`. Stage 01 uses `sys.path.insert(0,
+".")` for imports, so the `cd` is required.
+*`--universe` flag and positional-ticker form verified against argparse
+definitions in `run_screening.py`.*
 
----
-
-## Role Assignments
-
-| Role               | Tool                  | Responsibility                                      |
-|--------------------|-----------------------|-----------------------------------------------------|
-| Market Researcher  | Perplexity + Grok     | Gathers raw signal data for Layer 1 and Layer 2     |
-| Coder              | Claude Code           | Implements, tests, and runs all Python modules      |
-| Orchestrator       | Claude Cowork         | Coordinates analyst roles and assembles output      |
-| Chief Analyst      | Claude Finance Agent  | Synthesizes evidence and writes final recommendation|
-| Bull Analyst       | Claude Finance Agent  | Constructs strongest possible bullish case          |
-| Bear Analyst       | Claude Finance Agent  | Constructs strongest possible bearish case          |
-| Risk Officer       | Claude Finance Agent  | Evaluates risk factors and invalidation conditions  |
-| Architecture Critic| ChatGPT               | Reviews system design decisions                     |
-
----
-
-## Repository Structure
-
+**Stage 02 — Research**
 ```
-DUKE/
-├── layer1_screening/
-│   ├── screening/
-│   │   ├── screener.py              # Entry point: run_screening()
-│   │   ├── signal_scorer.py         # Six signal scoring functions (0–100)
-│   │   ├── regime_classifier.py     # Market regime detection + weight profiles
-│   │   └── reason_codes.py          # Reason codes and investigation flags
-│   ├── schemas/
-│   │   ├── raw_signal_record.json   # Input schema (one record per ticker)
-│   │   └── screening_output.json    # Output schema (ticker shortlist)
-│   ├── prompts/
-│   │   └── market_researcher.md     # System prompt: Market Researcher role
-│   └── README.md
-│
-├── layer2_research/
-│   ├── research/
-│   │   ├── evidence_types.py        # All enums and dataclasses
-│   │   ├── contradiction_detector.py# Detects evidence conflicts
-│   │   ├── catalyst_mapper.py       # Structures and prioritizes catalysts
-│   │   └── synthesizer.py           # Entry point: build_packet()
-│   ├── schemas/
-│   │   └── evidence_packet.json     # Master schema (Layer 2→3 contract)
-│   ├── prompts/
-│   │   ├── deep_researcher.md       # System prompt: Deep Researcher role
-│   │   └── earnings_call_analyst.md # System prompt: Transcript analysis
-│   └── README.md
-│
-└── layer3_scoring/                  # IN PROGRESS
-    └── ...
+cd pipeline/02_research
+source ~/.zprofile && python3 run.py TICKER ARCHETYPE
 ```
+`ARCHETYPE` must be one of: `long_term_compounder`, `quality_compounder`,
+`deep_value`. Use the archetype from the Stage 01 shortlist output.
+*Argument form verified against `run.py` docstring and `_VALID_ARCHETYPES`
+constant.*
+
+**Stage 03 — Refinery**
+```
+cd pipeline/03_evidence_processing
+source ~/.zprofile && python3 run.py TICKER
+```
+*Argument form verified against `run.py` docstring.*
+
+**Stage 04 — Scoring**
+```
+cd pipeline/04_scoring
+source ~/.zprofile && python3 run.py TICKER
+```
+*Argument form verified against `run.py` docstring.*
+
+**Stage 05 — Debate**
+```
+cd pipeline/05_debate
+source ~/.zprofile && python3 run.py TICKER
+```
+*Argument form verified against `run.py` docstring.*
+
+**Stage 06 — Synthesis**
+```
+cd pipeline/06_synthesis
+source ~/.zprofile && python3 run.py TICKER
+```
+*Argument form verified against `run.py` docstring.*
+
+**Stage 07 — Output**
+```
+cd pipeline/07_output
+source ~/.zprofile && python3 run.py TICKER
+```
+Stage 07 is interactive: it displays the recommendation, then prompts for
+action (`enter` / `watch` / `pass` / `override`), conviction (1–10), and
+notes. Answer the prompts directly.
+
+For non-interactive or automated runs, pipe responses after sourcing the
+environment. Example for a `watch` decision with conviction 5 and no notes:
+```
+cd pipeline/07_output
+source ~/.zprofile && printf "watch\n5\n\n" | python3 run.py TICKER
+```
+Prompt order: action → conviction → notes (position size is inserted between
+action and conviction only for `enter` or `override`).
+
+*Run command verified against `run.py` docstring. Prompt order verified
+against `decision_capture.py`.*
+
+The `cd pipeline/XX` convention for Stages 03–07 follows `CLAUDE.md`. Those
+run.py files resolve paths relative to `__file__` and may work from other
+directories, but the `cd` form is the tested invocation.
 
 ---
 
-## Design Principles
+## API Keys Required
 
-**Explicit uncertainty over false confidence.**
-Every score carries the data it was computed from. Missing data is `null`,
-not zero. The system would rather output a low-confidence packet than a
-high-confidence one built on gaps.
+All keys live in `~/.zprofile` and `~/.zshrc`. Claude Code bash sessions do
+not source these automatically.
 
-**Contradictions are features, not bugs.**
-The contradiction detector surfaces conflicts between evidence items before
-any analyst role sees the packet. Unresolved HIGH-severity contradictions
-apply uncertainty penalties in Layer 3.
-
-**Evidence hierarchy is enforced, not suggested.**
-SEC filings (0.95 reliability) and social media (0.20 reliability) produce
-fundamentally different evidence weights. The system does not treat them equally.
-
-**Human review is the last and most important layer.**
-The system produces recommendation packets. It does not size positions,
-execute trades, or override the investor's judgment.
+| Service | Environment Variable | Purpose |
+|---|---|---|
+| Anthropic | `ANTHROPIC_API_KEY` | All LLM calls (Stages 02–07) |
+| Perplexity | `PERPLEXITY_API_KEY` | Evidence discovery (Stage 02) |
+| NewsAPI | `NEWSAPI_KEY` | News discovery (Stage 02) |
+| FRED | `FRED_API_KEY` | HY spread and regime classification (Stage 01) |
+| EarningsCall | `EARNINGSCALL_API_KEY` | Earnings transcripts; S&P 500 universe fetch (Stages 01–02) |
 
 ---
 
-## Build Status
+## Documentation
 
-| Layer               | Status         | Notes                                      |
-|---------------------|----------------|--------------------------------------------|
-| Layer 1 — Screening | ✅ Complete    | Schemas, scoring logic, regime classifier  |
-| Layer 2 — Research  | ✅ Complete    | Evidence packet, contradiction detection   |
-| Layer 3 — Scoring   | 🔄 In progress | Evidence weighting, confidence, risk score |
-| Data ingestion      | ⏳ Pending     | Requires Mac mini + Claude Code            |
-| Analyst prompts     | ⏳ Pending     | Bull, Bear, Chief, Risk Officer roles      |
-| Output format       | ⏳ Pending     | Human-readable recommendation packet      |
-| Journal / postmortem| ⏳ Pending     | Feedback loop for system improvement       |
+**[CLAUDE.md](CLAUDE.md)** — Developer and operational reference. Architecture
+decisions, scoring design, known issues, commit history, and run commands.
+Read this before touching any code.
 
----
-
-## For Claude Code
-
-When you pull this repo, read this file first, then each layer's README
-before touching any code. The schemas define the data contracts between layers —
-do not modify a schema without checking all downstream consumers.
-
-Entry points:
-- Layer 1: `layer1_screening/screening/screener.py` → `run_screening()`
-- Layer 2: `layer2_research/research/synthesizer.py` → `build_packet()`
-- Layer 3: `layer3_scoring/scorer.py` → `score_packet()` (not yet built)
-
-Python stdlib only through Layer 2. Layer 3 will require `jsonschema`.
-Data ingestion modules will require `requests`, `pandas`, and source-specific SDKs.
-# DUKE
+**[docs/HISTORY.md](docs/HISTORY.md)** — Append-only project history. Records
+what each significant commit fixed, what was broken before it, and why it
+mattered. Includes the current open-issues list.
