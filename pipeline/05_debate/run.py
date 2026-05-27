@@ -93,13 +93,14 @@ def _load_prompt(name: str) -> str:
         return f.read()
 
 
-def _call_analyst(
+def _invoke_llm(
     client: anthropic.Anthropic,
     system_prompt: str,
     brief: dict,
     label: str,
-    max_tokens: int = _MAX_TOKENS,
-) -> dict:
+    max_tokens: int,
+) -> tuple[dict | None, str]:
+    """Single LLM call. Returns (parsed_dict, raw_text). parsed_dict is None on parse failure."""
     user_msg = (
         "Here is your structured brief. Study it carefully before responding.\n\n"
         + json.dumps(brief, indent=2)
@@ -121,21 +122,63 @@ def _call_analyst(
         raw   = "\n".join(lines[start:end])
 
     try:
-        return json.loads(raw)
+        return json.loads(raw), raw
     except json.JSONDecodeError as exc:
         print(f"  WARNING: {label} response is not valid JSON — {exc}")
         print(f"  raw (first 400 chars): {raw[:400]}")
-        return {
-            "analyst_role":          label.lower().split()[0],
-            "summary":               raw[:500],
-            "key_arguments":         [],
-            "evidence_cited":        [],
-            "contested_items":       [],
-            "raised_risks":          [],
-            "learning_hooks":        [],
-            "score_adjustment":      0.0,
-            "confidence_adjustment": 0.0,
-        }
+        return None, raw
+
+
+def _call_analyst(
+    client: anthropic.Anthropic,
+    system_prompt: str,
+    brief: dict,
+    label: str,
+    max_tokens: int = _MAX_TOKENS,
+) -> dict:
+    parsed, raw = _invoke_llm(client, system_prompt, brief, label, max_tokens)
+    if parsed is not None:
+        return parsed
+    return {
+        "analyst_role":          label.lower().split()[0],
+        "summary":               raw[:500],
+        "key_arguments":         [],
+        "evidence_cited":        [],
+        "contested_items":       [],
+        "raised_risks":          [],
+        "learning_hooks":        [],
+        "score_adjustment":      0.0,
+        "confidence_adjustment": 0.0,
+    }
+
+
+def _call_rebuttal_analyst(
+    client: anthropic.Anthropic,
+    system_prompt: str,
+    brief: dict,
+    label: str,
+    max_tokens: int,
+) -> dict:
+    """
+    Round 2 rebuttal call. Retries once on JSON parse failure. On persistent
+    failure, returns a sentinel dict with rebuttal_parse_failed=True and no
+    score_adjustment / confidence_adjustment keys — so downstream callers
+    cannot mistake a parse error for a real "no change" score of 0.0.
+    """
+    parsed, raw = _invoke_llm(client, system_prompt, brief, label, max_tokens)
+    if parsed is not None:
+        return parsed
+    print(f"  {label} parse failed — retrying once...")
+    parsed, raw = _invoke_llm(client, system_prompt, brief, f"{label} (retry)", max_tokens)
+    if parsed is not None:
+        return parsed
+    print(f"  ERROR: {label} parse failed on both attempts — flagging rebuttal as missing")
+    return {
+        "analyst_role":          label.lower().split()[0],
+        "rebuttal_parse_failed": True,
+        "parse_failure_reason":  "JSON parse failed on initial call and retry",
+        "raw_text_preview":      raw[:500],
+    }
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -253,31 +296,39 @@ def main() -> None:
         "your_round1_position": bear_pos,
         "bull_round1_position": bull_pos,
     }
-    bull_r2 = _call_analyst(client, bull_rebuttal_system, bull_r2_brief, "Bull Rebuttal", _MAX_TOKENS_R2)
-    bear_r2 = _call_analyst(client, bear_rebuttal_system, bear_r2_brief, "Bear Rebuttal", _MAX_TOKENS_R2)
+    bull_r2 = _call_rebuttal_analyst(client, bull_rebuttal_system, bull_r2_brief, "Bull Rebuttal", _MAX_TOKENS_R2)
+    bear_r2 = _call_rebuttal_analyst(client, bear_rebuttal_system, bear_r2_brief, "Bear Rebuttal", _MAX_TOKENS_R2)
 
-    # Enforce down-only conviction clamp in code (prompts also require this).
-    # Bull R2: cannot raise score_adjustment above Round 1 level.
-    # Bear R2: cannot lower score_adjustment below Round 1 level (more negative = more bearish).
-    # Both clamped to [-10, +10] — narrower than Round 1's [-15, +15].
+    bull_parse_failed = bool(bull_r2.get("rebuttal_parse_failed"))
+    bear_parse_failed = bool(bear_r2.get("rebuttal_parse_failed"))
+
+    # Round 1 baseline values used for the down-only clamp on Round 2.
     bull_r1_score = float(bull_pos.get("score_adjustment", 0.0))
     bull_r1_conf  = float(bull_pos.get("confidence_adjustment", 0.0))
     bear_r1_score = float(bear_pos.get("score_adjustment", 0.0))
     bear_r1_conf  = float(bear_pos.get("confidence_adjustment", 0.0))
 
-    bull_r2_score = max(-10.0, min(float(bull_r2.get("score_adjustment", 0.0)), 10.0))
-    bull_r2_conf  = max(-10.0, min(float(bull_r2.get("confidence_adjustment", 0.0)), 10.0))
-    bear_r2_score = max(-10.0, min(float(bear_r2.get("score_adjustment", 0.0)), 10.0))
-    bear_r2_conf  = max(-10.0, min(float(bear_r2.get("confidence_adjustment", 0.0)), 10.0))
-
-    bull_r2["score_adjustment"]      = min(bull_r2_score, bull_r1_score)
-    bull_r2["confidence_adjustment"] = min(bull_r2_conf,  bull_r1_conf)
-    bear_r2["score_adjustment"]      = max(bear_r2_score, bear_r1_score)
-    bear_r2["confidence_adjustment"] = max(bear_r2_conf,  bear_r1_conf)
+    # Enforce down-only conviction clamp in code (prompts also require this).
+    # Bull R2: cannot raise score_adjustment above Round 1 level.
+    # Bear R2: cannot lower score_adjustment below Round 1 level (more negative = more bearish).
+    # Both clamped to [-10, +10] — narrower than Round 1's [-15, +15].
+    # Parse-failed rebuttals carry no scores; they remain flagged and unclamped.
+    if not bull_parse_failed:
+        bull_r2_score = max(-10.0, min(float(bull_r2.get("score_adjustment", 0.0)), 10.0))
+        bull_r2_conf  = max(-10.0, min(float(bull_r2.get("confidence_adjustment", 0.0)), 10.0))
+        bull_r2["score_adjustment"]      = min(bull_r2_score, bull_r1_score)
+        bull_r2["confidence_adjustment"] = min(bull_r2_conf,  bull_r1_conf)
+    if not bear_parse_failed:
+        bear_r2_score = max(-10.0, min(float(bear_r2.get("score_adjustment", 0.0)), 10.0))
+        bear_r2_conf  = max(-10.0, min(float(bear_r2.get("confidence_adjustment", 0.0)), 10.0))
+        bear_r2["score_adjustment"]      = max(bear_r2_score, bear_r1_score)
+        bear_r2["confidence_adjustment"] = max(bear_r2_conf,  bear_r1_conf)
 
     debate_dict["bull_rebuttal"] = bull_r2
     debate_dict["bear_rebuttal"] = bear_r2
-    debate_dict["metadata"]["round_2_complete"] = True
+    debate_dict["metadata"]["round_2_complete"]            = not (bull_parse_failed or bear_parse_failed)
+    debate_dict["metadata"]["bull_rebuttal_parse_failed"]  = bull_parse_failed
+    debate_dict["metadata"]["bear_rebuttal_parse_failed"]  = bear_parse_failed
 
     # ── Write output ──────────────────────────────────────────────────────────
     date_tag = scoring.get("scored_at", "")[:10].replace("-", "") or args.date or "unknown"
