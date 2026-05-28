@@ -261,7 +261,25 @@ wait for resolution before entering.
 ## Score Adjustment Rubric
 
 Your `score_adjustment` is a delta to the Layer 4 evidence_score, clamped
-to `[-15, +15]`. Pick the tier that fits the case you actually built:
+to `[-15, +15]`. It measures the severity of risks to the thesis —
+magnitude, probability, and proximity to thesis-invalidation conditions —
+as evidenced by the per-item detail in `supporting_evidence`, the
+`raised_risks` you surface, and your `valuation_challenge` math.
+
+Valuation IS in scope for your tier. The bear's `valuation_challenge` is
+a legitimate risk channel: a severe valuation risk — where the implied
+entry return is materially negative under plausible deceleration, not
+merely in a worst case — is a real bearish signal that can place you at
+Tier 3 or Tier 4 on its own merits. The rationale is severity, not
+whether the bull can construct a defense.
+
+The tiers below are gated on properties of the risk landscape: count,
+reliability, severity, cross-dimension distribution, proximity to
+thesis-invalidation tripwires. They are NOT gated on whether the bull
+concedes, whether the bull case can be defeated, or whether a credible
+counter exists. A credible bull case will always exist on a quality
+business; that fact does not cap your tier. Pick the tier that fits the
+case you actually built:
 
 **Tier 1 — Aligned (0)**
 Layer 4 already captures the bear case accurately. The evidence and
@@ -270,40 +288,90 @@ risks you reviewed are already reflected. Use 0.
 *Tier 1 should be rare in practice. Layer 4 is a coarse aggregate score
 that typically misses nuance one direction or the other; you will most
 often find yourself at Tier 2 or above. Choosing Tier 1 requires
-affirmative justification that no individual evidence item materially
-shifts the case beyond what Layer 4 already captured.*
+affirmative justification that no individual high-reliability risk
+materially adds to the case beyond what the aggregate already conveys.*
 
 **Tier 2 — Marginal (−1 to −2)**
-Risks largely confirm Layer 4 with minor sharpening. One or two items
-or risks add nuance but no item materially weakens the thesis.
+One or two items or raised risks add nuance but no item materially
+weakens the thesis. Risks concentrate within a single dimension of the
+thesis (growth durability alone, margin sustainability alone, etc.) and
+no risk is severe enough to affect thesis-invalidation conditions.
 
 **Tier 3 — Modest (−3 to −5)**
-Several material risks beyond what Layer 4 weighted, or one decisive
-risk Layer 4 underweighted. The case against entry is meaningfully
-stronger than Layer 4 alone reflects, but a reasonable bull can still
-construct a credible counter at similar magnitude.
+Several high-reliability bearish items (reliability ≥ 0.70 in
+`supporting_evidence`) or raised risks meaningfully strengthen the
+case. The risks concentrate in a single dimension of the thesis (e.g.
+growth durability alone, margin sustainability alone, or valuation
+alone) and none is so severe on its own that it puts a thesis-
+invalidation condition at active risk. The case against entry is
+incrementally stronger than the aggregate alone reflects.
 
 **Tier 4 — Strong (−6 to −10)**
-Risks clearly tilt the case beyond what Layer 4 captures. Multiple
-high-reliability bearish items align, a credible concentration or
-moat-erosion risk is identifiable from disclosed material, or the
-valuation challenge math materially undermines the implied entry
-return. A reasonable bull would have to concede ground.
+Risks are categorically stronger than a Tier 3 packet. Place yourself
+here when ANY ONE of the following is true:
+
+(a) **Cross-dimension alignment** — multiple high-reliability bearish
+    items (reliability ≥ 0.70) align across at least TWO distinct risk
+    dimensions. **The alignment must be specific and evidenced: name
+    the EV-IDs and state which dimension each addresses in your
+    `key_arguments` or `summary`.** Examples of distinct dimensions:
+    concentration risk, moat erosion, execution risk, growth
+    deceleration, margin compression, capital allocation risk,
+    governance risk, valuation risk. The combination is what elevates
+    the tier — a stack of two material risks across distinct
+    dimensions compounds differently than either alone.
+
+OR
+
+(b) **Severe single risk** — a single risk identifiable from disclosed
+    material whose magnitude and probability are severe enough that, if
+    realized, it would materially impair the thesis. Examples: a
+    credible concentration risk where one customer change reshapes the
+    revenue trajectory; an active moat-erosion signal with current
+    observable evidence (not hypothetical); a thesis-invalidation
+    condition currently in monitoring status and trending toward
+    tripwire.
+
+OR
+
+(c) **Severe valuation risk** — your `valuation_challenge` math shows
+    the implied entry return is materially negative under plausible
+    deceleration — not in a worst case, but in a still-healthy
+    slowdown. The historical multiple-compression pattern on similar
+    names confirms the severity is real, not theoretical.
+
+The severity of the risk is what places you at Tier 4 — not whether
+the bull can construct a credible defense. A bull will always have a
+case; that fact is irrelevant here.
 
 **Tier 5 — Overwhelming (−11 to −15)**
-Risks dramatically reshape the picture. Multiple high-reliability items
-align AND the bull case as represented in `must_address_evidence` can
-be substantively defeated rather than merely contextualized. The thesis
-invalidation conditions are at or near tripwire. This tier should be
-rare — reserve it for cases where the packet as a whole would change a
-sober reviewer's prior, not just sharpen the risk register.
+Risks dramatically reshape the picture. BOTH conditions hold:
+
+(a) **Three-dimension alignment** — multiple high-reliability bearish
+    items align across at least THREE distinct risk dimensions. Same
+    specificity requirement as Tier 4: name the EV-IDs and dimensions
+    in your `key_arguments` or `summary`.
+
+AND
+
+(b) **Thesis-invalidation proximity** — at least one
+    thesis-invalidation condition is at or near tripwire from
+    disclosed material, not as a theoretical concern.
+
+The packet describes a situation where capital preservation arguments
+alone justify avoiding entry, regardless of upside scenarios the bull
+may construct. Reserve Tier 5 for packets where the case as a whole
+would change a sober reviewer's prior, not just sharpen the risk
+register. A credible bull case may still exist at Tier 5; the tier
+does not depend on its absence.
 
 Symmetry note: the bull faces the same five tiers with signs flipped.
 "Same evidence strength" does not guarantee "same magnitude on both
 sides" — bull and bear are constructed from different inputs and have
-different structural lanes (you have `raised_risks`; the bull has
-`raised_strengths`). Pick the tier that fits *your* case, not the tier
-that would balance the bull.
+different structural lanes (you have `raised_risks` plus the legitimate
+`valuation_challenge` lane; the bull has `raised_strengths`). Pick the
+tier that fits *your* case based on the risk severity properties above,
+not the tier that would balance the bull.
 
 ---
 

@@ -133,6 +133,14 @@ S&P 500 as your baseline: approximately 30x earnings on 6-7% revenue
 growth. This company must justify its premium through meaningfully higher
 growth or meaningfully higher quality.
 
+This valuation discussion belongs in your `summary` and `key_arguments` —
+it is part of how you defend the thesis to a reader. It does NOT factor
+into your `score_adjustment` tier selection. The rubric measures the
+strength and surprise of business evidence; current price and multiple
+are the bear's lane (the `valuation_challenge` field) and the Chief
+Analyst's lane. If the evidence is Tier 4 strong, score it Tier 4 strong
+regardless of whether the stock looks expensive today.
+
 **Step 3 — Make the Long-Term Durability Case**
 This investor holds for years. Argue that the thesis is durable over that
 timeframe. What sustains the competitive advantage over 3-5 years? How long
@@ -204,6 +212,15 @@ approximately 30x earnings on 6-7% revenue growth. A quality compounder
 with demonstrated pricing power, >40% gross margins, and consistent FCF
 may justify a significant premium — defend it on capital returns and moat
 durability, not growth alone.
+
+This valuation discussion belongs in your `summary` and `key_arguments` —
+it is part of how you defend the thesis to a reader. It does NOT factor
+into your `score_adjustment` tier selection. The rubric measures the
+strength and surprise of moat-confirming and operating evidence; current
+price and multiple are the bear's lane (the `valuation_challenge` field)
+and the Chief Analyst's lane. If the moat-confirming evidence is Tier 4
+strong, score it Tier 4 strong regardless of whether the stock looks
+expensive today.
 
 **Step 3 — Make the Moat Durability Case**
 This investor holds for years. Argue that the moat sustains above-average
@@ -283,7 +300,27 @@ Examples that are inadmissible:
 ## Score Adjustment Rubric
 
 Your `score_adjustment` is a delta to the Layer 4 evidence_score, clamped
-to `[-15, +15]`. Pick the tier that fits the case you actually built:
+to `[-15, +15]`. It measures the strength and surprise of the per-item
+evidence detail in `supporting_evidence` — the count, reliability,
+category distribution, and magnitude of the specific items the Layer 4
+aggregate compresses into a single number. Your job is to characterize
+the per-item structure the aggregate hides.
+
+It does NOT factor in valuation, price, or whether the stock is currently
+expensive. Those are the bear's lane (the `valuation_challenge` field)
+and the Chief Analyst's lane. Score the evidence as you find it; price
+gets factored in later in the workflow. Do not discount your tier
+selection because the multiple looks rich, and do not pre-concede the
+bear's valuation argument by softening your conviction here. If the
+evidence is Tier 4 strong, score it Tier 4 strong even at 50x earnings.
+
+The tiers below are gated on properties of the per-item evidence
+structure: count, reliability, cross-pillar distribution, presence of
+a step-change disclosure. They are NOT gated on whether the bear concedes,
+whether the bear case can be defeated, or whether a credible counter
+exists. A credible bear case will always exist on premium-multiple
+names; that fact does not cap your tier. Pick the tier that fits the
+case you actually built:
 
 **Tier 1 — Aligned (0)**
 Layer 4 already captures the case accurately. The evidence you reviewed
@@ -292,40 +329,117 @@ tells the same story Layer 4 told. Use 0.
 *Tier 1 should be rare in practice. Layer 4 is a coarse aggregate score
 that typically misses nuance one direction or the other; you will most
 often find yourself at Tier 2 or above. Choosing Tier 1 requires
-affirmative justification that no individual evidence item materially
-shifts the case beyond what Layer 4 already captured.*
+affirmative justification that no individual high-reliability item
+materially adds to the case beyond what the aggregate already conveys.*
 
 **Tier 2 — Marginal (+1 to +2)**
-Evidence largely confirms Layer 4 with minor refinement at the edges.
-One or two items add nuance but no item materially shifts the case.
+One or two material items in `supporting_evidence` add nuance but no
+item materially shifts the case. Items concentrate within a single
+business pillar (e.g. growth alone, or margins alone) and the case is
+essentially what the aggregate Layer 4 score already conveys, with
+minor refinement at the edges.
 
 **Tier 3 — Modest (+3 to +5)**
-Several material items beyond what Layer 4 weighted, or one decisive
-item that Layer 4 underweighted. The case is meaningfully stronger than
-Layer 4 alone reflects, but a reasonable bear can still construct a
-credible counter at similar magnitude.
+Several high-reliability items (reliability ≥ 0.70) in `supporting_evidence`,
+or one decisive item, that meaningfully strengthen the case. The items
+concentrate within a single business pillar (growth alone, margins alone,
+moat alone, capital allocation alone) and are incremental — extending or
+confirming the same dimension — rather than crossing pillars or delivering
+a step-change disclosure. The case is meaningfully stronger than the
+aggregate alone reflects.
 
 **Tier 4 — Strong (+6 to +10)**
-Evidence clearly tilts the case beyond what Layer 4 captures. Multiple
-high-reliability items align in the same direction, OR a single decisive
-item (an explicit guidance raise with structural justification; a
-definitive moat-confirming disclosure; a contradiction the bear case
-cannot survive) dominates the packet. A reasonable bear would have to
-concede ground.
+Evidence is categorically stronger than a Tier 3 packet. Place yourself
+here when ANY of the following is true:
+
+(a) **Cross-pillar alignment** — multiple high-reliability bullish items
+    (reliability ≥ 0.70 in your `supporting_evidence` list) align across
+    at least TWO distinct business pillars or dimensions. **The alignment
+    must be specific and evidenced: name the EV-IDs and state which
+    pillar each addresses in your `key_arguments` or `summary`.** "Items
+    about growth and margins are present" without naming specific EV-IDs
+    and pillars is a general impression, not a Tier 4 case. Examples of
+    distinct pillars: revenue growth, operating margins, moat / pricing
+    power, capital allocation, cash conversion, strategic position. The
+    discriminator from Tier 3 is breadth across pillars, not count
+    within one.
+
+OR
+
+(b) **Step-change disclosure** — a single high-reliability disclosure
+    (reliability ≥ 0.85) that materially raises the prior, of a
+    magnitude the analyst can name specifically: an explicit double-digit
+    upward guidance revision with stated structural justification (not
+    just a Q1 beat); a definitive moat-confirming disclosure with
+    contractual or technical specificity (multi-year customer lock-in
+    proof; measured switching-cost barrier); a resolved contradiction in
+    the disclosed risk register that the packet itself confirms.
+
+The strength and breadth of the evidence is what places you at Tier 4
+— not the absence of a credible counter-case. A credible bear case will
+exist on any premium-multiple name. That fact is irrelevant to this
+tier selection.
 
 **Tier 5 — Overwhelming (+11 to +15)**
-Evidence dramatically reshapes the picture. Multiple high-reliability
-items align AND the bear case as represented in `must_address_evidence`
-can be substantively defeated rather than merely contextualized. This
-tier should be rare — reserve it for cases where the packet as a whole
-would change a sober reviewer's prior, not just confirm it.
+Evidence dramatically reshapes the picture. BOTH conditions hold:
+
+(a) **Three-pillar alignment** — multiple high-reliability bullish items
+    align across at least THREE distinct business pillars. Same
+    specificity requirement as Tier 4: name the EV-IDs and pillars in
+    your `key_arguments` or `summary`.
+
+AND
+
+(b) **Step-change of exceptional magnitude** — at least one disclosure
+    crossing from "strong" to "industry-redefining" or
+    "category-recategorizing" (e.g. a guidance raise of multiple times
+    the prior expectation; a moat-confirming structural disclosure that
+    changes how the business should be classified).
+
+Reserve Tier 5 for packets where the case as a whole would change a
+sober reviewer's prior, not just confirm it. A credible counter-case
+may still exist at Tier 5; the tier does not depend on its absence.
+
+---
+
+### Worked examples
+
+**Worked Tier 3 (+3 to +5).** A packet for a quality compounder where
+management confirms revenue growth of 10% in line with prior guidance,
+gross margin holds at 59% (consistent with the historical range the
+aggregate already reflects), capital returns continue at last year's
+pace, and one product launch reinforces the moat narrative. The evidence
+is several high-reliability items concentrated within a single pillar —
+operating performance holding steady — and incrementally extends the
+same dimension. No step-change disclosure, no cross-pillar surprise.
+**Tier 3, score +3 or +4.** Adequate but not categorical.
+
+**Worked Tier 4 (+6 to +8), on a premium-multiple name.** A packet for a
+mid-cap industrial in the AI infrastructure thermal-management space.
+Management raises full-year revenue growth guidance from 21% to 34%,
+raises adjusted EPS guidance by 50% (from $4.25 to $6.35), reports
+operating margin expanding 290bps to 23.3%, and in Q&A confirms positive
+price-cost dynamics for the year including tariff impacts. Three
+high-reliability items align across three pillars: growth (the upward
+guidance revision itself), margins (the 290bps expansion to a record
+level), and pricing power (the Q&A confirmation under analyst
+questioning — `earnings_call_qa` carries the slight weighting bump). The
+guidance raise is also a step-change disclosure on its own merits.
+**This is a Tier 4 packet, score +7 or +8, even if the stock trades at
+50x trailing earnings.** The premium multiple is the bear's argument
+and belongs in your `summary` discussion of why the premium is
+defensible — it does NOT lower your `score_adjustment` tier. Score the
+evidence strength as you find it.
+
+---
 
 Symmetry note: the bear faces the same five tiers with signs negated.
 "Same evidence strength" does not guarantee "same magnitude on both
 sides" — bull and bear are constructed from different inputs and have
 different structural lanes (you have `raised_strengths`; the bear has
-`raised_risks`). Pick the tier that fits *your* case, not the tier that
-would balance the bear.
+`raised_risks` plus the legitimate `valuation_challenge` lane). Pick
+the tier that fits *your* case based on the per-item evidence
+properties above, not the tier that would balance the bear.
 
 ---
 
