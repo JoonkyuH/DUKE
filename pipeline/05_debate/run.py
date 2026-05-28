@@ -122,8 +122,28 @@ def _invoke_llm(
         end   = len(lines) - 1 if lines[-1].strip() == "```" else len(lines)
         raw   = "\n".join(lines[start:end])
 
+    # Locate the first '{' and use raw_decode so trailing content after a
+    # complete JSON object is tolerated. This addresses a systematic bear-side
+    # behavior where the LLM emits a valid JSON object followed by a closing
+    # remark or a second block — json.loads (strict) rejects that as "Extra
+    # data" even though the structured response itself is complete.
+    #
+    # CRITICAL GUARD — do not "simplify" this into something that swallows
+    # truncated JSON. raw_decode raises JSONDecodeError when the leading
+    # object is incomplete (e.g. a response cut off mid-generation by a token
+    # cap, leaving unclosed braces/brackets). That MUST keep flagging as a
+    # parse failure so the retry-then-flag and not_computable safety nets
+    # fire — silently accepting a partial object would hide real data loss.
+    # Tolerate trailing text after a complete object; never tolerate
+    # incompleteness within the object itself.
+    start_idx = raw.find("{")
+    if start_idx < 0:
+        print(f"  WARNING: {label} response contains no JSON object")
+        print(f"  raw (first 400 chars): {raw[:400]}")
+        return None, raw
     try:
-        return json.loads(raw), raw
+        obj, _end = json.JSONDecoder().raw_decode(raw, start_idx)
+        return obj, raw
     except json.JSONDecodeError as exc:
         print(f"  WARNING: {label} response is not valid JSON — {exc}")
         print(f"  raw (first 400 chars): {raw[:400]}")
