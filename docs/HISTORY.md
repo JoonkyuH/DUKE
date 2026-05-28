@@ -327,9 +327,63 @@ intent without asking the LLM to execute four-case conditional
 arithmetic with field-name discipline, which three iterations
 demonstrated it cannot do reliably.
 
+**b5e5d24** — `feat: move entry-price computation to Python (entry_price_calculator); Chief writes recommendation off deterministic band`
+Finishes Architecture B's design intent by moving the four-case
+entry-price arithmetic out of the Chief Analyst LLM and into a pure
+Python module (`pipeline/06_synthesis/entry_price_calculator.py`,
+13/13 tests pass). The calculator consumes
+bull_scenario_price + bear_scenario_price + current_price +
+screening_archetype and returns case_label
+(IN_BAND / ABOVE_BAND / BELOW_BEAR / INVERTED / DEGENERATE),
+entry_price, entry_range (`{low, high}` object), target_2to1_price
+`X = (bull + 2*bear) / 3`, ratio_at_current, archetype_min_rr
+(deep_value 2.0 / quality_compounder 1.5 / long_term_compounder 1.2),
+price_gate_passed, and a one-line rationale. Wired into Stage 06's
+`run.py` pre-Chief; result persists as `synthesis.computed_entry`;
+Stage 07's `decision_capture._build_record` reads journal entry
+fields from there, not from the Chief output.
+
+The Chief Analyst prompt is slimmed: Step 8 is now read-only ("Read
+the Entry-Price Band, no computation"). Step 5 is rewritten as a
+matrix on (`price_gate_passed` × business-merit lean) that maps to
+the existing recommendation enum:
+  gate pass + merit_bull       → ENTER (strong or moderate per a
+                                  second test on final_evidence_score
+                                  and bull R1)
+  gate pass + merit_balanced   → watch
+  gate pass + merit_bear       → pass (default); watch only on a
+                                  named, credible, management-driven
+                                  pivot addressing the bear's core
+                                  thesis with at least early evidence
+  gate fail + merit_bull       → watch
+  gate fail + merit_balanced   → pass
+  gate fail + merit_bear       → pass
+INVERTED and DEGENERATE case_labels are treated as gate-fail rows
+unconditionally — never ENTER.
+
+This removes the all-watch default that the 40c366f baseline produced
+under inconclusive debates. Inconclusive + Tier 4 + gate pass now
+lands in ENTER, not watch. The Chief no longer emits entry_price,
+entry_range, current_price_used, target_2to1_price, ratio_at_current,
+price_gate_passed, or archetype_min_rr — Python writes those to the
+journal directly. The Chief contributes `recommendation` (matrix
+outcome) and `entry_price_rationale` (business-merit prose).
+
+VRT end-to-end validation: bull $222.25 < current $327.46 →
+case_label=INVERTED → entry_price=null, target_2to1_price=172.75,
+gate_passed=false → recommendation=watch. Journal entry fields all
+populated from `synthesis.computed_entry`; Chief omitted the
+calculator-supplied number fields per the slimmed schema.
+
+Resolves the iteration cycle a844d3e → d378be2 → 909b59a: the
+prompt-level constraints cycle demonstrated that LLM-driven four-case
+conditional arithmetic with field-name discipline is unreliable. The
+arithmetic is now deterministic Python; the LLM judges only the
+recommendation off the resolved band, which is a job it can do.
+
 ---
 
-## Open Issues (as of 2026-05-26; Architecture B re-scoped 2026-05-28; Chief prompt reverted 2026-05-28)
+## Open Issues (as of 2026-05-26; Architecture B re-scoped 2026-05-28; Chief prompt reverted 2026-05-28; entry-price refactor landed 2026-05-28)
 
 **Must fix before relying on shortlist**
 
@@ -339,30 +393,36 @@ demonstrated it cannot do reliably.
 
 **Pending**
 
-- **NEW TOP PRIORITY — Entry-price computation in Python.** Move the
-  four-case entry-price logic out of the Chief Analyst prompt and into
-  Python (likely `synthesizer.py` or a new `entry_price_calculator.py`).
-  Chief outputs business-merit reasoning + scenario prices; Python
-  consumes bull_scenario_price + bear_scenario_price + current_price
-  and emits entry_price / entry_range / case-label deterministically;
-  Chief writes recommendation off the Python-computed case. Solves the
-  all-watch problem (recommendation can be driven from the deterministic
-  case label) and the four-case LLM arithmetic failure mode
-  demonstrated by the a844d3e → d378be2 → 909b59a iteration cycle.
-  The Chief's prompt-level job becomes:
-  (a) confirm/refine archetype, (b) adjudicate critical contentions,
-  (c) write executive summary + monitoring priorities, (d) write
-  recommendation off the Python-computed case + business-merit verdict.
-  No LLM-side case-formula execution.
+- ~~**NEW TOP PRIORITY — Entry-price computation in Python.**~~
+  **DONE in `b5e5d24`.** New module
+  `pipeline/06_synthesis/entry_price_calculator.py` (pure function,
+  13/13 tests pass) consumes bull_scenario_price + bear_scenario_price
+  + current_price + screening_archetype and returns case_label
+  (IN_BAND / ABOVE_BAND / BELOW_BEAR / INVERTED / DEGENERATE) +
+  entry_price + entry_range + ratio_at_current + price_gate_passed +
+  archetype_min_rr + target_2to1_price + rationale. Wired into
+  `synthesizer`/`run.py` before the Chief LLM call; result persists
+  as `synthesis.computed_entry`; Stage 07 `decision_capture._build_record`
+  reads entry-price numbers from there and writes them to the journal
+  top-level. The Chief Analyst prompt is slimmed: Step 8 is now
+  read-only ("Read the Entry-Price Band, no computation"); Step 5 is
+  a matrix on (price_gate_passed × business-merit lean) that maps to
+  the existing enum, replacing the all-watch default under
+  inconclusive outcomes. The Chief no longer emits entry_price,
+  entry_range, current_price_used, target_2to1_price,
+  ratio_at_current, price_gate_passed, or archetype_min_rr — it
+  writes only `recommendation` + `entry_price_rationale` (business-
+  merit prose) on the entry-price side. VRT end-to-end validated:
+  INVERTED case → entry_price=null, target_2to1=$172.75,
+  gate_passed=false, rec=watch (correct matrix outcome).
 
 - Architecture B status: committed (40c366f). Plumbing validated end-
-  to-end (scenario_price field flows from analysts through debate
-  record to Chief brief to journal). Recommendation behavior is at
-  baseline limitations pending the Python-computation refactor above.
-  Three prompt iterations (a844d3e, d378be2 + 909b59a revert) attempted
-  to fix the recommendation/field-mechanics issues at the prompt
-  level; each regressed. The refactor moves the problem out of the
-  LLM domain.
+  to-end. Entry-price computation refactored to Python in b5e5d24.
+  Three prompt iterations (a844d3e, d378be2 → 909b59a revert)
+  attempted to fix recommendation/field-mechanics at the prompt level
+  before the refactor; each regressed and was rolled back. The Chief
+  prompt now drives recommendation off the deterministic band rather
+  than computing it.
 
 - SYF misclassification: GICS "Credit Services" maps to payments_network, but
   SYF is a consumer-credit lender. Needs a banking ticker_override (same

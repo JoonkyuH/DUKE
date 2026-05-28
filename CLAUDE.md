@@ -151,24 +151,43 @@ generates three structured fields:
   uncertainties (1-3 items)
 Prompt: pipeline/03_evidence_processing/prompts/synthesis.md
 
-### Stage 05/06 Architecture B (40c366f — Chief prompt reverted to baseline in 909b59a)
+### Stage 05/06 Architecture B (40c366f + b5e5d24)
 Division of labor: Stage 05 debate scores business
-merit only. Stage 06 Chief Analyst adjudicates
-valuation separately.
+merit only. Stage 06 splits two ways:
+(a) Python — `entry_price_calculator.py` (b5e5d24)
+    deterministically computes the entry-price band
+    from bull_scenario_price + bear_scenario_price +
+    current_price + screening_archetype. Result
+    persists as `synthesis.computed_entry` and is
+    threaded to the journal top level by Stage 07.
+    The Chief Analyst LLM never computes these
+    numbers.
+(b) Chief Analyst — reads `computed_entry` (including
+    `price_gate_passed`), runs the Step 5
+    recommendation matrix on (price_gate_passed ×
+    business-merit lean), and contributes only the
+    `recommendation` enum + `entry_price_rationale`
+    prose. No four-case arithmetic in the prompt.
 
-Status: plumbing validated end-to-end (scenario_price
-field flows from analysts → debate record → Chief
-brief → journal). Recommendation behavior is at
-40c366f baseline — under inconclusive debate
-outcomes the Chief defaults to watch, and case-1
-entry_price has a known prose-vs-JSON drift.
-Three prompt iterations (a844d3e, d378be2) attempted
-to fix this at the prompt level; both regressed and
-were rolled back in 909b59a. Next planned change:
-move the four-case entry-price arithmetic out of
-the LLM and into Python (synthesizer.py or a new
-entry_price_calculator.py); Chief writes
-recommendation off the Python-computed case.
+Recommendation matrix:
+              gate_pass         gate_fail
+  merit_bull  ENTER             watch
+  merit_bal   watch             pass
+  merit_bear  pass (default;    pass
+              watch only on
+              named pivot)
+INVERTED / DEGENERATE case_labels are treated as
+gate-fail rows regardless of business-merit lean.
+ENTER splits into strong_conviction_enter (when
+final_evidence_score ≥ 80 AND bull R1 ≥ +6 AND
+no bear_correct critical adjudication) and
+moderate_conviction_enter otherwise.
+
+This replaces the 40c366f baseline's all-watch
+default under inconclusive debates. Three prompt
+iterations (a844d3e, d378be2 → 909b59a revert)
+tried to fix the issue at the prompt level before
+b5e5d24 moved the arithmetic out of the LLM.
 
 Stage 05 = business merit
   Bull: upside / quality case (ecosystem, moat,
@@ -295,20 +314,34 @@ with `ulimit -n 8192` per-terminal. Must be fixed
 before any unattended/scheduled run.
 
 ### Pending
-**NEW TOP PRIORITY — Entry-price computation in
-Python.** Move the four-case entry-price logic out
-of the Chief Analyst prompt and into Python (likely
-synthesizer.py or a new entry_price_calculator.py).
-Chief outputs business-merit reasoning + scenario
-prices; Python consumes bull_scenario_price +
-bear_scenario_price + current_price and emits
-entry_price / entry_range / case-label
-deterministically; Chief writes recommendation off
-the Python-computed case. Solves the all-watch
-problem (recommendation can be driven from the
-deterministic case label) and the four-case LLM
-arithmetic failure mode demonstrated by the
-a844d3e → d378be2 → 909b59a iteration cycle.
+~~Entry-price computation in Python~~ — DONE in
+**b5e5d24**. `pipeline/06_synthesis/entry_price_calculator.py`
+is a pure function (13/13 tests pass) consuming
+bull_scenario_price + bear_scenario_price +
+current_price + screening_archetype and returning
+case_label (IN_BAND / ABOVE_BAND / BELOW_BEAR /
+INVERTED / DEGENERATE), entry_price, entry_range
+({low, high}), target_2to1_price = (bull + 2*bear)/3,
+ratio_at_current, archetype_min_rr (deep_value 2.0
+/ quality_compounder 1.5 / long_term_compounder 1.2),
+price_gate_passed, and a rationale. Stage 06's
+run.py runs the calculator pre-Chief, injects
+computed_entry into the Chief brief, and persists
+it as synthesis.computed_entry. Stage 07's
+decision_capture._build_record reads journal entry
+fields from there. The Chief Analyst prompt is
+slimmed: Step 8 is now read-only (no computation);
+Step 5 is a matrix on (price_gate_passed ×
+business-merit lean) that maps to the existing
+recommendation enum. This removes the all-watch
+default that the 40c366f baseline produced under
+inconclusive debates. Chief no longer emits
+entry_price / entry_range / current_price_used /
+target_2to1_price / ratio_at_current /
+price_gate_passed / archetype_min_rr — Python
+writes those to the journal directly; Chief
+contributes recommendation + entry_price_rationale
+prose.
 
 SYF misclassification: GICS "Credit Services"
 maps to payments_network, but SYF is a consumer-
@@ -325,20 +358,21 @@ Requires two consecutive Stage 02 runs on the same
 ticker — first run populates transcript_cache; second
 run diffs against it and produces contradictions.
 
-Architecture B (40c366f) — committed; plumbing
+Architecture B (40c366f + b5e5d24) — committed; plumbing
 validated end-to-end (scenario_price field flows
 from analysts → debate → Chief brief → journal).
-Recommendation behavior is at baseline limitations
-pending the Python-computation refactor above —
-under inconclusive debate outcomes the Chief defaults
-to watch, and case-1 entry_price has a known
-prose-vs-JSON drift. Three prompt iterations
-(a844d3e, d378be2 → 909b59a revert) attempted to
-fix at the prompt level; each regressed. The
-discrimination thread (Path B 4478857 → Path B.2
-b1404d5 → Architecture B 40c366f) absorbed the
-earlier "test-run debates all resolved balanced"
-concern; b1404d5 is not separately validated.
+Entry-price refactor landed in b5e5d24 — numbers
+now computed deterministically in Python; Chief
+writes recommendation off the resolved band via
+Step 5 matrix. The all-watch default and case-1
+prose-vs-JSON drift from the 40c366f baseline are
+gone. Three prompt iterations (a844d3e, d378be2 →
+909b59a revert) preceded the refactor; each
+regressed at the prompt level. The discrimination
+thread (Path B 4478857 → Path B.2 b1404d5 →
+Architecture B 40c366f) absorbed the earlier
+"test-run debates all resolved balanced" concern;
+b1404d5 is not separately validated.
 
 Stage 04 fundamentals wiring deferred to V2: signal
 thresholds and economic profiles are live, but forward
@@ -412,6 +446,8 @@ da27c16  fix: route real Stage 02 contradictions through to scoring and debate
 546bdf4  fix: thread quality_compounder archetype through Stage 06 synthesis
 6d215ee  feat: activate Stage 05 Round 2 rebuttals — bull and bear now respond to each other
 4ea4c75  fix: anchor Chief Analyst to screened archetype; record archetype provenance in journal; document two-score distinction
+40c366f  feat: Architecture B — debate scores business merit only, valuation moves to Chief Analyst entry-price adjudication
+b5e5d24  feat: move entry-price computation to Python (entry_price_calculator); Chief writes recommendation off deterministic band
 
 
 ## S&P 500 Screening Results (2026-05-24)
