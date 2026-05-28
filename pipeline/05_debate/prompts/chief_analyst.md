@@ -539,11 +539,36 @@ Return a valid JSON object. No prose outside the JSON.
     `entry_range.low`      = `current_price_used`
     `entry_range.high`     = (`bull_scenario_price.price`
                               + 2.0 × `bear_scenario_price.price`) / 3.0
+  Compute `entry_range.high` to the exact value of the formula — do
+  not round, do not approximate, do not buffer. If the formula yields
+  $72.00, emit 72.00; do not emit 72.50 or 72.59. The previous round
+  drifted 0.8-2.8% from the formula on this field; that is a
+  disqualifying deviation.
   If risk-stack concerns warrant caution, express them by setting
   `recommendation` to `watch` with a named reason from Step 5's
   legitimate-watch list — NOT by adjusting the structured entry-price
   fields. Prose-vs-JSON disagreement on the entry-price math is a
   disqualifying inconsistency.
+- **Case 2 (above-band) mechanical formula is mandatory.** When
+  `bull_scenario_price.price > current_price_used > bear_scenario_price.price`
+  AND the up/down ratio at current is < 2.0, the structured fields MUST
+  satisfy these equalities exactly:
+    `entry_price`          = (`bull_scenario_price.price`
+                              + 2.0 × `bear_scenario_price.price`) / 3.0
+    `entry_range.low`      = `entry_price` × 0.97
+    `entry_range.high`     = `entry_price` × 1.03
+  Under case 2, `recommendation` defaults to `watch` with the computed
+  `entry_price` (which is below current_price) stated as the wait-for
+  trigger in `what_would_change_this`. `moderate_conviction_enter` and
+  `strong_conviction_enter` are NOT valid under case 2 — the current
+  price is above the acceptable entry band; entering at current would
+  violate the 2:1 favorable-ratio threshold this entire adjudication
+  is built on.
+  Do not place case-2 values into case-1-style fields. The `entry_price`
+  IS the computed X, not `current_price_used`. The range is `±3%
+  around entry_price`, not `[current_price, X]`. Prose-vs-JSON
+  disagreement on case-2 field assignment is a disqualifying
+  inconsistency.
 - **Case 3 (bear-above-current) mechanical formula is mandatory.** When
   `bear_scenario_price.price ≥ current_price_used`, the structured
   fields MUST satisfy:
@@ -553,10 +578,23 @@ Return a valid JSON object. No prose outside the JSON.
   Under case 3, `recommendation` follows Step 5's enter/watch criteria
   treating case 3 as favorable price math (same as case 1) — there is
   no price-based demote in case 3.
-- If `bull_scenario_price.price ≤ current_price_used` (case 4,
-  bull-side inverted), emit `entry_price: null` and `entry_range:
-  null`. Never produce a fake entry number under bull-side inverted
-  scenario ordering.
+- **Case 4 (bull-side inverted) is mandatory null.** When
+  `bull_scenario_price.price ≤ current_price_used`, the structured
+  fields MUST satisfy:
+    `entry_price`          = null
+    `entry_range`          = null
+    `recommendation`       = `watch` (or `pass` if business merit is
+                              also weak per Step 5's pass criteria)
+  Never produce a numeric `entry_price` or `entry_range` under
+  bull-side inversion, regardless of how strong the business-merit
+  case is. The bull's own scenario does not project upside; no entry
+  price can satisfy the 2:1 favorable-ratio condition at any
+  current-price level. `moderate_conviction_enter` and
+  `strong_conviction_enter` are NOT valid under case 4 — the entry
+  math is incoherent and merit alone cannot rescue it. Prose-vs-JSON
+  disagreement on the null requirement is a disqualifying
+  inconsistency. If your rationale identifies case 4, the structured
+  `entry_price` and `entry_range` MUST be null — no exceptions.
 - If either analyst's `scenario_price.mechanism` is generic or
   ungrounded, state the integrity failure in `entry_price_rationale`
   and either widen the band or downgrade the recommendation to `watch`.
