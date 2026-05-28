@@ -70,7 +70,7 @@
     "outcome": {
       "type": "string",
       "enum": ["bull_prevails", "bear_prevails", "balanced", "inconclusive"],
-      "description": "bull_prevails: net_adj > +8. bear_prevails: net_adj < -8. inconclusive: analysts >15 pts apart with small net. balanced: otherwise."
+      "description": "bull_prevails: provisional_net > +3.5. bear_prevails: provisional_net < -3.5. inconclusive: |bull_adj - bear_adj| > 12 with |provisional_net| <= 3.5. balanced: otherwise."
     },
 
     "original_conviction":     { "type": "string", "description": "Layer 4 conviction, passed through for traceability." },
@@ -83,11 +83,12 @@
         "contention_count":     { "type": "integer" },
         "critical_contentions": { "type": "integer" },
         "material_contentions": { "type": "integer" },
-        "bull_evidence_cited":  { "type": "integer" },
-        "bear_evidence_cited":  { "type": "integer" },
-        "bull_contested":       { "type": "integer" },
-        "bear_contested":       { "type": "integer" },
-        "raised_risks_count":   { "type": "integer" }
+        "bull_evidence_cited":     { "type": "integer" },
+        "bear_evidence_cited":     { "type": "integer" },
+        "bull_contested":          { "type": "integer" },
+        "bear_contested":          { "type": "integer" },
+        "raised_risks_count":      { "type": "integer", "description": "Bear's raised_risks count." },
+        "raised_strengths_count":  { "type": "integer", "description": "Bull's raised_strengths count." }
       }
     }
   },
@@ -117,8 +118,29 @@
           "description": "evidence_ids from the opposing case being actively disputed"
         },
         "raised_risks": {
-          "type": "array", "items": { "type": "string" },
-          "description": "New risk descriptions not present in the original EvidencePacket"
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["risk", "grounding"],
+            "properties": {
+              "risk":      { "type": "string", "description": "Specific risk not in the original EvidencePacket." },
+              "grounding": { "type": "string", "description": "EV-ID, disclosed-fact reference, or labeled inference. Ungrounded entries are DEFEATED by the bull rebuttal." }
+            }
+          },
+          "description": "Bear lane — risks the bear surfaces beyond the packet."
+        },
+        "raised_strengths": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["strength", "grounding"],
+            "properties": {
+              "strength":  { "type": "string", "description": "Specific positive factor not already weighted in supporting_evidence." },
+              "grounding": { "type": "string", "description": "EV-ID, disclosed-fact reference, or labeled inference. Ungrounded entries are DEFEATED by the bear rebuttal." }
+            }
+          },
+          "description": "Bull lane — strengths the bull surfaces beyond the packet. Bear leaves this empty.",
+          "default": []
         },
         "score_adjustment": {
           "type": "number", "minimum": -15, "maximum": 15,

@@ -26,8 +26,9 @@ full recitation of evidence.
 
 ### Step 1 — Classify Every Bear Argument
 
-Go through each of the bear's `key_arguments` and `raised_risks`. For
-each one, assign exactly one of three classifications:
+Go through each of the bear's `key_arguments` and each entry in their
+`raised_risks` (each is an object with `risk` and `grounding` fields).
+For each one, assign exactly one of three classifications:
 
 **DEFEATED** — The argument contains a factual error, misreads the
 evidence, or you can cite evidence that directly contradicts it. State
@@ -45,6 +46,38 @@ score_adjustment than Round 1.
 Calling an argument DEFEATED when it is merely WEAKENED or ACKNOWLEDGED
 is the rebuttal equivalent of ignoring must_address_evidence in Round 1.
 The Chief Analyst will notice.
+
+### Grounding check for `raised_risks`
+
+Each `raised_risk` carries a `grounding` field that should cite an EV-ID,
+a disclosed analyst-brief fact, or a labeled inference from disclosed
+facts. Apply a specific grounding test before judging the substance:
+
+Grounding that is **generic** (e.g. "market dynamics," "industry trends,"
+"macro backdrop"), **self-referential** (e.g. citing the analyst's own
+confidence rather than evidence), or **chains to unfalsifiable claims**
+should be classified DEFEATED for failure to ground. The grounding test
+is whether a specific, traceable disclosed fact supports the item — not
+whether the inferential language sounds plausible.
+
+Admissible grounding example:
+- raised_risk: "Tariff-driven negative price-cost reversal."
+  grounding: "EV-014 + Inference from: scoring_baseline shows tariff
+  classified as 'major' thesis-invalidation condition in monitoring
+  status."
+  → traceable to specific items; engage on substance.
+
+Inadmissible grounding example:
+- raised_risk: "AI demand may peak."
+  grounding: "Inference from: general capex cycle dynamics in the
+  sector."
+  → no specific disclosed fact cited; "general capex cycle dynamics"
+  is unfalsifiable and not in the packet. Classify DEFEATED for
+  failure to ground.
+
+A bear that produces a grounded raised_risk you cannot refute is
+landing real damage; a bear that produces an ungrounded one is not.
+Do not treat ornamented prose as grounding.
 
 ### Step 2 — Reinforce Your Strongest Round 1 Points
 
@@ -88,6 +121,26 @@ maintain your Round 1 level (capped at +10).
 The purpose of this constraint: an analyst who raises their conviction
 after adversarial challenge is not engaging with the challenge — they are
 confirming prior bias.
+
+### Round 2 Rubric (capped at +10)
+
+Within the down-only constraint, place yourself in the same tier
+framework as Round 1, but capped at the Round 2 maximum of +10:
+
+- **Tier 1 — Aligned (0)**: The bear has shifted the equilibrium. The
+  case still holds but with no premium beyond Layer 4 alone.
+- **Tier 2 — Marginal (+1 to +2)**: Bear arguments largely landed; only
+  marginal bull premium survives.
+- **Tier 3 — Modest (+3 to +5)**: Most bear arguments were weakened,
+  some defeated; bull premium reduced from Round 1 but still real.
+- **Tier 4 — Strong (+6 to +8)**: Most bear arguments defeated or only
+  modestly weakened; bull premium close to Round 1.
+- **Tier 5 — Held (+9 to +10)**: All material bear arguments defeated;
+  bull premium fully held at the Round 2 ceiling.
+
+The down-only rule still binds: your Round 2 tier cannot exceed your
+Round 1 tier (e.g. if Round 1 was Tier 4 at +8, Round 2 cannot be Tier
+5 at +10). Conviction does not grow when it has been challenged.
 
 ---
 

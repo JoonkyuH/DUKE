@@ -89,8 +89,14 @@ def build_bull_brief(packet: dict, scoring: dict) -> dict:
             "key_arguments":         ["<argument 1>", "<argument 2>", "<argument 3>"],
             "evidence_cited":        ["<evidence_id>", "..."],
             "contested_items":       ["<bear evidence_id you dispute>", "..."],
+            "raised_strengths":      [
+                {
+                    "strength":  "<specific positive factor not already weighted in supporting_evidence>",
+                    "grounding": "<EV-ID, disclosed-fact reference, or 'Inference from: ...'>",
+                },
+            ],
             "raised_risks":          [],
-            "score_adjustment":      "<float in [-15, +15]>",
+            "score_adjustment":      "<float in [-15, +15] — see Score Adjustment Rubric>",
             "confidence_adjustment": "<float in [-10, +10]>",
         },
     }
@@ -165,8 +171,13 @@ def build_bear_brief(packet: dict, scoring: dict) -> dict:
             "key_arguments":         ["<argument 1>", "<argument 2>", "<argument 3>"],
             "evidence_cited":        ["<bear evidence_id>", "..."],
             "contested_items":       ["<bull evidence_id you dispute>", "..."],
-            "raised_risks":          ["<new risk not in original packet>"],
-            "score_adjustment":      "<float in [-15, +15]>",
+            "raised_risks":          [
+                {
+                    "risk":      "<specific new risk not in original packet>",
+                    "grounding": "<EV-ID, disclosed-fact reference, or 'Inference from: ...'>",
+                },
+            ],
+            "score_adjustment":      "<float in [-15, +15] — see Score Adjustment Rubric>",
             "confidence_adjustment": "<float in [-10, +10]>",
         },
     }

@@ -53,6 +53,58 @@ any structural concession explicitly — adjusting your `score_adjustment`
 accordingly. An internally inconsistent rebuttal that concedes the
 foundation but maintains the superstructure is inadmissible.
 
+### Step 1B — Respond to the Bull's Raised Strengths
+
+The bull may have surfaced positive factors not in the original packet
+under `raised_strengths`, each carrying a `grounding` field. Go through
+each entry and classify it:
+
+**DEFEATED** — The bull's grounding is absent, generic, or does not
+support the strength claimed. Or the strength is contradicted by other
+packet evidence. State specifically what is wrong with the grounding or
+the inferential chain.
+
+**WEAKENED** — The strength is partially supported by its grounding but
+the bull has overstated its implication. Explain what the strength
+actually establishes (which is less than the bull claims) and why.
+
+**CONCEDED** — The strength is genuinely grounded and material. The
+bear case must absorb it. State explicitly that the strength stands and
+how it affects (if at all) your score_adjustment.
+
+A `raised_strength` with empty or non-grounded `grounding` defaults to
+DEFEATED for failure to ground.
+
+#### Grounding check for `raised_strengths`
+
+Apply a specific grounding test before judging the substance of any
+raised_strength:
+
+Grounding that is **generic** (e.g. "market dynamics," "industry trends,"
+"macro backdrop"), **self-referential** (e.g. citing the analyst's own
+confidence rather than evidence), or **chains to unfalsifiable claims**
+should be classified DEFEATED for failure to ground. The grounding test
+is whether a specific, traceable disclosed fact supports the item — not
+whether the inferential language sounds plausible.
+
+Admissible grounding example:
+- raised_strength: "Capacity expansion announced (EV-010) implies
+  demand visibility beyond the 12-18 month firm backlog window."
+  grounding: "EV-010 + Inference from: backlog conversion math in
+  EV-011."
+  → traceable to specific items; engage on substance.
+
+Inadmissible grounding example:
+- raised_strength: "Management appears highly confident in long-term
+  trajectory."
+  grounding: "Inference from: tone of earnings call commentary."
+  → no specific EV-ID cited; "tone of commentary" is self-referential
+  rather than evidence. Classify DEFEATED for failure to ground.
+
+A bull that produces a grounded raised_strength you cannot refute is
+landing real damage on your case; a bull that produces an ungrounded
+one is not. Do not treat ornamented prose as grounding.
+
 ### Step 2 — Challenge the Bull's Strongest Unrebutted Arguments
 
 The bull will identify arguments they believe you did not challenge. For
@@ -102,6 +154,27 @@ The purpose of this constraint: a bear analyst who becomes more bearish
 after a strong bull rebuttal is not engaging with the arguments — they are
 confirming prior bias in the opposite direction.
 
+### Round 2 Rubric (floor at −10)
+
+Within the down-only constraint, place yourself in the same tier
+framework as Round 1, but capped at the Round 2 floor of −10:
+
+- **Tier 1 — Aligned (0)**: The bull has fully addressed the bear case.
+  The thesis-against-entry no longer carries a premium beyond Layer 4.
+- **Tier 2 — Marginal (−1 to −2)**: Most bear arguments were defeated
+  or strongly weakened; only a marginal bear discount remains.
+- **Tier 3 — Modest (−3 to −5)**: Most bear arguments were weakened,
+  some defeated; bear discount reduced from Round 1 but still real.
+- **Tier 4 — Strong (−6 to −8)**: Most bear arguments survived rebuttal
+  or were only modestly weakened; bear discount close to Round 1.
+- **Tier 5 — Held (−9 to −10)**: All material bull responses were
+  defeated; bear discount fully held at the Round 2 floor.
+
+The down-only rule still binds: your Round 2 tier cannot be more
+negative than your Round 1 tier (e.g. if Round 1 was Tier 4 at −7,
+Round 2 cannot be Tier 5 at −10). Conviction does not deepen when it
+has been challenged.
+
 ---
 
 ## Output Format
@@ -118,6 +191,14 @@ Return a valid JSON object. No prose outside the JSON.
       "bull_response_summary": "<brief summary of what the bull argued in response>",
       "classification": "DEFEATED | WEAKENED | CONCEDED",
       "rebuttal": "For DEFEATED: cite the specific error in the bull's response. For WEAKENED: explain why the risk persists at reduced magnitude. For CONCEDED: state what you concede and whether it propagates to other legs of your case."
+    }
+  ],
+  "strength_responses": [
+    {
+      "bull_strength": "<verbatim or close paraphrase of the bull's raised_strength>",
+      "bull_grounding": "<the bull's stated grounding for it>",
+      "classification": "DEFEATED | WEAKENED | CONCEDED",
+      "rebuttal": "For DEFEATED: cite the grounding failure or contradicting evidence. For WEAKENED: explain what the strength actually establishes (less than the bull claimed). For CONCEDED: state what is conceded and how it affects the bear case."
     }
   ],
   "unrebutted_bull_argument_challenges": [
@@ -146,6 +227,8 @@ Return a valid JSON object. No prose outside the JSON.
 
 - Every bull `bear_evidence_response` must appear in `bull_response_reviews`.
   Missing one is a disqualifying omission.
+- Every entry in the bull's `raised_strengths` must appear in
+  `strength_responses`. Missing one is a disqualifying omission.
 - `valuation_defense` is mandatory.
 - `concession_propagation` is mandatory — "none" is a valid answer, but it
   must be stated.

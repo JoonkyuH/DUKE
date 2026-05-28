@@ -12,9 +12,9 @@ side then receives greater weight in the final net adjustment:
   BALANCED / INCONCLUSIVE → 50/50
 
 Outcome rules (evaluated in order):
-  BULL_PREVAILS:  provisional_net > +8
-  BEAR_PREVAILS:  provisional_net < -8
-  INCONCLUSIVE:   |bull_adj - bear_adj| > 15 AND |provisional_net| <= 8
+  BULL_PREVAILS:  provisional_net > +3.5
+  BEAR_PREVAILS:  provisional_net < -3.5
+  INCONCLUSIVE:   |bull_adj - bear_adj| > 12 AND |provisional_net| <= 3.5
                   (large disagreement, unresolved by averaging)
   BALANCED:       everything else
 """
@@ -22,10 +22,10 @@ Outcome rules (evaluated in order):
 from debate_types import DebateOutcome
 
 
-SCORE_ADJ_MAX     = 15.0   # Absolute bound for score adjustments
-CONF_ADJ_MAX      = 10.0   # Absolute bound for confidence adjustments
-PREVAIL_THRESHOLD =  8.0   # Net movement above this = one side prevailed
-INCONCLUSIVE_GAP  = 15.0   # Analyst disagreement gap above which debate is inconclusive
+SCORE_ADJ_MAX     = 15.0   # Absolute bound for score adjustments (unchanged)
+CONF_ADJ_MAX      = 10.0   # Absolute bound for confidence adjustments (unchanged)
+PREVAIL_THRESHOLD =  3.5   # Net movement above this = one side prevailed
+INCONCLUSIVE_GAP  = 12.0   # Analyst disagreement gap above which debate is inconclusive
 
 _PREVAIL_WEIGHTS = {
     DebateOutcome.BULL_PREVAILS: (0.70, 0.30),

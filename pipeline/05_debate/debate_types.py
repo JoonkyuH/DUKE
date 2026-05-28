@@ -34,16 +34,24 @@ class AnalystPosition:
     """
     Structured output from a Bull or Bear analyst role.
     Produced by the AI analyst after receiving their brief from position_builder.py.
+
+    raised_risks and raised_strengths are parallel lanes:
+      - bear surfaces risks not in the packet under raised_risks
+      - bull surfaces strengths not weighted in the packet under raised_strengths
+    Each entry is a dict {"risk"|"strength": str, "grounding": str}. Grounding
+    must cite EV-ID, a disclosed analyst-brief fact, or a labeled inference;
+    ungrounded entries are DEFEATED by the opposing rebuttal.
     """
     analyst_role:          AnalystRole
     summary:               str          # 3–5 sentence case
     key_arguments:         List[str]    # Top 3–5 one-sentence arguments
     evidence_cited:        List[str]    # evidence_ids from the EvidencePacket supporting this case
     contested_items:       List[str]    # evidence_ids from the opposing case being disputed
-    raised_risks:          List[str]    # New risks not in the original packet
+    raised_risks:          List[dict]   # Bear lane — [{"risk": str, "grounding": str}]
     score_adjustment:      float        # Recommended adjustment to evidence_score  [-15, +15]
     confidence_adjustment: float        # Recommended adjustment to confidence_score [-10, +10]
     learning_hooks:        List[Any]    = field(default_factory=list)  # Falsifiable predictions; checked at 90/180/365 days
+    raised_strengths:      List[dict]   = field(default_factory=list)  # Bull lane — [{"strength": str, "grounding": str}]
 
 
 @dataclass

@@ -102,7 +102,8 @@ def record_debate(
             "bear_evidence_cited":  len(bear.evidence_cited),
             "bull_contested":       len(bull.contested_items),
             "bear_contested":       len(bear.contested_items),
-            "raised_risks_count":   len(bull.raised_risks) + len(bear.raised_risks),
+            "raised_risks_count":      len(bear.raised_risks),
+            "raised_strengths_count":  len(bull.raised_strengths),
             "evidence_score_note":  scoring.get("evidence_score_note", ""),
             "confidence_score_note": scoring.get("confidence_score_note", ""),
         },
@@ -110,7 +111,11 @@ def record_debate(
 
 
 def _parse_position(pos: dict, role: AnalystRole) -> AnalystPosition:
-    """Parse a raw analyst position dict into an AnalystPosition, with safe defaults."""
+    """Parse a raw analyst position dict into an AnalystPosition, with safe defaults.
+
+    raised_risks and raised_strengths are expected as List[{"risk"|"strength": str,
+    "grounding": str}]. Hard-cut to the new shape — no legacy string-list shim.
+    """
     return AnalystPosition(
         analyst_role=role,
         summary=str(pos.get("summary", "")),
@@ -118,6 +123,7 @@ def _parse_position(pos: dict, role: AnalystRole) -> AnalystPosition:
         evidence_cited=list(pos.get("evidence_cited", [])),
         contested_items=list(pos.get("contested_items", [])),
         raised_risks=list(pos.get("raised_risks", [])),
+        raised_strengths=list(pos.get("raised_strengths", [])),
         score_adjustment=float(pos.get("score_adjustment", 0.0)),
         confidence_adjustment=float(pos.get("confidence_adjustment", 0.0)),
         learning_hooks=list(pos.get("learning_hooks", [])),
