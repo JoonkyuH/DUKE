@@ -25,6 +25,7 @@ import glob
 import json
 import os
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 # ── path setup so stage-internal imports resolve ──────────────────────────────
@@ -34,7 +35,7 @@ sys.path.insert(0, str(_THIS_DIR))
 sys.path.insert(0, str(_REPO_ROOT))
 
 from position_builder import build_bull_brief, build_bear_brief  # noqa: E402
-from debate_recorder import record_debate                         # noqa: E402
+from debate_recorder import record_debate, _make_debate_id        # noqa: E402
 from common.brief_adapter import build_evidence_packet           # noqa: E402
 
 try:
@@ -43,7 +44,7 @@ except ImportError:
     sys.exit("anthropic SDK not installed — run: pip install anthropic")
 
 _MODEL          = "claude-sonnet-4-6"
-_MAX_TOKENS     = 4096   # Round 1: bull/bear independent positions
+_MAX_TOKENS     = 16384  # Round 1: bull/bear independent positions (raised from 4096 — Path B prompt expansion pushed responses past the prior cap, causing silent truncation→parse-fail)
 _MAX_TOKENS_R2  = 16384  # Round 2: rebuttals must respond to every opposing argument
 _REPO_ROOT  = _THIS_DIR.parent.parent   # pipeline/05_debate/../../ = repo root
 
@@ -136,19 +137,27 @@ def _call_analyst(
     label: str,
     max_tokens: int = _MAX_TOKENS,
 ) -> dict:
+    """
+    Round 1 analyst call. Retries once on JSON parse failure (mirrors
+    _call_rebuttal_analyst). On persistent failure, returns a sentinel dict
+    with position_parse_failed=True and NO score_adjustment / confidence_adjustment
+    keys — so downstream callers cannot mistake a parse error for a real "no
+    change" score of 0.0. The Round 1 driver in main() detects this flag and
+    writes a debate record marked debate_invalid with outcome=not_computable.
+    """
     parsed, raw = _invoke_llm(client, system_prompt, brief, label, max_tokens)
     if parsed is not None:
         return parsed
+    print(f"  {label} parse failed — retrying once...")
+    parsed, raw = _invoke_llm(client, system_prompt, brief, f"{label} (retry)", max_tokens)
+    if parsed is not None:
+        return parsed
+    print(f"  ERROR: {label} parse failed on both attempts — flagging position as missing")
     return {
         "analyst_role":          label.lower().split()[0],
-        "summary":               raw[:500],
-        "key_arguments":         [],
-        "evidence_cited":        [],
-        "contested_items":       [],
-        "raised_risks":          [],
-        "learning_hooks":        [],
-        "score_adjustment":      0.0,
-        "confidence_adjustment": 0.0,
+        "position_parse_failed": True,
+        "parse_failure_reason":  "JSON parse failed on initial call and retry",
+        "raw_text_preview":      raw[:500],
     }
 
 
@@ -267,6 +276,61 @@ def main() -> None:
 
     bull_pos = _call_analyst(client, bull_system, bull_brief, "Bull Analyst")
     bear_pos = _call_analyst(client, bear_system, bear_brief, "Bear Analyst")
+
+    # ── R1 parse-failure short-circuit ────────────────────────────────────────
+    # If either Round 1 position failed to parse (after retry), the debate
+    # cannot be scored. Fabricating 0.0 would let a parse error flow through as
+    # a misleading "balanced" outcome (the failure mode that hit VRT in the
+    # Path B validation run). Instead, write a debate record marked
+    # debate_invalid with outcome=not_computable, pass Stage 04 baseline scores
+    # through unchanged, and skip Round 2 (rebuttals against empty positions
+    # are vacuous).
+    bull_r1_failed = bool(bull_pos.get("position_parse_failed"))
+    bear_r1_failed = bool(bear_pos.get("position_parse_failed"))
+
+    if bull_r1_failed or bear_r1_failed:
+        print(
+            f"\n  ERROR: Round 1 parse failed — "
+            f"bull={bull_r1_failed} bear={bear_r1_failed}"
+        )
+        print("         Debate cannot be scored; writing not_computable record and skipping Round 2.")
+        base_ev = round(float(scoring.get("evidence_score", 0.0)),   1)
+        base_cf = round(float(scoring.get("confidence_score", 0.0)), 1)
+        debate_dict = {
+            "debate_id":                 _make_debate_id(args.ticker),
+            "score_reference":           scoring.get("score_id", ""),
+            "packet_reference":          packet.get("packet_id", ""),
+            "ticker":                    args.ticker,
+            "company_name":              packet.get("company_name", ""),
+            "debated_at":                datetime.now(timezone.utc).isoformat(),
+            "bull_position":             bull_pos,
+            "bear_position":             bear_pos,
+            "contentions":               [],
+            "base_evidence_score":       base_ev,
+            "base_confidence_score":     base_cf,
+            # Pass Stage 04 baseline through unchanged — no debate adjustment was computed.
+            "debate_evidence_score":     base_ev,
+            "debate_confidence_score":   base_cf,
+            "net_score_adjustment":      0.0,
+            "outcome":                   "not_computable",
+            "original_conviction":       scoring.get("conviction", ""),
+            "original_recommendation":   scoring.get("recommendation", ""),
+            "debate_invalid":            True,
+            "metadata": {
+                "round_1_bull_parse_failed": bull_r1_failed,
+                "round_1_bear_parse_failed": bear_r1_failed,
+                "round_2_complete":          False,
+                "reason": (
+                    "Round 1 JSON parse failed after retry; debate not computable. "
+                    "Stage 04 baseline scores are passed through unchanged."
+                ),
+            },
+        }
+        date_tag = scoring.get("scored_at", "")[:10].replace("-", "") or args.date or "unknown"
+        out_path = _write_debate(debate_dict, args.ticker, date_tag)
+        print(f"\n  written: {out_path.relative_to(_REPO_ROOT)}")
+        print("  ⚠ DEBATE INVALID — outcome=not_computable, scores unchanged from Stage 04")
+        return
 
     # ── Record debate ─────────────────────────────────────────────────────────
     debate_record = record_debate(packet, scoring, bull_pos, bear_pos)

@@ -69,8 +69,8 @@
 
     "outcome": {
       "type": "string",
-      "enum": ["bull_prevails", "bear_prevails", "balanced", "inconclusive"],
-      "description": "bull_prevails: provisional_net > +3.5. bear_prevails: provisional_net < -3.5. inconclusive: |bull_adj - bear_adj| > 12 with |provisional_net| <= 3.5. balanced: otherwise."
+      "enum": ["bull_prevails", "bear_prevails", "balanced", "inconclusive", "not_computable"],
+      "description": "bull_prevails: provisional_net > +3.5. bear_prevails: provisional_net < -3.5. inconclusive: |bull_adj - bear_adj| > 12 with |provisional_net| <= 3.5. balanced: otherwise. not_computable: a Round 1 position failed to parse after retry; baseline scores are passed through and debate_invalid is set."
     },
 
     "original_conviction":     { "type": "string", "description": "Layer 4 conviction, passed through for traceability." },
