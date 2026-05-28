@@ -151,34 +151,85 @@ generates three structured fields:
   uncertainties (1-3 items)
 Prompt: pipeline/03_evidence_processing/prompts/synthesis.md
 
-### Stage 05/06 Evidence Slices
-Risk Officer receives filtered evidence:
-  management quotes: risk/guidance/tone, HIGH/MEDIUM
-  filing quotes: risk_factors + MD&A sections
-  all external bear evidence
-  all external bull evidence
-  output: evidence_verification field
+### Stage 05/06 Architecture B (40c366f — UNVALIDATED)
+Division of labor: Stage 05 debate scores business
+merit only. Stage 06 Chief Analyst adjudicates
+valuation separately.
 
-Chief Analyst receives full compressed set:
-  all 8 management quotes
-  all 8 filing quotes
-  all 4 external bull
-  all 4 external bear
-  output: evidence_challenge field
+Stage 05 = business merit
+  Bull: upside / quality case (ecosystem, moat,
+        margins, FCF, growth durability).
+        NO valuation discussion.
+  Bear: fundamental-risk case (execution misses,
+        moat erosion, concentration, growth
+        durability). NO valuation_challenge.
+  Both: emit a grounded scenario_price
+        {price, mechanism, grounding} — price if
+        their case plays out. Mechanism must cite
+        disclosed inputs (guided EPS × multiple,
+        intrinsic-value math, deceleration ×
+        compression). R1-only; rebuttals do not
+        emit or revise scenario_price.
+
+Stage 06 = valuation adjudicator
+  Risk Officer receives filtered evidence:
+    management quotes: risk/guidance/tone, HIGH/MEDIUM
+    filing quotes: risk_factors + MD&A sections
+    all external bear evidence
+    all external bull evidence
+    output: evidence_verification field
+
+  Chief Analyst receives full compressed set:
+    all 8 management quotes
+    all 8 filing quotes
+    all 4 external bull
+    all 4 external bear
+    output: evidence_challenge field
+
+  Chief Analyst additionally adjudicates entry price:
+    Reads bull_scenario_price + bear_scenario_price
+    + current_price (from market_technical_context).
+    Computes up/down = (bull_scenario − current) /
+    (current − bear_scenario).
+    Threshold: fixed 2:1. Entry acceptable when
+    up/down ≥ 2.0.
+    Three output cases:
+      (1) Normal ordering, ratio ≥ 2.0:
+            entry_price = current_price
+            entry_range = [current, (bull+2×bear)/3]
+      (2) Normal ordering, ratio < 2.0:
+            entry_price = (bull + 2×bear) / 3
+            entry_range = [entry×0.97, entry×1.03]
+            recommend watch
+      (3) Inverted (bull_scenario ≤ current):
+            entry_price = null
+            entry_range = null
+            state inversion in rationale
+            NEVER produce a fake entry number
+            under inversion.
+    Emits: entry_price, entry_range,
+           entry_price_rationale, current_price_used.
+    Surfaced to journal top-level.
 
 Stage 05 runs two rounds:
-  Round 1: Bull and Bear independent positions
-    (max_tokens=4096 each)
-  Round 2: Cross-feed rebuttals (activated)
-    Bull gets bear R1; Bear gets bull R1
+  Round 1: Bull and Bear independent business-merit
+    positions (max_tokens=16384 each — raised from
+    4096 in 7b33f34 for Path B prompt expansion).
+  Round 2: Cross-feed rebuttals (activated 6d215ee).
+    Bull gets bear R1; Bear gets bull R1.
     max_tokens=16384 — rebuttals must respond
-    to every opposing argument
+    to every opposing argument.
     Down-only clamp enforced in code:
       bull R2 score ≤ bull R1 score
       bear R2 score ≥ bear R1 score (less negative)
-    Both clamped to [-10, +10]
-    R2 adjustments are informational only;
-    debate scores computed from R1 only.
+    Both clamped to [-10, +10].
+    R2 adjustments are informational only; debate
+    scores computed from R1 only.
+  Outcome classifier on R1 net adjustment:
+    PREVAIL_THRESHOLD = 3.5, INCONCLUSIVE_GAP = 12.0.
+    Outcomes now mean "does the BUSINESS-MERIT
+    picture lean bull or bear" — valuation no longer
+    enters the classifier.
 
 ### Two-Score Distinction (Stage 05 vs Stage 06)
 Stage 05 produces mechanical evidence_score and
@@ -188,9 +239,10 @@ Chief Analyst produces its own final_evidence_score
 and final_confidence_score — these are reasoned
 narrative numbers that reflect the full synthesis
 (debate outcome, risk officer flags, contention
-adjudications, philosophy fit). The two sets
-deliberately differ. The Chief Analyst's scores are
-the ones reflecting full synthesis and are used in
+adjudications, philosophy fit). Stage 06 also emits
+entry_price / entry_range / entry_price_rationale /
+current_price_used (Architecture B). The Chief
+Analyst's scores plus entry-price band are used in
 Stage 07 and the journal record. Stage 05 scores
 are preserved in the debate record for traceability.
 
@@ -244,12 +296,14 @@ Requires two consecutive Stage 02 runs on the same
 ticker — first run populates transcript_cache; second
 run diffs against it and produces contradictions.
 
-Test-run debate outcomes: all four test-run syntheses
-(CRM, NVDA, PODD, APH — 2026-05-26) resolved
-"balanced". May indicate debate scoring is
-systematically underpowered or that high-quality S&P
-500 names genuinely produce ambiguous evidence.
-Worth reviewing after 10+ ticker runs.
+Architecture B (40c366f) — UNVALIDATED end-to-end.
+Debate now scores business merit only; Chief Analyst
+adjudicates entry price via 2:1 risk/reward band on
+scenario prices. The discrimination thread (Path B
+4478857 → Path B.2 b1404d5 → Architecture B 40c366f)
+absorbed the earlier "test-run debates all resolved
+balanced" concern; b1404d5 is not separately
+validated. Re-run pending.
 
 Stage 04 fundamentals wiring deferred to V2: signal
 thresholds and economic profiles are live, but forward
@@ -265,6 +319,38 @@ commodity_cyclical.
 
 DUKE-16: Multi-period trend analysis
 DUKE-19: TAM share-gain and ROIC signals
+
+DCF valuation anchor (V2, data-blocked): intrinsic-
+value entry price via discounted cash flow. Requires
+multi-year cash-flow projections DUKE does not
+generate plus a paid fundamentals feed (previously
+declined). Future option pending data.
+
+Reverse-DCF / expectations anchor (V2, data-blocked):
+compute the growth/margin trajectory implied by
+current price and judge achievability. Best-fit for
+priced-for-perfection names. Same data dependency
+as DCF anchor.
+
+yfinance plumbing + multiple-check panel: Architecture
+B currently anchors entry price on the screening
+raw file's current_price (potentially days old).
+Follow-up adds yfinance daily refresh plus a
+trailing/forward P/E + peer-multiple panel for the
+Chief Analyst to sanity-check the analysts' scenario
+multiples. Required before V2 valuation anchors
+become useful.
+
+Thread debate_invalid to journal top-level: when
+Round 1 parse-failure produces outcome="not_computable"
+(7b33f34), the flag lives in the source debate file
+and chief_analyst_output.metadata.debate_outcome_used
+but not at journal top level. A casual reader sees a
+plausible watch recommendation without the
+failure-mode signal. Minimal one-line fix in
+decision_capture._build_record, parallel to the
+philosophy_fit_notes / entry_price patterns.
+Cosmetic; safety net itself works.
 
 ### Do last
 DUKE-17: Master orchestrator duke.py

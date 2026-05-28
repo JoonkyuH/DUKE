@@ -18,8 +18,8 @@ trading bot and does not execute orders.
 | 02 — Research | `pipeline/02_research/` | Acquires earnings transcripts, SEC filings, and external evidence for a single ticker; extracts and validates structured quotes | `data/raw/{TICKER}_evidence_{date}.json` |
 | 03 — Refinery | `pipeline/03_evidence_processing/` | Compresses raw evidence into a ranked analyst brief; generates catalyst map, thesis-invalidation conditions, and uncertainties | `data/processed/{TICKER}_analyst_brief_{date}.json` |
 | 04 — Scoring | `pipeline/04_scoring/` | Computes Directional Thesis Score (DTS), Risk Burden Score (RBS), and confidence score from the analyst brief | `data/scored/{TICKER}_score_{date}.json` |
-| 05 — Debate | `pipeline/05_debate/` | Bull and Bear analysts build independent positions (Round 1), then respond to each other (Round 2); produces contentions, debate-adjusted scores, and an outcome | `data/debate/{TICKER}_debate_{date}.json` |
-| 06 — Synthesis | `pipeline/06_synthesis/` | Risk Officer reviews for blocking issues; Chief Analyst synthesizes the full debate record into a final recommendation with adjudicated contentions | `data/synthesis/{TICKER}_synthesis_{date}.json` |
+| 05 — Debate | `pipeline/05_debate/` | Bull and Bear analysts build independent business-merit positions (Round 1) and respond to each other (Round 2). Each emits a grounded `scenario_price` (per-share price if their case plays out). Produces contentions, business-merit-only debate scores, and an outcome | `data/debate/{TICKER}_debate_{date}.json` |
+| 06 — Synthesis | `pipeline/06_synthesis/` | Risk Officer reviews for blocking issues; Chief Analyst synthesizes the business-merit verdict into a final recommendation with adjudicated contentions, and separately adjudicates valuation — computing an entry price band from `current_price` plus both analysts' scenario prices using a 2:1 risk/reward threshold | `data/synthesis/{TICKER}_synthesis_{date}.json` |
 | 07 — Output | `pipeline/07_output/` | Displays the formatted recommendation and sizing guidance; prompts for investor decision inputs; writes the decision record | `data/journal/DEC-{TICKER}-{YYYYMMDD}.json` |
 
 ---

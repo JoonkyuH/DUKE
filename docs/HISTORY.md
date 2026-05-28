@@ -198,9 +198,70 @@ Three related fixes in one commit:
    the debate record for traceability. This distinction is now documented in
    CLAUDE.md.
 
+**40c366f** — `feat: Architecture B — debate scores business merit only, valuation moves to Chief Analyst entry-price adjudication`
+**UNVALIDATED.** Restructures the Stage 05 / Stage 06 division of labor. The
+prior design had the debate carry a hybrid mandate — bull defended valuation,
+bear's mandatory `valuation_challenge` could elevate its tier to 4 on
+valuation alone (Tier 4 path c). An empirical discrimination test (CRM/PTC at
+DTS +82.6/+80.9 alongside four tickers at DTS 63–82) found five of six bulls
+clustering at exactly +3.0 regardless of evidence strength. Diagnosis: the
+bull was self-capped by the bear's mandatory valuation lane that the bull's
+tier ladder acknowledged but could not surmount.
+
+Architecture B:
+- Stage 05 debate = pure business merit. Bull argues upside / quality;
+  bear argues fundamental risk (execution, moat erosion, concentration,
+  growth durability). Neither analyst scores valuation. The bear's
+  `valuation_challenge` field is removed, along with Step 4 "Address
+  Valuation Explicitly" and Tier 4 path (c). The mandatory
+  `valuation_rebuttal` (bull R2) and `valuation_defense` (bear R2) are
+  also removed.
+- Each analyst emits a grounded `scenario_price` — `{price, mechanism,
+  grounding}` — representing where the stock goes if their business-merit
+  case plays out. Mechanism must cite disclosed inputs (guided EPS ×
+  multiple, intrinsic-value math, deceleration × compression). R1-only;
+  rebuttals do not emit or revise scenario_price. Same grounding
+  discipline as `raised_strengths` / `raised_risks`.
+- Stage 06 Chief Analyst = valuation adjudicator. Reads
+  `bull_scenario_price` + `bear_scenario_price` + `current_price`,
+  computes the up/down ratio at the current price, and emits an entry
+  price band using a fixed 2:1 favorable-ratio threshold. New journal
+  fields: `entry_price`, `entry_range`, `entry_price_rationale`,
+  `current_price_used`. Three output cases — in-band (entry = current),
+  above-band (solve for X), and inverted-ordering (bull_scenario ≤
+  current → entry = null; the solve-for-X formula does not apply under
+  inversion and would produce nonsense numbers, so emit null and state
+  the inversion in rationale).
+
+Absorbs the earlier discrimination-thread commits (4478857 Path B, b1404d5
+Path B.2). Those addressed rubric anchoring and opponent-decoupling but did
+not solve the valuation-asymmetry root cause; Architecture B does. Path B
+and Path B.2 are not separately validated.
+
+Score commensurability: bull and bear `score_adjustment` now measure the
+same thing — business-merit conviction beyond Layer 4 — on the same ±15
+scale with the same evidence-anchored rubric. `PREVAIL_THRESHOLD = 3.5`
+and `INCONCLUSIVE_GAP = 12.0` now mean "does the business-merit picture
+lean bull or bear", not "does the all-things-considered investability
+lean." Valuation is the Chief Analyst's separate downstream computation.
+
+Deep_value bull's Step 2 (Quantify the Discount to Intrinsic Value)
+preserved by design — that IS the bull case for deep_value and naturally
+becomes the mechanism producing scenario_price. Compounder /
+quality_compounder bull lose the "Valuation relative to growth/quality"
+paragraphs entirely.
+
+Scope guards: numeric tier ranges, ±15/±10 clamps, PREVAIL/INCONCLUSIVE
+thresholds, raised_strengths/raised_risks lanes, Q&A weighting, parser
+retry-then-flag, not_computable short-circuit, rebuttal down-only —
+all unchanged. No Stage 04 changes.
+
+Validation pending. The Chief Analyst's entry_price computation has
+never been exercised end-to-end against real scenario_price inputs.
+
 ---
 
-## Open Issues (as of 2026-05-26)
+## Open Issues (as of 2026-05-26; Architecture B re-scoped 2026-05-28)
 
 **Must fix before relying on shortlist**
 
@@ -222,10 +283,16 @@ Three related fixes in one commit:
   consecutive Stage 02 runs on the same ticker (first run populates
   transcript_cache; second run diffs against it and produces contradictions).
 
-- Test-run debate outcomes: all four test-run syntheses (CRM, NVDA, PODD, APH
-  — 2026-05-26) resolved "balanced". May indicate debate scoring is
+- ~~Test-run debate outcomes: all four test-run syntheses (CRM, NVDA, PODD,
+  APH — 2026-05-26) resolved "balanced". May indicate debate scoring is
   systematically underpowered or that high-quality S&P 500 names genuinely
-  produce ambiguous evidence. Worth reviewing after 10+ ticker runs.
+  produce ambiguous evidence. Worth reviewing after 10+ ticker runs.~~
+  **Superseded by Architecture B (40c366f).** The discrimination thread
+  (Path B 4478857 → Path B.2 b1404d5 → Architecture B 40c366f) absorbed
+  this concern. b1404d5 is not separately validated; its rubric changes
+  carried into Architecture B. Validation of business-merit
+  discrimination + the new entry-price adjudication is pending the next
+  re-run.
 
 - Stage 04 fundamentals wiring deferred to V2: signal thresholds and economic
   profiles are live, but forward guidance-vs-consensus comparison needs a
@@ -244,6 +311,36 @@ Three related fixes in one commit:
 
 - DUKE-16: Multi-period trend analysis
 - DUKE-19: TAM share-gain and ROIC signals
+
+- DCF valuation anchor (V2, data-blocked): intrinsic-value entry price via
+  discounted cash flow. Requires multi-year cash-flow projections DUKE does
+  not generate plus a paid fundamentals feed (previously declined). Future
+  option pending data.
+
+- Reverse-DCF / expectations anchor (V2, data-blocked): compute the
+  growth/margin trajectory implied by current price and judge achievability.
+  Best-fit for priced-for-perfection names. Same data dependency as DCF
+  valuation anchor.
+
+- yfinance plumbing + multiple-check panel: Architecture B's Chief Analyst
+  anchors entry price against `current_price` from the existing screening
+  raw file. The follow-up that was deliberately deferred from Architecture B
+  is a yfinance-backed daily-current-price refresh (so the Chief sees a
+  current price that isn't days old) plus a "multiple-check panel" that
+  reads trailing/forward P/E and peer-multiple distributions, giving the
+  Chief a sanity check on the analysts' scenario-price multiples. Required
+  before V2 valuation anchors (DCF, reverse-DCF) become useful.
+
+- Thread `debate_invalid` to journal top-level: when Round 1 parse-failure
+  produces an `outcome: "not_computable"` debate record (7b33f34), the
+  flag lives in the source debate file and in
+  `chief_analyst_output.metadata.debate_outcome_used` but does not appear
+  at the journal record's top level. A casual reader of the journal sees
+  a plausible-looking `watch` recommendation without the failure-mode
+  signal. Minimal fix: thread `debate_invalid` from the synthesis source
+  through `decision_capture._build_record`, parallel to the
+  `philosophy_fit_notes` / `entry_price` patterns. Cosmetic, not
+  load-bearing — the safety net itself works.
 
 **Do last**
 
