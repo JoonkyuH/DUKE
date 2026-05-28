@@ -239,6 +239,7 @@ def _build_record(
         "debate_outcome":            syn.get("debate_outcome"),
         "overall_risk_assessment":   syn.get("overall_risk_assessment"),
         "philosophy_fit":            ca.get("philosophy_fit"),
+        "philosophy_fit_notes":      ca.get("philosophy_fit_notes", ""),
         # screening_archetype = Stage 01 screened value; investment_archetype = Chief Analyst's confirmed value
         # Live field names: analyst_recommendation, investment_archetype, final_evidence_score,
         #   final_confidence_score, conviction_1_to_10 (not the shorthand versions of these names)

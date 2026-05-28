@@ -36,6 +36,7 @@
     "debate_outcome":          { "type": ["string", "null"] },
     "overall_risk_assessment": { "type": ["string", "null"] },
     "philosophy_fit":          { "type": ["string", "null"] },
+    "philosophy_fit_notes":    { "type": ["string", "null"], "description": "Rationale for philosophy_fit, especially used when the Chief Analyst reclassifies the screened archetype." },
     "investment_archetype":    { "type": ["string", "null"] },
     "executive_summary":       { "type": ["string", "null"] },
     "what_would_change_this":  { "type": ["string", "null"] },
