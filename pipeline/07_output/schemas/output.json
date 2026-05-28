@@ -39,11 +39,11 @@
     "philosophy_fit_notes":    { "type": ["string", "null"], "description": "Rationale for philosophy_fit, especially used when the Chief Analyst reclassifies the screened archetype." },
     "entry_price": {
       "type": ["number", "null"],
-      "description": "Chief Analyst's recommended single entry price per share (the price at which the up/down ratio meets the 2:1 threshold). Null if recommendation is 'blocked', scenario prices invalid, or bull_scenario ≤ current_price (inverted setup)."
+      "description": "Python-computed entry price per share (the price at which the modeled reward/risk meets the 2:1 threshold). Sourced from synthesis.computed_entry. Null if case_label is INVERTED or DEGENERATE, or if recommendation is 'blocked'."
     },
     "entry_range": {
       "type": ["object", "null"],
-      "description": "Acceptable entry band around entry_price. Null under the same conditions as entry_price.",
+      "description": "Python-computed acceptable entry band. {low, high} object. Null under the same conditions as entry_price.",
       "properties": {
         "low":  { "type": "number" },
         "high": { "type": "number" }
@@ -51,11 +51,32 @@
     },
     "entry_price_rationale": {
       "type": ["string", "null"],
-      "description": "Chief Analyst's rationale: current_price, both scenario prices, up/down ratio at current, and the output case applied (in-band / above-band with computed entry / inverted with null entry)."
+      "description": "Chief Analyst's rationale prose if present (referencing case_label, gate, and matrix outcome); otherwise the calculator's one-line rationale. Chief no longer restates the calculator's arithmetic."
     },
     "current_price_used": {
       "type": ["number", "null"],
-      "description": "Absolute current price the Chief Analyst anchored against, for auditability."
+      "description": "Absolute current price the calculator anchored against, sourced from price_data.current_price. For auditability."
+    },
+    "entry_price_case": {
+      "type": ["string", "null"],
+      "enum": ["IN_BAND", "ABOVE_BAND", "BELOW_BEAR", "INVERTED", "DEGENERATE", null],
+      "description": "Calculator case label. Drives the gate axis of the Chief's recommendation matrix."
+    },
+    "ratio_at_current": {
+      "type": ["number", "null"],
+      "description": "Reward/risk at current price: (bull_scenario - current) / (current - bear_scenario). Null when undefined (current at/outside the bear-bull interval)."
+    },
+    "price_gate_passed": {
+      "type": ["boolean", "null"],
+      "description": "Whether ratio_at_current ≥ archetype_min_rr. The price-discipline axis of the recommendation matrix. Null if archetype unrecognized or ratio undefined."
+    },
+    "archetype_min_rr": {
+      "type": ["number", "null"],
+      "description": "Minimum reward/risk at current price for the entry to clear the gate. deep_value 2.0, quality_compounder 1.5, long_term_compounder 1.2. Null if archetype unrecognized."
+    },
+    "target_2to1_price": {
+      "type": ["number", "null"],
+      "description": "The 2:1 reward/risk entry price X = (bull + 2*bear)/3. Reference number; the entry recommendation already accounts for this via case_label and entry_range."
     },
     "investment_archetype":    { "type": ["string", "null"] },
     "executive_summary":       { "type": ["string", "null"] },

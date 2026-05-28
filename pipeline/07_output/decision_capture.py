@@ -223,6 +223,8 @@ def _build_record(
 ) -> dict:
     now = datetime.now(timezone.utc)
     ticker = syn.get("ticker") or ca.get("ticker") or "UNKNOWN"
+    # Python-computed entry-price band; the Chief no longer emits these numbers.
+    ce = syn.get("computed_entry", {}) or {}
 
     return {
         "ticker":       ticker,
@@ -240,10 +242,18 @@ def _build_record(
         "overall_risk_assessment":   syn.get("overall_risk_assessment"),
         "philosophy_fit":            ca.get("philosophy_fit"),
         "philosophy_fit_notes":      ca.get("philosophy_fit_notes", ""),
-        "entry_price":               ca.get("entry_price"),
-        "entry_range":               ca.get("entry_range"),
-        "entry_price_rationale":     ca.get("entry_price_rationale", ""),
-        "current_price_used":        ca.get("current_price_used"),
+        # Entry-price numbers come from Python (computed_entry); the Chief
+        # contributes only the rationale prose. entry_price_rationale uses
+        # the Chief's text if present, otherwise the calculator's one-liner.
+        "entry_price":               ce.get("entry_price"),
+        "entry_range":               ce.get("entry_range"),
+        "entry_price_rationale":     ca.get("entry_price_rationale") or ce.get("rationale", ""),
+        "current_price_used":        ce.get("current_price_used"),
+        "entry_price_case":          ce.get("case_label"),
+        "ratio_at_current":          ce.get("ratio_at_current"),
+        "price_gate_passed":         ce.get("price_gate_passed"),
+        "archetype_min_rr":          ce.get("archetype_min_rr"),
+        "target_2to1_price":         ce.get("target_2to1_price"),
         # screening_archetype = Stage 01 screened value; investment_archetype = Chief Analyst's confirmed value
         # Live field names: analyst_recommendation, investment_archetype, final_evidence_score,
         #   final_confidence_score, conviction_1_to_10 (not the shorthand versions of these names)

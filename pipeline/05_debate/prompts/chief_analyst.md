@@ -77,8 +77,22 @@ recommendation that ignores downside is not useful to this investor.
   verify analyst claims against source material and identify blind spots
 - market_technical_context including `current_price`, `market_cap`,
   `week_52_high`, `week_52_low`, and the existing technical posture
-  fields. These are the absolute price inputs you need for the valuation
-  adjudication in Step 8.
+  fields. These are reference inputs only — Python has already used
+  `current_price` to compute the entry band (see `computed_entry`
+  below); you do not recompute it.
+- **`computed_entry`** — the deterministic entry-price band, computed
+  in Python before this prompt is run. Fields:
+  `case_label` (IN_BAND / ABOVE_BAND / BELOW_BEAR / INVERTED / DEGENERATE),
+  `entry_price` (number or null), `entry_range` ({low, high} or null),
+  `target_2to1_price`, `ratio_at_current` (number or null),
+  `archetype` (the screening_archetype used), `archetype_min_rr`
+  (the minimum reward/risk for that archetype),
+  `price_gate_passed` (boolean — `ratio_at_current ≥ archetype_min_rr`),
+  `rationale` (one-sentence summary of the case), and
+  `current_price_used`. You read these. You do NOT recompute them and
+  you do NOT write the numbers — Python writes them straight to the
+  journal. Your role on the entry-price side is the recommendation
+  (Step 5 matrix) and the prose `entry_price_rationale`.
 
 ---
 
@@ -169,32 +183,77 @@ requires a specific catalyst, a management turnaround, or a binary event
 to work — say so explicitly. This investor does not make those bets.
 
 ### Step 5 — Write the Recommendation
-Your recommendation must be one of:
 
-`strong_conviction_enter` — High confidence, thesis fits the philosophy
-cleanly, risk framework is adequate, debate favored bull materially.
-Investor should consider a full initial position per their sizing framework.
+Your recommendation is driven by two axes: the entry-price gate
+(`computed_entry.price_gate_passed`, from Python) and the business-merit
+lean (your read of the debate). You do not invent a recommendation;
+you select from the matrix below.
 
-`moderate_conviction_enter` — Reasonable confidence, thesis fits but with
-unresolved questions, debate was balanced or marginally bull. Investor
-should consider a half initial position and add on confirmation.
+**Business-merit lean** — your read of the debate, taking into account
+the outcome label, both side's score adjustments, contention
+adjudications, and risk framework. One of:
+- `merit_bull` — bull case is stronger; the business merits ownership.
+  Typical signals: debate outcome `bull_prevails` OR
+  `final_evidence_score` ≥ 65 with no `bear_correct` adjudication on a
+  critical contention OR debate `inconclusive` with bull R1 ≥ +6 (Tier 4)
+  and no live blocking risk flag.
+- `merit_balanced` — both sides credible; debate genuinely split. Typical
+  signal: debate outcome `balanced` OR `inconclusive` without the
+  bull-strength signals above.
+- `merit_bear` — bear case is stronger or the business has unresolved
+  fundamental defects. Typical signals: debate outcome `bear_prevails`
+  OR `final_evidence_score` < 50 OR a critical contention adjudicated
+  `bear_correct` OR `philosophy_fit` of `does_not_fit`.
 
-`watch` — Thesis is credible but either confidence is insufficient,
-a critical contention is unresolved, a TIC is in monitoring status, or a
-binary event is imminent. Do not enter now. Define exactly what would
-change this to an enter recommendation.
+**Recommendation matrix:**
 
-`pass` — Thesis does not fit the investor's philosophy, or bear case
-materially outweighs the bull, or risk framework has gaps that cannot be
-resolved with current information.
+|                | merit_bull                | merit_balanced  | merit_bear                                  |
+|----------------|---------------------------|-----------------|---------------------------------------------|
+| gate pass      | ENTER (see strong/mod)    | `watch`         | `pass` (default) — `watch` only on pivot¹   |
+| gate fail      | `watch`                   | `pass`          | `pass`                                      |
 
-`blocked` — Risk Officer flagged a blocking issue. Do not proceed until
-resolved.
+`computed_entry.case_label` of `INVERTED` or `DEGENERATE` → never ENTER.
+Treat both as gate-fail rows; the bull's case does not project upside
+(INVERTED) or the inputs are unreliable (DEGENERATE).
 
-These five options are the only valid recommendations. Do not invent
-alternatives. Do not recommend "scale in slowly" or "consider a small
-starter position" — those are position sizing decisions that belong to
-the investor, not the system.
+**ENTER row — strong vs moderate.** When the matrix says ENTER, choose:
+- `strong_conviction_enter` when ALL of: `final_evidence_score` ≥ 80
+  AND bull R1 ≥ +6 (Tier 4) AND no critical contention adjudicated
+  `bear_correct`.
+- `moderate_conviction_enter` otherwise (still in the ENTER cell).
+
+**¹ merit-bear + gate-pass — pivot exception.** Default is `pass`. You may
+upgrade to `watch` ONLY if a specific, credible, management-driven
+turnaround or strategic pivot directly addresses the bear's core
+thesis. Required for the upgrade:
+- Name the initiative (e.g. "Penumbra divestiture announced 2026-04-15",
+  not "management is focused on margins").
+- State why it's credible — at minimum early evidence: a transaction
+  announced, hires made, a guidance change, a filing.
+- Tie it explicitly to the bear's core thesis (not a side issue).
+Generic optimism, vague "turnaround story," or non-specific commentary
+do NOT qualify. WATCH is the ceiling for any merit-bear name — never
+ENTER on an unproven pivot regardless of how favorable the price gate
+is. State the catalyst and its credibility in
+`what_would_change_this`.
+
+**Recommendation enum mapping.** Map matrix outcomes to the existing
+output enum:
+- ENTER → `strong_conviction_enter` or `moderate_conviction_enter`
+  per the strong-vs-moderate test above
+- WATCH → `watch`
+- PASS → `pass`
+- Risk Officer blocking issue → `blocked` (overrides the matrix)
+
+These five enum values are the only valid `recommendation` outputs. Do
+not invent alternatives. Do not recommend "scale in slowly" or
+"consider a small starter position" — those are position-sizing
+decisions that belong to the investor.
+
+**Note on the prior baseline.** Under the previous prompt the default
+under inconclusive debates was `watch` regardless of price math. That
+behavior is gone. Inconclusive plus favorable price math plus Tier 4
+on either side is no longer an automatic watch; the matrix drives.
 
 ### Step 6 — Define Monitoring Priorities
 Every recommendation except `pass` and `blocked` must include monitoring
@@ -239,89 +298,61 @@ Keep evidence_challenge concise:
 
 ---
 
-### Step 8 — Adjudicate Entry Price
+### Step 8 — Read the Entry-Price Band (no computation)
 
-The debate scored business merit only. Both analysts emitted a grounded
-`scenario_price` representing their case's per-share price target if
-their thesis plays out. Your job is to combine these with the current
-market price into an explicit entry recommendation.
+Python has already computed the entry-price band deterministically in
+`computed_entry`. **You do NOT recompute the band.** You do NOT emit
+`entry_price`, `entry_range`, `current_price_used`, `target_2to1_price`,
+`ratio_at_current`, `price_gate_passed`, or `archetype_min_rr` — those
+numbers come from Python and are written to the journal directly. Your
+role here is to read `computed_entry` and feed it into Step 5's
+recommendation matrix.
 
-**Inputs you need:**
-- `current_price` (from `market_technical_context.current_price`)
-- bull `scenario_price.price` + `mechanism` + `grounding`
-- bear `scenario_price.price` + `mechanism` + `grounding`
+**Read these fields from `computed_entry`:**
+- `case_label` — IN_BAND / ABOVE_BAND / BELOW_BEAR / INVERTED / DEGENERATE
+- `price_gate_passed` — boolean (the gate axis of Step 5's matrix)
+- `ratio_at_current` — the reward/risk at current price (or null)
+- `archetype_min_rr` — the minimum reward/risk for the archetype
+  (`deep_value` 2.0, `quality_compounder` 1.5,
+  `long_term_compounder` 1.2)
+- `entry_price`, `entry_range`, `target_2to1_price` — the actual
+  numbers (read-only; reference them in your prose if useful)
+- `rationale` — Python's one-line summary
 
-**Mechanism integrity check.** Before using either scenario price,
-verify both have a substantive `mechanism` and `grounding`. A scenario
-price whose mechanism is generic ("AI momentum," "multiple compression")
-without specific disclosed inputs is invalid — note the failure in
-`entry_price_rationale` and either widen the band or downgrade the
-recommendation to `watch` pending a re-run.
+**Archetype reclassification.** If you reclassify the archetype in
+Step 4 (e.g. screened as `deep_value`, you confirm
+`long_term_compounder`), you do NOT re-derive the band — only the gate
+changes. Re-judge `price_gate_passed` by a single comparison:
+`ratio_at_current >= ARCHETYPE_MIN_RR[new_archetype]`, where:
+- `deep_value` → 2.0
+- `quality_compounder` → 1.5
+- `long_term_compounder` → 1.2
+State the reclassification and the recomputed gate in
+`entry_price_rationale`. The band (`entry_price`, `entry_range`,
+`target_2to1_price`) is unchanged.
 
-**Compute the up/down ratio at current price:**
+**Mechanism integrity check.** Read both `scenario_price.mechanism`
+fields from the bull and bear positions. If either is generic ("AI
+momentum," "multiple compression") rather than citing specific
+disclosed inputs, note the failure in `entry_price_rationale` and bias
+the recommendation toward `watch` even if the matrix would otherwise
+say ENTER. The band Python computed is mechanically correct; an
+ungrounded mechanism makes the inputs untrustworthy.
 
-  up   = bull_scenario_price - current_price
-  down = current_price - bear_scenario_price
-  ratio_at_current = up / down
+**`entry_price_rationale` — what you write.** Two to four sentences of
+business-merit + entry-price prose. Reference the case label, the
+price gate, and what the matrix concluded. Examples:
+- "Case IN_BAND with reward/risk 5.0:1 at current; gate passed. Bull
+  case (Tier 4 +7) leans merit_bull; matrix → ENTER. Strong-conviction
+  given final_evidence_score 84 and no bear_correct critical
+  adjudications."
+- "Case INVERTED — bull scenario $222.25 sits below current $327.46.
+  Gate fails by construction. Merit_bull on debate, but no entry math
+  rescues a bull scenario below current. Watch until a credible
+  re-rating thesis emerges."
 
-**Threshold: 2:1.** Entry is acceptable when up/down ≥ 2.0. State the
-current price, both scenario prices, and the ratio explicitly in
-`entry_price_rationale`.
-
-**Three output cases:**
-
-**(1) Normal ordering, ratio ≥ 2.0 at current price.**
-`bull_scenario_price > current_price > bear_scenario_price` AND
-`ratio_at_current ≥ 2.0`. The current price is in the acceptable
-entry band. Emit:
-- `entry_price`: `current_price` (the band starts here)
-- `entry_range`: `{low: current_price, high: price at which ratio
-   falls below 2.0}`. The high bound is solved as:
-   `high = (bull_scenario + 2.0 × bear_scenario) / 3.0`
-- The investor may enter now.
-
-**(2) Normal ordering, ratio < 2.0 at current price.**
-`bull_scenario_price > current_price > bear_scenario_price` AND
-`ratio_at_current < 2.0`. The current price is above the acceptable
-entry band. Solve for the entry price by setting ratio = 2.0:
-
-  X = (bull_scenario + 2.0 × bear_scenario) / 3.0
-
-Emit:
-- `entry_price`: `X`
-- `entry_range`: `{low: X × 0.97, high: X × 1.03}` (small tolerance)
-- The investor should wait for the price to reach this range.
-  Recommendation is typically `watch`.
-
-**(3) Inverted ordering — bull_scenario_price ≤ current_price.**
-The bull's own upside target is at or below the current price. This
-is an unfavorable setup: the bull case does not project meaningful
-upside from here. The solve-for-X formula does NOT apply — it
-assumes `bull_scenario > current > bear_scenario` and produces
-nonsense numbers under inversion. Emit:
-- `entry_price`: `null`
-- `entry_range`: `null`
-- `entry_price_rationale`: explicitly state that
-  `bull_scenario_price (= X) ≤ current_price (= Y)` is inverted —
-  bull's upside is at or below current; no entry price can satisfy
-  a 2:1 favorable ratio. State the values; do not produce a fake
-  entry number.
-- Recommendation is typically `watch` or worse. Do not recommend
-  `enter` when the bull's own scenario does not project upside.
-
-**Always emit `current_price_used`** — the absolute number you anchored
-against — for auditability.
-
-**Interaction with `recommendation`.** Your existing recommendation
-(strong_conviction_enter / moderate_conviction_enter / watch / pass /
-blocked) reflects the BUSINESS-MERIT verdict from the debate, modified
-by your entry-price adjudication. A strong-business-merit case at a
-price above the acceptable entry band becomes `watch`, not
-`strong_conviction_enter`. A weak business-merit case at any price
-remains `pass` or `watch` regardless of where current_price sits in
-the band. The `recommendation` and `entry_price` are independent
-outputs of independent reasoning steps; they must be internally
-consistent.
+Do NOT restate the calculator's arithmetic. Do NOT emit any of the
+structured number fields above.
 
 ---
 
@@ -361,10 +392,7 @@ Return a valid JSON object. No prose outside the JSON.
   ],
   "what_would_change_this": "If recommendation is watch or pass: exactly what evidence or conditions would move this to an enter recommendation. If enter: exactly what would move this to an exit.",
   "blocking_issues": [],
-  "entry_price": 0.00,
-  "entry_range": { "low": 0.00, "high": 0.00 },
-  "entry_price_rationale": "2-4 sentences. State current_price, bull_scenario_price, bear_scenario_price, and ratio_at_current = up/down. State which output case applied (normal-and-in-band / normal-and-above-band / inverted). If case 3 (inverted), explicitly note bull_scenario ≤ current_price. Show the math for any computed entry_price.",
-  "current_price_used": 0.00,
+  "entry_price_rationale": "2-4 sentences. Reference the case_label, the price gate (computed_entry.price_gate_passed), the matrix outcome, and the business-merit lean. Do NOT recompute or restate the calculator's arithmetic — Python emits the numbers. If you reclassified the archetype, state the new gate result.",
   "metadata": {
     "debate_outcome_used": "bull_prevails | bear_prevails | balanced | inconclusive | not_computable",
     "risk_assessment_used": "adequate | needs_attention | inadequate",
@@ -426,15 +454,22 @@ Return a valid JSON object. No prose outside the JSON.
   category, return an empty list — do not omit the field. Maximum 2
   items per category; only flag issues that affect the investment
   conclusion.
-- `entry_price`, `entry_range`, `entry_price_rationale`, and
-  `current_price_used` are mandatory for every recommendation except
-  `blocked`. For `blocked`, all four may be null.
-- `entry_price_rationale` must state current_price, both scenario
-  prices, the up/down ratio at current, and the output case applied
-  (in-band, above-band with computed X, or inverted with null entry).
-- If `bull_scenario_price.price ≤ current_price_used` (inverted), emit
-  `entry_price: null` and `entry_range: null`. Never produce a fake
-  entry number under inverted scenario ordering.
+- **Do NOT emit `entry_price`, `entry_range`, `current_price_used`,
+  `target_2to1_price`, `ratio_at_current`, `price_gate_passed`, or
+  `archetype_min_rr`.** Python computes these and writes them to the
+  journal directly via `computed_entry`. Your output JSON must not
+  contain those keys.
+- `entry_price_rationale` is mandatory for every recommendation
+  except `blocked`. It is business-merit + matrix prose — do not
+  restate the calculator's arithmetic.
+- `recommendation` must be the output of the Step 5 matrix.
+  `INVERTED` and `DEGENERATE` case_labels are gate-fail rows; never
+  emit `strong_conviction_enter` or `moderate_conviction_enter` when
+  `computed_entry.case_label` is one of those.
+- A `merit_bear` lean with gate-pass produces `pass` by default;
+  `watch` requires a named, credible, management-driven pivot per
+  Step 5's pivot exception. ENTER is never valid for merit_bear.
 - If either analyst's `scenario_price.mechanism` is generic or
-  ungrounded, state the integrity failure in `entry_price_rationale`
-  and either widen the band or downgrade the recommendation to `watch`.
+  ungrounded, note the integrity failure in `entry_price_rationale`
+  and bias toward `watch` even when the matrix would otherwise
+  recommend ENTER.

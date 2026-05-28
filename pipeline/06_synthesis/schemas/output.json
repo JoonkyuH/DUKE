@@ -88,6 +88,34 @@
         "material_contentions": { "type": "integer" },
         "raised_risks_count":   { "type": "integer" }
       }
+    },
+    "chief_analyst_output": {
+      "type": "object",
+      "description": "Chief Analyst LLM output. Schema documented in chief_analyst.md."
+    },
+    "computed_entry": {
+      "type": "object",
+      "description": "Python-computed entry-price band from entry_price_calculator.compute_entry_price(). The Chief Analyst reads these fields but does not recompute them; they are written directly to the journal by Stage 07.",
+      "properties": {
+        "case_label":        { "type": "string", "enum": ["IN_BAND", "ABOVE_BAND", "BELOW_BEAR", "INVERTED", "DEGENERATE"] },
+        "entry_price":       { "type": ["number", "null"] },
+        "entry_range":       { "type": ["object", "null"], "properties": { "low": {"type":"number"}, "high": {"type":"number"} } },
+        "target_2to1_price": { "type": ["number", "null"] },
+        "ratio_at_current":  { "type": ["number", "null"] },
+        "archetype":         { "type": "string" },
+        "archetype_min_rr":  { "type": ["number", "null"] },
+        "price_gate_passed": { "type": ["boolean", "null"] },
+        "rationale":         { "type": "string" },
+        "current_price_used": { "type": ["number", "null"] }
+      }
+    },
+    "risk_assessment": {
+      "type": "object",
+      "description": "Risk Officer output, passed through for Stage 07."
+    },
+    "learning_hooks": {
+      "type": "array",
+      "description": "Collected bull + bear learning hooks for 90/180/365-day outcome tracking."
     }
   },
   "additionalProperties": false

@@ -32,7 +32,8 @@ from pathlib import Path
 _THIS_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(_THIS_DIR))
 
-from synthesizer import synthesize  # noqa: E402
+from synthesizer import synthesize                       # noqa: E402
+from entry_price_calculator import compute_entry_price   # noqa: E402
 
 try:
     import anthropic
@@ -581,12 +582,32 @@ def main() -> None:
     synthesis_output = synthesize(debate_record, risk_assessment, price_data)
     synthesis_dict   = synthesis_output.to_dict()
 
+    # ── Deterministic entry-price computation (pre-Chief) ─────────────────────
+    # Python owns the entry-price numbers; the Chief reads them and authors only
+    # the recommendation and rationale prose. Replaces the four-case arithmetic
+    # that previously lived in the chief_analyst.md prompt (rolled back in
+    # 909b59a — the LLM could not execute it reliably).
+    bull_sp = (debate_record.get("bull_position") or {}).get("scenario_price") or {}
+    bear_sp = (debate_record.get("bear_position") or {}).get("scenario_price") or {}
+    screening_archetype = analyst_brief.get("screening_archetype", "unknown")
+
+    epr = compute_entry_price(
+        bull_sp.get("price"),
+        bear_sp.get("price"),
+        (price_data or {}).get("current_price"),
+        screening_archetype,
+    )
+    computed_entry = epr.to_dict()
+    computed_entry["current_price_used"] = (price_data or {}).get("current_price")
+
     # ── Chief Analyst ─────────────────────────────────────────────────────────
     print("\nChief Analyst synthesis")
     chief_system = _load_prompt("chief_analyst.md")
     chief_brief  = synthesis_dict["chief_analyst_brief"]
     chief_brief["evidence_brief"] = _format_evidence_for_chief(analyst_brief)
-    chief_brief["screening_archetype"] = analyst_brief.get("screening_archetype", "unknown")
+    chief_brief["screening_archetype"] = screening_archetype
+    # inject computed_entry for the Chief to reference — do not recompute.
+    chief_brief["computed_entry"] = computed_entry
     chief_raw    = _call_analyst(client, _CHIEF_MODEL, chief_system, chief_brief, "Chief Analyst")
 
     chief_output = chief_raw if chief_raw else _chief_fallback(debate_record)
@@ -596,6 +617,7 @@ def main() -> None:
     final = {
         **synthesis_dict,
         "chief_analyst_output": chief_output,
+        "computed_entry":       computed_entry,
         "risk_assessment":      risk_assessment,
         "learning_hooks":       learning_hooks,
     }
