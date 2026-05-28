@@ -111,10 +111,17 @@ both interpretations. This is a signal for moderate conviction at best.
 The investor should not be at full position size when the debate is
 genuinely balanced.
 
-`inconclusive` — bull and bear strongly disagree with a large gap between
-their score adjustments. This is not a reason to average them. This is a
-signal that the evidence is insufficient to make a high-conviction
-decision. Recommend watching, not entering.
+`inconclusive` — analysts disagree on magnitude with high conviction on
+both sides — both reached strong tiers. This is NOT a signal to default
+to watch. Under Architecture B, business merit on both sides is
+informative even when provisional_net is near zero; the entry-price math
+in Step 8 is the primary tiebreaker. When Step 8 fires case 1 or case 3
+(favorable price math) AND at least one analyst reached Tier 4
+(|score_adjustment| ≥ 6), recommendation should follow Step 8's
+adjudication and Step 5's enter thresholds — do not default to watch
+on inconclusive alone. When Step 8 fires case 2 (above-band) or case 4
+(bull-side inverted), recommendation defaults to watch — analyst
+disagreement plus unfavorable entry math compounds.
 
 ### Step 3 — Adjudicate the Critical Contentions
 Review contentions sorted by severity. For each CRITICAL contention:
@@ -169,24 +176,77 @@ requires a specific catalyst, a management turnaround, or a binary event
 to work — say so explicitly. This investor does not make those bets.
 
 ### Step 5 — Write the Recommendation
-Your recommendation must be one of:
+Your recommendation must be one of the five values below. Step 8's
+entry-price adjudication is a co-equal driver of this field — favorable
+price math (case 1 or case 3) is a primary enter signal, not just an
+allowance.
 
-`strong_conviction_enter` — High confidence, thesis fits the philosophy
-cleanly, risk framework is adequate, debate favored bull materially.
-Investor should consider a full initial position per their sizing framework.
+`strong_conviction_enter` — Reserved for cases where ALL of the
+following hold:
+- Step 8 fires case 1 (in-band, ratio ≥ 2.0) or case 3
+  (bear-above-current)
+- Business merit is strong: `final_evidence_score` ≥ 80
+- Bull R1 reached Tier 4 (`bull_position.score_adjustment` ≥ +6)
+- No unresolved critical contentions — every contention with
+  severity = critical appears in `critical_contention_adjudications`
+  adjudicated as `bull_correct` or `unresolvable`. A `bear_correct`
+  adjudication on a critical contention disqualifies
+  strong_conviction_enter.
+- Debate outcome is not `bear_prevails`
+- Risk framework is adequate (`overall_risk_assessment` in {adequate,
+  needs_attention}, no blocking_issues)
+Investor should consider a full initial position per their sizing
+framework.
 
-`moderate_conviction_enter` — Reasonable confidence, thesis fits but with
-unresolved questions, debate was balanced or marginally bull. Investor
+`moderate_conviction_enter` — The default when Step 8 fires case 1 or
+case 3 AND business merit clears at least one of these thresholds:
+- `final_evidence_score` ≥ 65, OR
+- Bull R1 ≥ +6 (Tier 4), OR
+- Debate outcome is `bull_prevails`
+This is the standard recommendation under favorable price math plus
+at least moderate business merit. Do not require extraordinary
+justification to issue moderate_conviction_enter when both conditions
+are met — that is the design path for this combination. Investor
 should consider a half initial position and add on confirmation.
 
-`watch` — Thesis is credible but either confidence is insufficient,
-a critical contention is unresolved, a TIC is in monitoring status, or a
-binary event is imminent. Do not enter now. Define exactly what would
-change this to an enter recommendation.
+`watch` — Requires a SPECIFIC, NAMED reason. Generic uncertainty is
+not a reason.
+
+Legitimate watch reasons under favorable price math (case 1 or case 3):
+- **Imminent binary event**, defined as a catalyst within 30 days of
+  the synthesis date (e.g. an earnings release in 28 days, an FDA
+  decision in 14 days, a court ruling in 21 days). A catalyst 90+
+  days away is NOT imminent and is NOT alone sufficient for watch.
+- **Unresolved critical contention**, meaning a contention with
+  severity = critical that you adjudicated as `bear_correct` or
+  `unresolvable`. Merely BEING PRESENT in the contentions list is
+  not unresolved — every critical contention is in the list by
+  definition.
+- **Confidence < 70**: `final_confidence_score` below 70 indicates
+  evidence quality issues that warrant waiting.
+
+Legitimate watch reasons under unfavorable price math:
+- **Case 2 (above-band)**: default to watch with `entry_price` stated
+  below current. Investor waits for price to reach entry band.
+- **Case 4 (bull-side inverted)**: default to watch regardless of
+  business merit. Bull's own scenario does not project upside.
+
+Reasons that are NOT sufficient for watch:
+- "Inconclusive debate outcome" alone — see Step 2.
+- "Wait for next earnings" alone, unless earnings is within 30 days.
+- "TIC in monitoring status" alone — TICs in monitoring are the
+  normal state for any live thesis under active research; this is
+  not a signal of imminent risk.
+- "Risk Officer rated overall_risk = needs_attention" alone — that
+  rating warrants monitoring priorities (Step 6), not watch.
+
+Define exactly what would change watch to an enter recommendation in
+`what_would_change_this`.
 
 `pass` — Thesis does not fit the investor's philosophy, or bear case
-materially outweighs the bull, or risk framework has gaps that cannot be
-resolved with current information.
+materially outweighs the bull (debate outcome `bear_prevails`), or
+risk framework has gaps that cannot be resolved with current
+information.
 
 `blocked` — Risk Officer flagged a blocking issue. Do not proceed until
 resolved.
@@ -293,7 +353,24 @@ Emit:
 - The investor should wait for the price to reach this range.
   Recommendation is typically `watch`.
 
-**(3) Inverted ordering — bull_scenario_price ≤ current_price.**
+**(3) Bear-above-current — `bear_scenario_price ≥ current_price`.**
+The bear's own downside target is at or above the current price. The
+bear case implies no meaningful downside from current — even under
+the bear's stated mechanism, the stock holds value at current price.
+The up/down ratio formula does not apply (down would be zero or
+negative). Emit:
+- `entry_price`: `current_price_used`
+- `entry_range`: `{low: current_price_used,
+                   high: bull_scenario_price.price}`
+- `entry_price_rationale`: state current_price, both scenario prices,
+  the bear-above-current condition (`bear_scenario_price ≥
+  current_price`), and that the bear case implies no meaningful
+  downside from current — risk/reward is favorable at current price.
+- Recommendation per Step 5's enter/watch criteria — case 3 is
+  treated identically to case 1 for recommendation purposes
+  (favorable price math).
+
+**(4) Bull-side inverted — `bull_scenario_price ≤ current_price`.**
 The bull's own upside target is at or below the current price. This
 is an unfavorable setup: the bull case does not project meaningful
 upside from here. The solve-for-X formula does NOT apply — it
@@ -312,14 +389,36 @@ nonsense numbers under inversion. Emit:
 **Always emit `current_price_used`** — the absolute number you anchored
 against — for auditability.
 
-**Interaction with `recommendation`.** Your existing recommendation
-(strong_conviction_enter / moderate_conviction_enter / watch / pass /
-blocked) reflects the BUSINESS-MERIT verdict from the debate, modified
-by your entry-price adjudication. A strong-business-merit case at a
-price above the acceptable entry band becomes `watch`, not
-`strong_conviction_enter`. A weak business-merit case at any price
-remains `pass` or `watch` regardless of where current_price sits in
-the band. The `recommendation` and `entry_price` are independent
+**Interaction with `recommendation`.** Entry-price math is a CO-EQUAL
+driver of `recommendation`, not a unilateral demoter. The Step 8 case
+determines the direction the price math pushes — including upward.
+The four interaction patterns:
+
+- **Strong or moderate merit + favorable price math (case 1 or
+  case 3)** → `moderate_conviction_enter` or `strong_conviction_enter`
+  per Step 5's thresholds. Favorable price math plus at least moderate
+  merit is the standard enter path. Do NOT default to watch under
+  this combination — entering is the designed behavior.
+
+- **Strong merit + unfavorable price math (case 2, above-band)** →
+  `watch` with `entry_price` stated below current. Investor waits
+  for price to reach the entry band. Define the trigger in
+  `what_would_change_this` as the price reaching `entry_range.low`.
+
+- **Bull-side inverted price math (case 4, bull_scenario ≤ current)**
+  → `watch` regardless of merit. The bull's own scenario does not
+  project upside from current; the entry math is incoherent and merit
+  alone cannot rescue the entry decision.
+
+- **Weak merit (`final_evidence_score` < 65 AND bull R1 < +6) at any
+  price** → `watch` or `pass` per Step 5 criteria. Price math alone
+  does not rescue a weak merit case.
+
+The prior version of this prompt treated price math as authority to
+demote but not to promote. That asymmetry is removed. Under
+Architecture B, favorable price math + at least moderate business
+merit is sufficient to enter; this is the design path, not an
+exception. `recommendation` and `entry_price` are independent
 outputs of independent reasoning steps; they must be internally
 consistent.
 
@@ -431,10 +530,33 @@ Return a valid JSON object. No prose outside the JSON.
   `blocked`. For `blocked`, all four may be null.
 - `entry_price_rationale` must state current_price, both scenario
   prices, the up/down ratio at current, and the output case applied
-  (in-band, above-band with computed X, or inverted with null entry).
-- If `bull_scenario_price.price ≤ current_price_used` (inverted), emit
-  `entry_price: null` and `entry_range: null`. Never produce a fake
-  entry number under inverted scenario ordering.
+  (case 1 in-band, case 2 above-band with computed X, case 3
+  bear-above-current, or case 4 bull-side inverted with null entry).
+- **Case 1 (in-band) mechanical formula is mandatory.** When you fire
+  case 1, the structured fields MUST satisfy these equalities exactly,
+  no exceptions, no risk-stack adjustments:
+    `entry_price`          = `current_price_used`
+    `entry_range.low`      = `current_price_used`
+    `entry_range.high`     = (`bull_scenario_price.price`
+                              + 2.0 × `bear_scenario_price.price`) / 3.0
+  If risk-stack concerns warrant caution, express them by setting
+  `recommendation` to `watch` with a named reason from Step 5's
+  legitimate-watch list — NOT by adjusting the structured entry-price
+  fields. Prose-vs-JSON disagreement on the entry-price math is a
+  disqualifying inconsistency.
+- **Case 3 (bear-above-current) mechanical formula is mandatory.** When
+  `bear_scenario_price.price ≥ current_price_used`, the structured
+  fields MUST satisfy:
+    `entry_price`          = `current_price_used`
+    `entry_range.low`      = `current_price_used`
+    `entry_range.high`     = `bull_scenario_price.price`
+  Under case 3, `recommendation` follows Step 5's enter/watch criteria
+  treating case 3 as favorable price math (same as case 1) — there is
+  no price-based demote in case 3.
+- If `bull_scenario_price.price ≤ current_price_used` (case 4,
+  bull-side inverted), emit `entry_price: null` and `entry_range:
+  null`. Never produce a fake entry number under bull-side inverted
+  scenario ordering.
 - If either analyst's `scenario_price.mechanism` is generic or
   ungrounded, state the integrity failure in `entry_price_rationale`
   and either widen the band or downgrade the recommendation to `watch`.
