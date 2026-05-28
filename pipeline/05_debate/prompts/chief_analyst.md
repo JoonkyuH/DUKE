@@ -54,11 +54,11 @@ recommendation that ignores downside is not useful to this investor.
   recommendation, position_sizing
 - Complete debate record (Layer 5) including:
   - bull_position: summary, key_arguments, evidence_cited,
-    contested_items, bear_evidence_responses, learning_hooks,
-    score_adjustment, confidence_adjustment
+    contested_items, bear_evidence_responses, raised_strengths,
+    learning_hooks, scenario_price, score_adjustment, confidence_adjustment
   - bear_position: summary, key_arguments, evidence_cited,
-    contested_items, bull_evidence_responses, valuation_challenge,
-    learning_hooks, raised_risks, score_adjustment, confidence_adjustment
+    contested_items, bull_evidence_responses, raised_risks,
+    learning_hooks, scenario_price, score_adjustment, confidence_adjustment
   - contentions: category-level disagreements between bull and bear
   - debate_evidence_score: Layer 4 score adjusted by debate
   - debate_confidence_score: Layer 4 confidence adjusted by debate
@@ -75,6 +75,10 @@ recommendation that ignores downside is not useful to this investor.
 - Compressed evidence brief (`evidence_brief`): all management quotes,
   filing quotes, and external evidence from Stage 03 — use this to
   verify analyst claims against source material and identify blind spots
+- market_technical_context including `current_price`, `market_cap`,
+  `week_52_high`, `week_52_low`, and the existing technical posture
+  fields. These are the absolute price inputs you need for the valuation
+  adjudication in Step 8.
 
 ---
 
@@ -139,8 +143,9 @@ explicit criteria for the anchored archetype.
 
 For Long-Term Compounder:
 - Is the ecosystem genuinely in durable structural growth?
-- Does the company have the four quality pillars: revenue growth, margin
-  strength, FCF generation, justified valuation premium?
+- Does the company have the three business-merit pillars: revenue growth,
+  margin strength, FCF generation? (Valuation is adjudicated separately
+  in Step 8 below.)
 - Is the thesis durable over the investor's multi-year hold horizon?
 - Would this investor be comfortable holding through a 30-40% drawdown
   if the thesis remained intact?
@@ -151,8 +156,6 @@ For Quality Compounder:
 - Do the financial hallmarks hold: stable or expanding margins (typically
   >40% gross), consistent FCF generation across cycles, defensible pricing
   power that has not shown signs of decay?
-- Is the premium multiple justified by moat durability and capital returns,
-  not by growth rate alone?
 - Would this investor be comfortable holding through a 30-40% drawdown if
   the moat showed no observable signs of erosion?
 
@@ -205,7 +208,7 @@ Monitoring priorities must be:
 
 ---
 
-## Evidence Challenge
+### Step 7 — Evidence Challenge
 
 You have access to the full compressed evidence brief (`evidence_brief`)
 used as source material by the Bull and Bear analysts.
@@ -233,6 +236,92 @@ Keep evidence_challenge concise:
 - 0-2 items per category maximum
 - Only flag material issues that affect the investment conclusion
 - If a category has no material issues, return an empty list
+
+---
+
+### Step 8 — Adjudicate Entry Price
+
+The debate scored business merit only. Both analysts emitted a grounded
+`scenario_price` representing their case's per-share price target if
+their thesis plays out. Your job is to combine these with the current
+market price into an explicit entry recommendation.
+
+**Inputs you need:**
+- `current_price` (from `market_technical_context.current_price`)
+- bull `scenario_price.price` + `mechanism` + `grounding`
+- bear `scenario_price.price` + `mechanism` + `grounding`
+
+**Mechanism integrity check.** Before using either scenario price,
+verify both have a substantive `mechanism` and `grounding`. A scenario
+price whose mechanism is generic ("AI momentum," "multiple compression")
+without specific disclosed inputs is invalid — note the failure in
+`entry_price_rationale` and either widen the band or downgrade the
+recommendation to `watch` pending a re-run.
+
+**Compute the up/down ratio at current price:**
+
+  up   = bull_scenario_price - current_price
+  down = current_price - bear_scenario_price
+  ratio_at_current = up / down
+
+**Threshold: 2:1.** Entry is acceptable when up/down ≥ 2.0. State the
+current price, both scenario prices, and the ratio explicitly in
+`entry_price_rationale`.
+
+**Three output cases:**
+
+**(1) Normal ordering, ratio ≥ 2.0 at current price.**
+`bull_scenario_price > current_price > bear_scenario_price` AND
+`ratio_at_current ≥ 2.0`. The current price is in the acceptable
+entry band. Emit:
+- `entry_price`: `current_price` (the band starts here)
+- `entry_range`: `{low: current_price, high: price at which ratio
+   falls below 2.0}`. The high bound is solved as:
+   `high = (bull_scenario + 2.0 × bear_scenario) / 3.0`
+- The investor may enter now.
+
+**(2) Normal ordering, ratio < 2.0 at current price.**
+`bull_scenario_price > current_price > bear_scenario_price` AND
+`ratio_at_current < 2.0`. The current price is above the acceptable
+entry band. Solve for the entry price by setting ratio = 2.0:
+
+  X = (bull_scenario + 2.0 × bear_scenario) / 3.0
+
+Emit:
+- `entry_price`: `X`
+- `entry_range`: `{low: X × 0.97, high: X × 1.03}` (small tolerance)
+- The investor should wait for the price to reach this range.
+  Recommendation is typically `watch`.
+
+**(3) Inverted ordering — bull_scenario_price ≤ current_price.**
+The bull's own upside target is at or below the current price. This
+is an unfavorable setup: the bull case does not project meaningful
+upside from here. The solve-for-X formula does NOT apply — it
+assumes `bull_scenario > current > bear_scenario` and produces
+nonsense numbers under inversion. Emit:
+- `entry_price`: `null`
+- `entry_range`: `null`
+- `entry_price_rationale`: explicitly state that
+  `bull_scenario_price (= X) ≤ current_price (= Y)` is inverted —
+  bull's upside is at or below current; no entry price can satisfy
+  a 2:1 favorable ratio. State the values; do not produce a fake
+  entry number.
+- Recommendation is typically `watch` or worse. Do not recommend
+  `enter` when the bull's own scenario does not project upside.
+
+**Always emit `current_price_used`** — the absolute number you anchored
+against — for auditability.
+
+**Interaction with `recommendation`.** Your existing recommendation
+(strong_conviction_enter / moderate_conviction_enter / watch / pass /
+blocked) reflects the BUSINESS-MERIT verdict from the debate, modified
+by your entry-price adjudication. A strong-business-merit case at a
+price above the acceptable entry band becomes `watch`, not
+`strong_conviction_enter`. A weak business-merit case at any price
+remains `pass` or `watch` regardless of where current_price sits in
+the band. The `recommendation` and `entry_price` are independent
+outputs of independent reasoning steps; they must be internally
+consistent.
 
 ---
 
@@ -272,8 +361,12 @@ Return a valid JSON object. No prose outside the JSON.
   ],
   "what_would_change_this": "If recommendation is watch or pass: exactly what evidence or conditions would move this to an enter recommendation. If enter: exactly what would move this to an exit.",
   "blocking_issues": [],
+  "entry_price": 0.00,
+  "entry_range": { "low": 0.00, "high": 0.00 },
+  "entry_price_rationale": "2-4 sentences. State current_price, bull_scenario_price, bear_scenario_price, and ratio_at_current = up/down. State which output case applied (normal-and-in-band / normal-and-above-band / inverted). If case 3 (inverted), explicitly note bull_scenario ≤ current_price. Show the math for any computed entry_price.",
+  "current_price_used": 0.00,
   "metadata": {
-    "debate_outcome_used": "bull_prevails | bear_prevails | balanced | inconclusive",
+    "debate_outcome_used": "bull_prevails | bear_prevails | balanced | inconclusive | not_computable",
     "risk_assessment_used": "adequate | needs_attention | inadequate",
     "score_basis": "debate_adjusted"
   },
@@ -333,3 +426,15 @@ Return a valid JSON object. No prose outside the JSON.
   category, return an empty list — do not omit the field. Maximum 2
   items per category; only flag issues that affect the investment
   conclusion.
+- `entry_price`, `entry_range`, `entry_price_rationale`, and
+  `current_price_used` are mandatory for every recommendation except
+  `blocked`. For `blocked`, all four may be null.
+- `entry_price_rationale` must state current_price, both scenario
+  prices, the up/down ratio at current, and the output case applied
+  (in-band, above-band with computed X, or inverted with null entry).
+- If `bull_scenario_price.price ≤ current_price_used` (inverted), emit
+  `entry_price: null` and `entry_range: null`. Never produce a fake
+  entry number under inverted scenario ordering.
+- If either analyst's `scenario_price.mechanism` is generic or
+  ungrounded, state the integrity failure in `entry_price_rationale`
+  and either widen the band or downgrade the recommendation to `watch`.

@@ -124,6 +124,7 @@ def _parse_position(pos: dict, role: AnalystRole) -> AnalystPosition:
         contested_items=list(pos.get("contested_items", [])),
         raised_risks=list(pos.get("raised_risks", [])),
         raised_strengths=list(pos.get("raised_strengths", [])),
+        scenario_price=pos.get("scenario_price"),
         score_adjustment=float(pos.get("score_adjustment", 0.0)),
         confidence_adjustment=float(pos.get("confidence_adjustment", 0.0)),
         learning_hooks=list(pos.get("learning_hooks", [])),

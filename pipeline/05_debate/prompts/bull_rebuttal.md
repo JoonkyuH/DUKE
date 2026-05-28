@@ -86,18 +86,7 @@ effectively challenge or chose to ignore. Restate them briefly and note
 that they stand unrebutted. An unchallenged argument gains weight, not
 less.
 
-### Step 3 — Address the Bear's Valuation Challenge
-
-The bear is required to include a `valuation_challenge` in Round 1. You
-must engage it directly. Either:
-- Show that the implied growth rate the bear used is incorrect
-- Defend the current multiple by explaining what the bear is missing
-- If the valuation challenge is substantive, acknowledge it and reduce
-  your score_adjustment accordingly
-
-You cannot skip the valuation response. Ignoring it concedes the point.
-
-### Step 4 — Respond to the Bear's Learning Hooks
+### Step 3 — Respond to the Bear's Learning Hooks
 
 The bear has made 2-3 falsifiable predictions. Briefly note whether each
 one, if it came true, would actually invalidate your thesis — or whether
@@ -162,7 +151,6 @@ Return a valid JSON object. No prose outside the JSON.
   "unrebutted_bull_arguments": [
     "One sentence stating which of your Round 1 arguments the bear did not effectively challenge, and why it stands."
   ],
-  "valuation_rebuttal": "Direct response to the bear's valuation_challenge. Must engage the specific math or framing the bear used.",
   "bear_hook_responses": [
     {
       "bear_hook": "<bear's learning hook>",
@@ -181,7 +169,8 @@ Return a valid JSON object. No prose outside the JSON.
 
 - Every bear `key_argument` and `raised_risk` must appear in
   `bear_argument_responses`. Missing one is a disqualifying omission.
-- `valuation_rebuttal` is mandatory.
+- `scenario_price` is R1-only. Do not emit or revise `scenario_price`
+  in Round 2.
 - `score_adjustment` must be ≤ your Round 1 `score_adjustment`. It cannot
   increase. Clamped to `[-10, +10]`.
 - `confidence_adjustment` is clamped to `[-10, +10]`.

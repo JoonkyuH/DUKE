@@ -133,7 +133,9 @@ def _build_brief(
             "evidence_cited":        bull.get("evidence_cited", []),
             "contested_items":       bull.get("contested_items", []),
             "raised_risks":          bull.get("raised_risks", []),
+            "raised_strengths":      bull.get("raised_strengths", []),
             "learning_hooks":        bull.get("learning_hooks", []),
+            "scenario_price":        bull.get("scenario_price"),
             "score_adjustment":      bull.get("score_adjustment"),
             "confidence_adjustment": bull.get("confidence_adjustment"),
         },
@@ -145,7 +147,7 @@ def _build_brief(
             "contested_items":       bear.get("contested_items", []),
             "raised_risks":          bear.get("raised_risks", []),
             "learning_hooks":        bear.get("learning_hooks", []),
-            "valuation_challenge":   bear.get("valuation_challenge"),
+            "scenario_price":        bear.get("scenario_price"),
             "score_adjustment":      bear.get("score_adjustment"),
             "confidence_adjustment": bear.get("confidence_adjustment"),
         },
@@ -255,6 +257,10 @@ def _derive_technical_context(price_data: dict) -> dict:
         posture = "technical_uptrend"
 
     return {
+        "current_price":       current,
+        "market_cap":          price_data.get("market_cap"),
+        "week_52_high":        hi_52w,
+        "week_52_low":         lo_52w,
         "price_vs_ma200_pct":  vs_ma200,
         "price_vs_ma50_pct":   vs_ma50,
         "rsi_14":              rsi_14,

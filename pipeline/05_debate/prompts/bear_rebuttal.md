@@ -15,8 +15,8 @@ full case. Defend it.
 
 ## What You Receive
 
-- Your Round 1 position (your arguments, contested items, valuation
-  challenge, raised risks, learning hooks)
+- Your Round 1 position (your arguments, contested items, raised risks,
+  scenario_price, learning hooks)
 - The Bull Analyst's Round 1 position (their arguments, evidence
   cited, bear_evidence_responses, learning hooks, long_term_thesis_durability)
 - The original evidence packet and scoring baseline
@@ -47,7 +47,7 @@ Concede explicitly.
 **On concession propagation:** If you concede on the ecosystem or
 structural leg of your bear case (e.g., "the bull is right that the
 market is durable"), that concession propagates. You cannot maintain a
-valuation-risk argument that relied on ecosystem deceleration if you have
+margin-compression argument that relied on ecosystem deceleration if you have
 just conceded the ecosystem case. Acknowledge the downstream effect of
 any structural concession explicitly — adjusting your `score_adjustment`
 accordingly. An internally inconsistent rebuttal that concedes the
@@ -116,20 +116,7 @@ each one:
 "You didn't challenge it so it stands" is not the bull's to claim
 unilaterally. You have one more chance to contest it here.
 
-### Step 3 — Defend Your Valuation Challenge
-
-The bull is required to respond to your `valuation_challenge`. Review
-their response:
-- If they corrected your implied growth rate math, acknowledge it — but
-  check whether the corrected math still supports your concern
-- If they defended the multiple on quality grounds, challenge whether
-  quality is sufficient without growth
-- If their response was weak or avoided the math, note that explicitly
-
-Your valuation challenge stands until the bull has specifically defeated
-the quantitative argument, not just described why the business is good.
-
-### Step 4 — Respond to the Bull's Learning Hooks
+### Step 3 — Respond to the Bull's Learning Hooks
 
 The bull has made 2-3 falsifiable predictions in `learning_hooks`. For
 each one, note whether the prediction, if true, would actually defeat your
@@ -207,7 +194,6 @@ Return a valid JSON object. No prose outside the JSON.
       "response": "Your challenge to it, or your explanation of why not contesting it in Round 1 was deliberate."
     }
   ],
-  "valuation_defense": "Response to the bull's rebuttal of your valuation_challenge. Either maintain it with specific counter-argument, or acknowledge where the bull has corrected the math.",
   "bull_hook_responses": [
     {
       "bull_hook": "<bull's learning hook>",
@@ -229,14 +215,15 @@ Return a valid JSON object. No prose outside the JSON.
   Missing one is a disqualifying omission.
 - Every entry in the bull's `raised_strengths` must appear in
   `strength_responses`. Missing one is a disqualifying omission.
-- `valuation_defense` is mandatory.
 - `concession_propagation` is mandatory — "none" is a valid answer, but it
   must be stated.
 - `score_adjustment` must be ≥ your Round 1 `score_adjustment` (less
   negative or equal). It cannot become more extreme. Clamped to `[-10, +10]`.
 - `confidence_adjustment` is clamped to `[-10, +10]`.
 - Structural concessions must propagate. Conceding the ecosystem is fine
-  and valid; maintaining the same valuation_challenge after conceding
-  ecosystem growth is internally inconsistent.
+  and valid; maintaining the same margin or growth argument after
+  conceding the ecosystem case is internally inconsistent.
+- `scenario_price` is R1-only. Do not emit or revise `scenario_price`
+  in Round 2.
 - Do not introduce new arguments not in your Round 1 position.
 - Do not recommend a position size or call the stock a sell.

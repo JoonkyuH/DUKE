@@ -41,6 +41,13 @@ class AnalystPosition:
     Each entry is a dict {"risk"|"strength": str, "grounding": str}. Grounding
     must cite EV-ID, a disclosed analyst-brief fact, or a labeled inference;
     ungrounded entries are DEFEATED by the opposing rebuttal.
+
+    scenario_price is a single field interpreted by analyst_role:
+      - bull's scenario_price = price if the upside / quality case plays out
+      - bear's scenario_price = price if the fundamental-risk case plays out
+    Each has shape {"price": float, "mechanism": str, "grounding": str}.
+    Used by the Chief Analyst at Stage 06 to adjudicate entry price.
+    R1-only — rebuttals do not emit or revise scenario_price.
     """
     analyst_role:          AnalystRole
     summary:               str          # 3–5 sentence case
@@ -50,8 +57,9 @@ class AnalystPosition:
     raised_risks:          List[dict]   # Bear lane — [{"risk": str, "grounding": str}]
     score_adjustment:      float        # Recommended adjustment to evidence_score  [-15, +15]
     confidence_adjustment: float        # Recommended adjustment to confidence_score [-10, +10]
-    learning_hooks:        List[Any]    = field(default_factory=list)  # Falsifiable predictions; checked at 90/180/365 days
-    raised_strengths:      List[dict]   = field(default_factory=list)  # Bull lane — [{"strength": str, "grounding": str}]
+    learning_hooks:        List[Any]      = field(default_factory=list)  # Falsifiable predictions; checked at 90/180/365 days
+    raised_strengths:      List[dict]     = field(default_factory=list)  # Bull lane — [{"strength": str, "grounding": str}]
+    scenario_price:        Optional[dict] = None                          # {"price": float, "mechanism": str, "grounding": str}
 
 
 @dataclass

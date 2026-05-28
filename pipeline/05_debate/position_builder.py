@@ -85,7 +85,7 @@ def build_bull_brief(packet: dict, scoring: dict) -> dict:
 
         "output_format": {
             "analyst_role":          "bull",
-            "summary":               "<3-5 sentence bullish case>",
+            "summary":               "<3-5 sentence bullish business-merit case; do not discuss current price or valuation multiple>",
             "key_arguments":         ["<argument 1>", "<argument 2>", "<argument 3>"],
             "evidence_cited":        ["<evidence_id>", "..."],
             "contested_items":       ["<bear evidence_id you dispute>", "..."],
@@ -96,7 +96,12 @@ def build_bull_brief(packet: dict, scoring: dict) -> dict:
                 },
             ],
             "raised_risks":          [],
-            "score_adjustment":      "<float in [-15, +15] — see Score Adjustment Rubric>",
+            "scenario_price":        {
+                "price":     "<float — per-share price if your upside / quality case plays out>",
+                "mechanism": "<stated path: guided EPS × terminal multiple, intrinsic-value math, etc. Must cite disclosed inputs.>",
+                "grounding": "<EV-IDs and disclosed facts supporting the mechanism>",
+            },
+            "score_adjustment":      "<float in [-15, +15] — business-merit conviction, see Score Adjustment Rubric>",
             "confidence_adjustment": "<float in [-10, +10]>",
         },
     }
@@ -167,7 +172,7 @@ def build_bear_brief(packet: dict, scoring: dict) -> dict:
 
         "output_format": {
             "analyst_role":          "bear",
-            "summary":               "<3-5 sentence bearish case>",
+            "summary":               "<3-5 sentence bearish business-merit case; do not discuss current price or valuation multiple>",
             "key_arguments":         ["<argument 1>", "<argument 2>", "<argument 3>"],
             "evidence_cited":        ["<bear evidence_id>", "..."],
             "contested_items":       ["<bull evidence_id you dispute>", "..."],
@@ -177,7 +182,12 @@ def build_bear_brief(packet: dict, scoring: dict) -> dict:
                     "grounding": "<EV-ID, disclosed-fact reference, or 'Inference from: ...'>",
                 },
             ],
-            "score_adjustment":      "<float in [-15, +15] — see Score Adjustment Rubric>",
+            "scenario_price":        {
+                "price":     "<float — per-share price if your fundamental-risk case plays out>",
+                "mechanism": "<stated path: growth deceleration × multiple compression, impairment math, etc. Must cite disclosed inputs.>",
+                "grounding": "<EV-IDs and disclosed facts supporting the mechanism>",
+            },
+            "score_adjustment":      "<float in [-15, +15] — business-merit conviction, see Score Adjustment Rubric>",
             "confidence_adjustment": "<float in [-10, +10]>",
         },
     }
