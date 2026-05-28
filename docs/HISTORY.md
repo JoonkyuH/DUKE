@@ -259,9 +259,77 @@ all unchanged. No Stage 04 changes.
 Validation pending. The Chief Analyst's entry_price computation has
 never been exercised end-to-end against real scenario_price inputs.
 
+**a844d3e** — `fix: Stage 06 Chief Analyst — case-1 formula mandatory, case-3 bear-above-current added, recommendation logic prioritizes favorable price math`
+**ROLLED BACK in 909b59a.** First attempt to fix Architecture B's
+all-watch + case-1 prose-vs-JSON drift. Added a Step-8 case 3 for
+bear-above-current (separate from the bull-side inversion case, which
+was renumbered to case 4). Rewrote Step 5 enter/watch criteria so that
+favorable price math + ≥moderate business merit defaults to
+moderate_conviction_enter rather than watch. Made the case-1 mechanical
+formula a Hard Constraint. Validation on six tickers showed mixed
+results: cases 1 and 3 emitted correct entry/range.low; case 4 (VRT)
+regressed — Chief emitted non-null entry despite the unchanged null
+Hard Constraint and despite its own rationale stating null; case 2
+(NVDA) emitted current_price as entry (case-1-style) with the
+case-2 X formula value placed in range.high, producing an inverted
+range; case 1 range.high drifted 0.8-2.8% from formula on BSX and PTC.
+Recommendation distribution shifted from 6/6 watch to 6/6
+moderate_conviction_enter — including VRT case 4 and NVDA case 2 where
+the prompt explicitly says watch. The rebalance worked on cases 1 and
+3 but bled into cases 2 and 4.
+
+**d378be2** — `fix: Stage 06 Chief Analyst — positive Hard Constraints on cases 2 and 4, anti-drift on case 1 range.high`
+**ROLLED BACK in 909b59a.** Second attempt: tightened Hard Constraints
+to give cases 2 and 4 explicit positive mechanical structure
+(previously case 4 was null-only, case 2 had no Hard Constraint at
+all), and added anti-drift language on case 1 range.high. Validation
+on the same six tickers showed the tightening backfired across the
+board. Case 4 VRT: Chief still emitted numbers, this time $172.75
+(exactly the case-2 X formula applied to VRT's bull and bear) despite
+the new explicit "If your rationale identifies case 4, the structured
+entry_price and entry_range MUST be null — no exceptions" clause.
+Case 2 NVDA: same inverted-range field-confusion, no change. Case 1
+BSX: entry regressed from $57.78 (= current, correct) to $56.43 (not
+matching any formula); range became entry × ±3% (case-2-style applied
+to case-1 inputs). Case 1 PTC range.high drift worsened from 2.8%
+to 13% off formula. Case 3 CRM: range.high broken — Chief applied
+case-1 formula instead of `bull_scenario_price`. Recommendations
+became inconsistent: 3 watch + 3 moderate_conviction_enter, but the
+wrong tickers in each bucket. Adding more Hard Constraints made the
+LLM's four-case formula execution worse, not better.
+
+**909b59a** — `revert: Stage 06 Chief Analyst prompt to 40c366f baseline`
+Rolls back both prompt iterations (a844d3e + d378be2). Three prompt
+iterations attempted to fix Architecture B's all-watch + mechanical-
+field issues by tightening case-formula constraints; each regressed
+into a new failure mode. The 40c366f baseline has a known limitation
+(all-watch under inconclusive outcomes; case 1 prose-vs-JSON drift
+on entry_price) but is a consistent, characterized state. The
+follow-up commits introduced inconsistent edge-case behavior that
+worsened with each attempt.
+
+Architecture B plumbing remains at HEAD: `AnalystPosition.scenario_price`
+dataclass field, Stage 05 schema, position_builder output_format,
+analyst prompts (bull/bear/rebuttals) with scenario_price emit and
+valuation removal, synthesizer.py current_price + market_cap + 52w
+threading, decision_capture.py journal threading for entry_price /
+entry_range / entry_price_rationale / current_price_used, Stage 07
+schema declarations — all unchanged by the revert. Only the Chief
+Analyst prompt was reverted.
+
+Next step (deferred, separate task): move entry-price computation from
+LLM to Python. Chief Analyst's role becomes business-merit reasoning +
+recommendation off a Python-computed entry-price case; the
+deterministic arithmetic (case identification + entry_price /
+entry_range formulas) moves into synthesizer.py or a new
+entry_price_calculator.py. This finishes Architecture B's design
+intent without asking the LLM to execute four-case conditional
+arithmetic with field-name discipline, which three iterations
+demonstrated it cannot do reliably.
+
 ---
 
-## Open Issues (as of 2026-05-26; Architecture B re-scoped 2026-05-28)
+## Open Issues (as of 2026-05-26; Architecture B re-scoped 2026-05-28; Chief prompt reverted 2026-05-28)
 
 **Must fix before relying on shortlist**
 
@@ -270,6 +338,31 @@ never been exercised end-to-end against real scenario_price inputs.
   before any unattended or scheduled run.
 
 **Pending**
+
+- **NEW TOP PRIORITY — Entry-price computation in Python.** Move the
+  four-case entry-price logic out of the Chief Analyst prompt and into
+  Python (likely `synthesizer.py` or a new `entry_price_calculator.py`).
+  Chief outputs business-merit reasoning + scenario prices; Python
+  consumes bull_scenario_price + bear_scenario_price + current_price
+  and emits entry_price / entry_range / case-label deterministically;
+  Chief writes recommendation off the Python-computed case. Solves the
+  all-watch problem (recommendation can be driven from the deterministic
+  case label) and the four-case LLM arithmetic failure mode
+  demonstrated by the a844d3e → d378be2 → 909b59a iteration cycle.
+  The Chief's prompt-level job becomes:
+  (a) confirm/refine archetype, (b) adjudicate critical contentions,
+  (c) write executive summary + monitoring priorities, (d) write
+  recommendation off the Python-computed case + business-merit verdict.
+  No LLM-side case-formula execution.
+
+- Architecture B status: committed (40c366f). Plumbing validated end-
+  to-end (scenario_price field flows from analysts through debate
+  record to Chief brief to journal). Recommendation behavior is at
+  baseline limitations pending the Python-computation refactor above.
+  Three prompt iterations (a844d3e, d378be2 + 909b59a revert) attempted
+  to fix the recommendation/field-mechanics issues at the prompt
+  level; each regressed. The refactor moves the problem out of the
+  LLM domain.
 
 - SYF misclassification: GICS "Credit Services" maps to payments_network, but
   SYF is a consumer-credit lender. Needs a banking ticker_override (same

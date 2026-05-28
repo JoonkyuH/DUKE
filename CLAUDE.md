@@ -151,10 +151,24 @@ generates three structured fields:
   uncertainties (1-3 items)
 Prompt: pipeline/03_evidence_processing/prompts/synthesis.md
 
-### Stage 05/06 Architecture B (40c366f — UNVALIDATED)
+### Stage 05/06 Architecture B (40c366f — Chief prompt reverted to baseline in 909b59a)
 Division of labor: Stage 05 debate scores business
 merit only. Stage 06 Chief Analyst adjudicates
 valuation separately.
+
+Status: plumbing validated end-to-end (scenario_price
+field flows from analysts → debate record → Chief
+brief → journal). Recommendation behavior is at
+40c366f baseline — under inconclusive debate
+outcomes the Chief defaults to watch, and case-1
+entry_price has a known prose-vs-JSON drift.
+Three prompt iterations (a844d3e, d378be2) attempted
+to fix this at the prompt level; both regressed and
+were rolled back in 909b59a. Next planned change:
+move the four-case entry-price arithmetic out of
+the LLM and into Python (synthesizer.py or a new
+entry_price_calculator.py); Chief writes
+recommendation off the Python-computed case.
 
 Stage 05 = business merit
   Bull: upside / quality case (ecosystem, moat,
@@ -281,6 +295,21 @@ with `ulimit -n 8192` per-terminal. Must be fixed
 before any unattended/scheduled run.
 
 ### Pending
+**NEW TOP PRIORITY — Entry-price computation in
+Python.** Move the four-case entry-price logic out
+of the Chief Analyst prompt and into Python (likely
+synthesizer.py or a new entry_price_calculator.py).
+Chief outputs business-merit reasoning + scenario
+prices; Python consumes bull_scenario_price +
+bear_scenario_price + current_price and emits
+entry_price / entry_range / case-label
+deterministically; Chief writes recommendation off
+the Python-computed case. Solves the all-watch
+problem (recommendation can be driven from the
+deterministic case label) and the four-case LLM
+arithmetic failure mode demonstrated by the
+a844d3e → d378be2 → 909b59a iteration cycle.
+
 SYF misclassification: GICS "Credit Services"
 maps to payments_network, but SYF is a consumer-
 credit lender. Needs a banking ticker_override
@@ -296,14 +325,20 @@ Requires two consecutive Stage 02 runs on the same
 ticker — first run populates transcript_cache; second
 run diffs against it and produces contradictions.
 
-Architecture B (40c366f) — UNVALIDATED end-to-end.
-Debate now scores business merit only; Chief Analyst
-adjudicates entry price via 2:1 risk/reward band on
-scenario prices. The discrimination thread (Path B
-4478857 → Path B.2 b1404d5 → Architecture B 40c366f)
-absorbed the earlier "test-run debates all resolved
-balanced" concern; b1404d5 is not separately
-validated. Re-run pending.
+Architecture B (40c366f) — committed; plumbing
+validated end-to-end (scenario_price field flows
+from analysts → debate → Chief brief → journal).
+Recommendation behavior is at baseline limitations
+pending the Python-computation refactor above —
+under inconclusive debate outcomes the Chief defaults
+to watch, and case-1 entry_price has a known
+prose-vs-JSON drift. Three prompt iterations
+(a844d3e, d378be2 → 909b59a revert) attempted to
+fix at the prompt level; each regressed. The
+discrimination thread (Path B 4478857 → Path B.2
+b1404d5 → Architecture B 40c366f) absorbed the
+earlier "test-run debates all resolved balanced"
+concern; b1404d5 is not separately validated.
 
 Stage 04 fundamentals wiring deferred to V2: signal
 thresholds and economic profiles are live, but forward
