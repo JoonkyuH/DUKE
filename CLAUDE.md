@@ -151,7 +151,7 @@ generates three structured fields:
   uncertainties (1-3 items)
 Prompt: pipeline/03_evidence_processing/prompts/synthesis.md
 
-### Stage 05/06 Architecture B (40c366f + b5e5d24)
+### Stage 05/06 Architecture B (40c366f + b5e5d24 + a4a5792)
 Division of labor: Stage 05 debate scores business
 merit only. Stage 06 splits two ways:
 (a) Python — `entry_price_calculator.py` (b5e5d24)
@@ -163,9 +163,10 @@ merit only. Stage 06 splits two ways:
     The Chief Analyst LLM never computes these
     numbers.
 (b) Chief Analyst — reads `computed_entry` (including
-    `price_gate_passed`), runs the Step 5
+    `price_gate_passed`), reads `merit_lean` from the
+    Debate Moderator (a4a5792), runs the Step 5
     recommendation matrix on (price_gate_passed ×
-    business-merit lean), and contributes only the
+    merit_lean), and contributes only the
     `recommendation` enum + `entry_price_rationale`
     prose. No four-case arithmetic in the prompt.
 
@@ -179,15 +180,96 @@ Recommendation matrix:
 INVERTED / DEGENERATE case_labels are treated as
 gate-fail rows regardless of business-merit lean.
 ENTER splits into strong_conviction_enter (when
-final_evidence_score ≥ 80 AND bull R1 ≥ +6 AND
-no bear_correct critical adjudication) and
-moderate_conviction_enter otherwise.
+final_evidence_score ≥ 80 AND merit_margin ≥ 4.0
+AND no bear_correct critical adjudication) and
+moderate_conviction_enter otherwise. Margin threshold
+4.0 replaced the prior `bull R1 ≥ +6` test in a4a5792
+since R1 self-scores are now audit-only.
 
 This replaces the 40c366f baseline's all-watch
 default under inconclusive debates. Three prompt
 iterations (a844d3e, d378be2 → 909b59a revert)
 tried to fix the issue at the prompt level before
 b5e5d24 moved the arithmetic out of the LLM.
+
+### Debate Moderator (a4a5792)
+Stage 05 ends with a neutral evidence referee — the
+Debate Moderator — that reads both R1 positions,
+both R2 rebuttals, and the contentions (with the
+analysts' self-scores stripped out) and allocates a
+fixed pool of 10 points between bull and bear based
+on grounded, surviving evidence. Sum-10 forces a
+relative judgment: points given to one side are
+denied the other. Forced-directional: must name a
+single `decisive_evidence` item for the leaning side
+unless the scores are a true near-tie.
+
+Code-side lean derivation (`derive_lean` in
+`pipeline/05_debate/run.py`, kept in sync with
+`run_moderator_only.py`):
+  margin = normalised_bull - normalised_bear
+  abs(margin) <= 0.5  → "balanced"
+  margin > 0          → "bull_leans"
+  margin < 0          → "bear_leans"
+ε = 0.5 (tightened from 1.0 after the harness sample
+showed the wider band suppressed thin but real
+bear-leaning reads). LLM cannot mint its own
+"balanced" label — the code recomputes from its two
+scores.
+
+Decision wiring (`debate_scorer.compute_debate_scores`):
+  outcome label:
+    bull_leans → BULL_PREVAILS
+    bear_leans → BEAR_PREVAILS
+    balanced   → BALANCED
+    null/parse-fail → INCONCLUSIVE (failure state only)
+  winner/loser weights (margin-scaled):
+    winner_w = 0.50 + min(|margin|, 10) / 10 × 0.30
+             = 0.50 .. 0.80
+    loser_w  = 1 − winner_w
+  net_score_adj = w_bull × bull_self_adj
+                + w_bear × bear_self_adj
+  Self-scores still feed the net adjustment, but the
+  weight RATIO is no longer derived from them.
+  INCONCLUSIVE is no longer a normal state — it
+  fires only when the Moderator block is missing.
+
+Chief Analyst anchoring (Step 5 in
+`prompts/chief_analyst.md`):
+  merit_lean is treated as an anchor, same status as
+  screening_archetype (4ea4c75). Default mapping:
+    bull_leans → merit_bull
+    bear_leans → merit_bear
+    balanced   → merit_balanced
+  Overriding the Moderator lean requires a NAMED,
+  SPECIFIC reason in `entry_price_rationale`:
+    (1) a CRITICAL contention adjudicated against the
+        leaning side in Step 3, OR
+    (2) a LIVE Risk Officer blocking flag the
+        Moderator's evidence pool did not contain, OR
+    (3) `philosophy_fit = does_not_fit` (downgrade
+        to merit_bear regardless of lean).
+  "Debate was close" / "merits to both sides" /
+  "decisive_evidence is contestable" are explicitly
+  NOT valid overrides. `bull_leans + gate-pass →
+  ENTER unless a named blocker is stated.`
+
+Why this exists: the discrimination thread (Path B
+4478857 → Path B.2 b1404d5 → Architecture B 40c366f
+→ b5e5d24) addressed structural causes of debate
+clustering, but the bull and bear were still each
+scoring their own case in isolation — both saturate
+their conviction and inconclusive debates produced
+all-watch defaults. The Moderator does the
+relative-judgment job the analysts structurally
+cannot. Self-scores stay in the record for audit
+but no longer drive outcome or weighting.
+
+Journal threading (decision_capture._build_record):
+  merit_lean, merit_margin, decisive_evidence are
+  written to the journal record for outcome-tracking
+  correlation (post-hoc: did the decisions follow
+  the Moderator's call, and did those calls hold up?).
 
 Stage 05 = business merit
   Bull: upside / quality case (ecosystem, moat,
@@ -244,7 +326,7 @@ Stage 06 = valuation adjudicator
            entry_price_rationale, current_price_used.
     Surfaced to journal top-level.
 
-Stage 05 runs two rounds:
+Stage 05 runs two rounds plus the Moderator:
   Round 1: Bull and Bear independent business-merit
     positions (max_tokens=16384 each — raised from
     4096 in 7b33f34 for Path B prompt expansion).
@@ -256,28 +338,41 @@ Stage 05 runs two rounds:
       bull R2 score ≤ bull R1 score
       bear R2 score ≥ bear R1 score (less negative)
     Both clamped to [-10, +10].
-    R2 adjustments are informational only; debate
-    scores computed from R1 only.
-  Outcome classifier on R1 net adjustment:
-    PREVAIL_THRESHOLD = 3.5, INCONCLUSIVE_GAP = 12.0.
-    Outcomes now mean "does the BUSINESS-MERIT
-    picture lean bull or bear" — valuation no longer
-    enters the classifier.
+    R2 adjustments are audit-only — they no longer
+    feed outcome or weighting (a4a5792).
+  Moderator (a4a5792): neutral evidence referee that
+    reads both rounds + contentions (with self-scores
+    stripped) and emits a sum-10 verdict. Its `lean`
+    drives outcome; its `margin` drives the
+    margin-scaled (0.50..0.80) winner/loser
+    weighting in compute_debate_scores. See the
+    "Debate Moderator" section above for details.
+    The prior R1-net-adjustment classifier
+    (PREVAIL_THRESHOLD = 3.5, INCONCLUSIVE_GAP = 12.0)
+    is removed.
 
 ### Two-Score Distinction (Stage 05 vs Stage 06)
 Stage 05 produces mechanical evidence_score and
-confidence_score from the debate (signal weights,
-contention adjustments, clamp logic). Stage 06's
-Chief Analyst produces its own final_evidence_score
-and final_confidence_score — these are reasoned
-narrative numbers that reflect the full synthesis
-(debate outcome, risk officer flags, contention
-adjudications, philosophy fit). Stage 06 also emits
-entry_price / entry_range / entry_price_rationale /
-current_price_used (Architecture B). The Chief
-Analyst's scores plus entry-price band are used in
-Stage 07 and the journal record. Stage 05 scores
-are preserved in the debate record for traceability.
+confidence_score from the debate. As of a4a5792 the
+mechanics are: base scores + Moderator-weighted
+sum of self-score adjustments (winner_w 0.50..0.80
+margin-scaled), clamped. Self-scores are still
+inputs to the net; they are no longer drivers of
+the outcome label or the weight ratio.
+
+Stage 06's Chief Analyst produces its own
+final_evidence_score and final_confidence_score —
+reasoned narrative numbers reflecting the full
+synthesis (debate outcome from the Moderator, risk
+officer flags, contention adjudications, philosophy
+fit, computed_entry from the entry-price
+calculator). The Chief Analyst's scores plus entry-
+price band are used in Stage 07 and the journal
+record. Stage 05 scores are preserved in the debate
+record for traceability. The Moderator block
+(`debate_record.moderator`) is also preserved and
+its `lean` / `margin` / `decisive_evidence` are
+threaded to the journal.
 
 ### EDGAR Data Integrity (3 layers)
 Layer 1 - Concept selection (_entries() in edgar_client.py):
@@ -358,21 +453,25 @@ Requires two consecutive Stage 02 runs on the same
 ticker — first run populates transcript_cache; second
 run diffs against it and produces contradictions.
 
-Architecture B (40c366f + b5e5d24) — committed; plumbing
-validated end-to-end (scenario_price field flows
-from analysts → debate → Chief brief → journal).
-Entry-price refactor landed in b5e5d24 — numbers
-now computed deterministically in Python; Chief
-writes recommendation off the resolved band via
-Step 5 matrix. The all-watch default and case-1
-prose-vs-JSON drift from the 40c366f baseline are
-gone. Three prompt iterations (a844d3e, d378be2 →
-909b59a revert) preceded the refactor; each
-regressed at the prompt level. The discrimination
-thread (Path B 4478857 → Path B.2 b1404d5 →
-Architecture B 40c366f) absorbed the earlier
-"test-run debates all resolved balanced" concern;
-b1404d5 is not separately validated.
+Architecture B (40c366f + b5e5d24 + a4a5792) —
+committed; validated end-to-end on 6 tickers
+(VRT/BSX/CRM/NVDA/PODD/PTC). scenario_price flows
+analysts → debate → Chief brief → journal. Entry-
+price refactor (b5e5d24) computes the band
+deterministically in Python; Chief writes
+recommendation off the resolved band via the Step 5
+matrix. Debate Moderator (a4a5792) drives outcome
++ weighting; self-scores demoted to audit-only;
+Chief's Step 5 anchors on merit_lean. The all-watch
+default and the all-balanced-debate clustering are
+both gone. Three prompt iterations (a844d3e, d378be2
+→ 909b59a revert) and the discrimination thread
+(Path B 4478857 → Path B.2 b1404d5 → 40c366f →
+b5e5d24) preceded the Moderator fix; each addressed
+a structural piece, but the analysts-scoring-their-
+own-case root cause needed a neutral judge to close.
+b1404d5 is not separately validated; its rubric
+changes carried into Architecture B.
 
 Stage 04 fundamentals wiring deferred to V2: signal
 thresholds and economic profiles are live, but forward
@@ -448,6 +547,7 @@ da27c16  fix: route real Stage 02 contradictions through to scoring and debate
 4ea4c75  fix: anchor Chief Analyst to screened archetype; record archetype provenance in journal; document two-score distinction
 40c366f  feat: Architecture B — debate scores business merit only, valuation moves to Chief Analyst entry-price adjudication
 b5e5d24  feat: move entry-price computation to Python (entry_price_calculator); Chief writes recommendation off deterministic band
+a4a5792  feat: Debate Moderator drives outcome + weighting (ε=0.5); self-scores demoted to audit-only; Chief lean is a named-override anchor
 
 
 ## S&P 500 Screening Results (2026-05-24)

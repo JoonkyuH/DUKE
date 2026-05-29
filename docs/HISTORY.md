@@ -381,9 +381,86 @@ conditional arithmetic with field-name discipline is unreliable. The
 arithmetic is now deterministic Python; the LLM judges only the
 recommendation off the resolved band, which is a job it can do.
 
+**a4a5792** — `feat: Debate Moderator drives outcome + weighting (ε=0.5); self-scores demoted to audit-only; Chief lean is a named-override anchor`
+The structural cause behind the persistent "all debates resolve
+balanced / all-watch under inconclusive" pattern was that the bull and
+bear were each scoring their own case in isolation — both routinely
+saturated their own conviction (bull at +6/+7, bear at −5/−6), leaving
+the R1-net classifier (PREVAIL_THRESHOLD = 3.5, INCONCLUSIVE_GAP =
+12.0) systematically over-clustering at BALANCED or INCONCLUSIVE.
+Architecture B (40c366f) re-anchored what the analysts argue but did
+not change the structural problem: the agents that produced the scores
+were not the agents that judged the relative weight of evidence.
+
+This commit adds a neutral evidence referee — the Debate Moderator —
+that runs after the two rebuttals. It reads both R1 positions, both R2
+rebuttals, and the contentions WITH SELF-SCORES STRIPPED so the
+analysts' allocations cannot anchor it. It allocates a fixed pool of
+10 points between bull and bear: sum-10 makes the judgment relative
+(points denied one side go to the other), and the prompt forces a
+direction unless the points are a true near-tie, requiring a single
+`decisive_evidence` citation for the leaning side. The Moderator
+output also reports a `lean` label, but the system recomputes lean in
+code from the two scores so the LLM cannot mint its own "balanced"
+escape hatch.
+
+The code-side lean derivation uses an epsilon band of ±0.5 on the
+normalised-to-10 score difference (`pipeline/05_debate/run.py:derive_lean`,
+kept in sync with `run_moderator_only.py`). Tightened from 1.0 to 0.5
+after a 21-ticker Moderator-harness sample showed the wider band
+suppressed four real bear-leaning reads (DXCM/FSLR/GEN/PAYX at 5.5/4.5)
+and three thin bull reads.
+
+The decision wiring is now:
+  outcome label:
+    `bull_leans` → `bull_prevails`
+    `bear_leans` → `bear_prevails`
+    `balanced`   → `balanced`
+    null         → `inconclusive` (Moderator parse-failure only)
+  weighting (margin-scaled, in `debate_scorer.compute_debate_scores`):
+    `winner_w = 0.50 + min(|margin|, 10) / 10 × 0.30`  → 0.50..0.80
+    `loser_w  = 1 − winner_w`
+    Self-scores still feed `net_score_adjustment` via
+    `w_bull × bull_self_adj + w_bear × bear_self_adj`, but the weight
+    RATIO is no longer derived from them.
+The prior `PREVAIL_THRESHOLD`, `INCONCLUSIVE_GAP`, and
+`_PREVAIL_WEIGHTS` are removed. `INCONCLUSIVE` is now a failure state
+only — it fires when the Moderator block is missing.
+
+Stage 06's synthesizer threads `merit_lean` / `merit_margin` /
+`decisive_evidence` into the Chief Analyst brief. The Chief's Step 5
+prompt (`pipeline/05_debate/prompts/chief_analyst.md`) is rewritten so
+that `merit_lean` is the business-merit anchor (same status as
+`screening_archetype` from 4ea4c75). Overriding the Moderator's lean
+requires a NAMED, SPECIFIC reason: a critical contention adjudicated
+against the leaning side, a live Risk Officer blocking flag, or a
+`philosophy_fit = does_not_fit` downgrade. "The debate was close" and
+"merits to both sides" are explicitly invalid overrides. `bull_leans +
+gate-pass → ENTER unless a named blocker is stated.` The strong-vs-
+moderate split inside the ENTER cell now uses `merit_margin ≥ 4.0`
+(Moderator decisiveness) rather than the prior `bull R1 ≥ +6` test,
+since R1 self-scores are now audit-only.
+
+Stage 07's `decision_capture._build_record` persists `merit_lean`,
+`merit_margin`, and `decisive_evidence` to the journal record, with
+schema declarations in `pipeline/07_output/schemas/output.json` and
+the moderator block declared in `pipeline/05_debate/schemas/output.json`.
+
+Validated end-to-end on six tickers from the 2026-05-24 shortlist
+(VRT long_term_compounder, BSX quality_compounder, CRM
+quality_compounder, NVDA long_term_compounder, PODD deep_value, PTC
+quality_compounder). All six produced `merit_lean = bull_leans` with
+margins 2.0 or 3.0. Distribution: 4 `moderate_conviction_enter` (BSX,
+CRM, PODD, PTC) + 2 `watch` (VRT ABOVE_BAND, NVDA INVERTED). Both
+watches fired on gate-fail, not on a Chief override of the Moderator's
+lean. No `bull_leans + gate-pass` was blocked by a Chief override. The
+strong-vs-moderate threshold held everyone at moderate (no margin
+cleared 4.0), as designed. The all-watch default from the 40c366f
+baseline is gone.
+
 ---
 
-## Open Issues (as of 2026-05-26; Architecture B re-scoped 2026-05-28; Chief prompt reverted 2026-05-28; entry-price refactor landed 2026-05-28)
+## Open Issues (as of 2026-05-28; Architecture B re-scoped 2026-05-28; Chief prompt reverted 2026-05-28; entry-price refactor landed 2026-05-28; Debate Moderator added 2026-05-28)
 
 **Must fix before relying on shortlist**
 
@@ -440,12 +517,14 @@ recommendation off the resolved band, which is a job it can do.
   APH — 2026-05-26) resolved "balanced". May indicate debate scoring is
   systematically underpowered or that high-quality S&P 500 names genuinely
   produce ambiguous evidence. Worth reviewing after 10+ ticker runs.~~
-  **Superseded by Architecture B (40c366f).** The discrimination thread
-  (Path B 4478857 → Path B.2 b1404d5 → Architecture B 40c366f) absorbed
-  this concern. b1404d5 is not separately validated; its rubric changes
-  carried into Architecture B. Validation of business-merit
-  discrimination + the new entry-price adjudication is pending the next
-  re-run.
+  **Resolved by the Debate Moderator (a4a5792).** Architecture B (40c366f)
+  re-anchored what the analysts argue but left the structural problem
+  in place — bull and bear each scored their own case in isolation and
+  both saturated their own conviction. The Moderator does the relative
+  judgment the self-scorers structurally cannot. Validated on six
+  tickers: 4 ENTER + 2 watch (both gate-fail), no all-watch / all-
+  balanced clustering. Self-scores demoted to audit-only; outcome and
+  weighting now driven by Moderator.lean + Moderator.margin.
 
 - Stage 04 fundamentals wiring deferred to V2: signal thresholds and economic
   profiles are live, but forward guidance-vs-consensus comparison needs a
@@ -457,10 +536,12 @@ recommendation off the resolved band, which is a job it can do.
   new profiles: health_insurer, it_services, commodity_cyclical.
 
 - Rebuttal activation (6d215ee) reverses the earlier DUKE-13 decision against
-  Round 2 rebuttals. Evaluate whether R1→R2 movement tracks evidence or merely
-  compresses debate outcomes toward "balanced" — assess against the first
-  20-ticker run. Related to the "all test-run debates resolved balanced" item
-  above.
+  Round 2 rebuttals. With self-scores now audit-only (a4a5792), the question
+  of whether R1→R2 movement tracks evidence is no longer load-bearing for
+  the outcome — but R2 content still flows to the Moderator (it reads both
+  rebuttals), so rebuttal quality continues to affect the verdict
+  indirectly through what evidence survives. Worth evaluating against the
+  first full 20-ticker Moderator-driven run.
 
 - DUKE-16: Multi-period trend analysis
 - DUKE-19: TAM share-gain and ROIC signals
