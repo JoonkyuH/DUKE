@@ -630,6 +630,54 @@ Still pending (per-ticker passes, deliberately out of scope): chemicals
 cyclical-vs-secular call and a TSLA-style exclusion). The gate remains the
 safety boundary — only GICS-confirmed-clean strings are swept per pass.
 
+**380f663** — `fix: SYF→banking override + new electronic_components profile (0.60); JBL→industrial_manufacturer`
+Two independent classification fixes (no scoring-logic or gate changes), both
+flagged in the backlog. A read-only diagnose confirmed both and, as with the
+cyclical work, found the discriminating GICS string collides distinct business
+models in each case.
+
+SYF → banking. GICS `Credit Services` is shared by balance-sheet lenders (SYF,
+COF, PYPL) and fee-based networks (V, MA). The string maps to payments_network
+— correct for V/MA, wrong for the lenders — so lenders are pulled out by
+ticker_override. COF and AXP already were; SYF was the lone remaining
+consumer-credit lender scored as a payment network. Fix: SYF banking
+ticker_override (mirrors COF). The live distortion is narrower than it looks —
+SYF's gross_margin/fcf_margin/fcf_to_ni are None regardless of profile (a lender
+has no such EDGAR concepts), so banking's disable of those is redundant for SYF;
+the real correction is net_cash (banking disables it — deposits/funding are
+operating liabilities, not leverage) plus the revenue_growth multiplier (0.50
+banking vs 0.80 payments_network). On the checkpoint SYF moved
+payments_network → banking, 32.6 → 41.0. PYPL also carries `Credit Services` but
+is a payments platform — left alone (separate judgment, not swept).
+
+New electronic_components profile. GICS `Electronic Components` was the only
+unmapped string in the electronics/instruments space (Computer Hardware,
+Scientific & Technical Instruments, Medical Instruments & Supplies, Electronic
+Gaming were all already routed), so its members fell to `unknown`, whose neutral
+1.0 thresholds under-scored component specialists by ~20-25 BQ points (their
+mid-30s gross margins failed the 65% bar). New profile at 0.60 multipliers
+across (between industrial_manufacturer 0.55 and medtech/consumer_electronics
+0.65), NO disabled_signals — every signal is meaningful, the problem was only
+mis-thresholding. The string maps to it, lifting APH (BQ 70→81), TEL (45→67),
+GLW (43→64). semiconductor_platform was rejected as a template — its ~1.0 gross
+multiplier reproduces the unknown suppression.
+
+JBL exclusion. JBL carries the same `Electronic Components` string but is a
+~9%-GM EMS contract manufacturer, not a component specialist → JBL
+industrial_manufacturer ticker_override routes it to the profile that fits thin
+assembly margins (override takes precedence over the GICS pattern).
+
+Validated (SYF COF AXP V MA APH TEL GLW JBL ANET): SYF→banking; V/MA still
+payments_network (override didn't leak); APH/TEL/GLW→electronic_components with
+BQ lifted; JBL→industrial_manufacturer via override; ANET unchanged
+(consumer_electronics, different string).
+
+Why it mattered: a balance-sheet lender scored on payment-network economics, and
+a class of quality component makers suppressed by neutral thresholds, both
+distort the shortlist the book trades off. Pure classification — lower risk than
+the cyclical work; the only things to watch were the leak checks (V/MA intact,
+ANET intact, JBL excluded), all clean.
+
 ---
 
 ## Open Issues (as of 2026-05-29; Architecture B re-scoped 2026-05-28; Chief prompt reverted 2026-05-28; entry-price refactor landed 2026-05-28; Debate Moderator added 2026-05-28; Stage 01 FD leak fixed 2026-05-29)
@@ -675,13 +723,17 @@ safety boundary — only GICS-confirmed-clean strings are swept per pass.
   prompt now drives recommendation off the deterministic band rather
   than computing it.
 
-- SYF misclassification: GICS "Credit Services" maps to payments_network, but
-  SYF is a consumer-credit lender. Needs a banking ticker_override (same
-  pattern as COF).
+- ~~SYF misclassification~~ — **FIXED (380f663).** SYF banking ticker_override
+  added (mirrors COF/AXP). "Credit Services" collides lenders with networks, so
+  the string stays mapped to payments_network for V/MA and SYF is pulled out by
+  override. PYPL (also "Credit Services", a payments platform) left as a
+  separate judgment, not swept.
 
-- Electronic Components profile gap: APH, TEL, GLW route to unknown/neutral.
-  The bucket warrants a dedicated economic profile — without it, DTS scores
-  for electronic components names are suppressed by neutral multipliers.
+- ~~Electronic Components profile gap~~ — **FIXED (380f663).** New
+  electronic_components profile (0.60 multipliers, no disabled signals) mapped
+  from GICS "Electronic Components"; lifts APH/TEL/GLW out of unknown's neutral
+  thresholds. JBL (EMS contract mfr, ~9% GM) excluded via an
+  industrial_manufacturer override.
 
 - Expand commodity-cyclical classification — per-ticker passes still pending.
   Done: energy (7ae2272) and metals & mining + fertilizer (1f04754 — new

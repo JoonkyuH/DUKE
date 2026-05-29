@@ -699,6 +699,7 @@ b5e5d24  feat: move entry-price computation to Python (entry_price_calculator); 
 a4a5792  feat: Debate Moderator drives outcome + weighting (ε=0.5); self-scores demoted to audit-only; Chief lean is a named-override anchor
 7ae2272  fix: mid-cycle FCF normalization for commodity-cyclicals — peak-cycle FCF no longer reads as durable quality/cheapness (energy-gated); EQT 64.6 #1 → 51.2 #4
 1f04754  fix: extend commodity-cyclical gate to metals + fertilizer (Gold/Copper/Steel/Aluminum/Other Metals/Ag Inputs) + mid-cycle FCF near-zero denominator guard; NEM 67.1 #1 → 49.1
+380f663  fix: SYF→banking override + new electronic_components profile (0.60); JBL→industrial_manufacturer
 
 
 ## S&P 500 Screening Results (2026-05-24)
