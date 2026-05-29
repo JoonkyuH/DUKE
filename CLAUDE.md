@@ -403,10 +403,16 @@ Peak-cycle FCF makes it look like a compounder.
 EDGAR gross profit for E&P excludes DD&A/depletion.
 No energy cyclical economic profile handles this.
 
-File-handle leak: Stage 01 does not release
-file/DB handles between tickers. Worked around
-with `ulimit -n 8192` per-terminal. Must be fixed
-before any unattended/scheduled run.
+~~File-handle leak~~ — FIXED (see Pending below).
+Stage 01 previously leaked ~6 FDs per ticker
+(~3.3 sockets + ~2.1 pipes), requiring
+`ulimit -n 8192` to survive 500 tickers. Resolved
+by hoisting `ThreadPoolExecutor` out of the
+per-ticker loop and closing `yf.Ticker.session`
+explicitly. Post-fix slope is ~0/ticker. The
+`ulimit -n 8192` guidance is kept as a
+belt-and-suspenders safety net but is no longer
+load-bearing.
 
 ### Pending
 ~~Entry-price computation in Python~~ — DONE in

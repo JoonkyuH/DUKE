@@ -145,6 +145,20 @@ def fetch_next_earnings_date(ticker: str) -> Optional[int]:
         return None
 
 
+def _close_yf_ticker(t) -> None:
+    """Release the curl_cffi/requests session that yf.Ticker keeps open.
+
+    yfinance ≥0.2 backs each Ticker with a per-instance session (curl_cffi
+    on the installed build) whose connection pool keeps idle HTTPS sockets
+    alive. Without an explicit close those sockets persisted in the process,
+    leaking ~3 IPv6 FDs per ticker on the screening loop.
+    """
+    try:
+        t.session.close()
+    except Exception:
+        pass
+
+
 def fetch_market_data(ticker: str) -> dict:
     """
     Fetch market data for ticker and return a raw_signal_record dict.
@@ -153,7 +167,13 @@ def fetch_market_data(ticker: str) -> dict:
     """
     ticker = ticker.upper()
     t = yf.Ticker(ticker)
+    try:
+        return _fetch_market_data_inner(ticker, t)
+    finally:
+        _close_yf_ticker(t)
 
+
+def _fetch_market_data_inner(ticker: str, t) -> dict:
     hist = t.history(period="1y")
     if hist.empty:
         raise ValueError(f"No price history returned for {ticker!r}")
@@ -200,9 +220,14 @@ def fetch_market_data(ticker: str) -> dict:
     sector_etf  = SECTOR_ETF_MAP.get(sector_name)
 
     # ── Relative strength vs SPY ──────────────────────
+    # SPY is currently re-fetched per ticker. A future optimization is to
+    # hoist the SPY (and sector-ETF) fetch out of the per-ticker loop in
+    # run_screening.py so we fetch them once per run. For now we still create
+    # the Ticker per call but explicitly close its session afterwards.
     rs_vs_spy_10d = rs_vs_spy_20d = None
+    spy_t = yf.Ticker("SPY")
     try:
-        spy_closes = yf.Ticker("SPY").history(period="1y")["Close"]
+        spy_closes = spy_t.history(period="1y")["Close"]
         if not spy_closes.empty:
             ticker_10d = _pct_change(closes, 10)
             ticker_20d = _pct_change(closes, 20)
@@ -214,12 +239,15 @@ def fetch_market_data(ticker: str) -> dict:
                 rs_vs_spy_20d = round(ticker_20d - spy_20d, 2)
     except Exception:
         pass
+    finally:
+        _close_yf_ticker(spy_t)
 
     # ── Relative strength vs sector ETF ───────────────
     rs_vs_sector_10d = rs_vs_sector_20d = None
     if sector_etf:
+        sect_t = yf.Ticker(sector_etf)
         try:
-            sect_closes = yf.Ticker(sector_etf).history(period="1y")["Close"]
+            sect_closes = sect_t.history(period="1y")["Close"]
             if not sect_closes.empty:
                 ticker_10d  = _pct_change(closes, 10)
                 ticker_20d  = _pct_change(closes, 20)
@@ -231,6 +259,8 @@ def fetch_market_data(ticker: str) -> dict:
                     rs_vs_sector_20d = round(ticker_20d - sect_20d, 2)
         except Exception:
             pass
+        finally:
+            _close_yf_ticker(sect_t)
 
     # ── Earnings ─────────────────────────────────────
     next_earnings_date = days_to_earnings = None

@@ -269,10 +269,15 @@ def main():
     raw_records = []
     fetch_errors = {}
 
-    for i, t in enumerate(tickers):
-        if i > 0:
-            time.sleep(0.5)
-        with ThreadPoolExecutor(max_workers=1) as ex:
+    # Single shared executor across all tickers — creating one per iteration
+    # leaked the executor's internal wakeup pipes on Python 3.14/Darwin
+    # (~2 FDs per ticker). The 20-ticker harness saw zero 30s timeouts, so a
+    # shared max_workers=1 executor is safe; if a real hang ever occurs the
+    # queued ticker will time out and surface the problem.
+    with ThreadPoolExecutor(max_workers=1) as ex:
+        for i, t in enumerate(tickers):
+            if i > 0:
+                time.sleep(0.5)
             future = ex.submit(_fetch_ticker_data, t)
             try:
                 raw_records.append(future.result(timeout=30))

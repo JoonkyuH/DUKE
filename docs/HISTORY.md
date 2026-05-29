@@ -460,13 +460,60 @@ baseline is gone.
 
 ---
 
-## Open Issues (as of 2026-05-28; Architecture B re-scoped 2026-05-28; Chief prompt reverted 2026-05-28; entry-price refactor landed 2026-05-28; Debate Moderator added 2026-05-28)
+### 2026-05-29 Session
+
+**(commit hash recorded post-commit)** — `fix: Stage 01 file-handle leak — hoist ThreadPoolExecutor out of per-ticker loop, close yfinance sessions`
+Stage 01 was leaking ~6 file descriptors per ticker. The `ulimit -n 8192`
+per-terminal workaround was required to survive 500-ticker S&P 500 runs and
+the "must fix before unattended/scheduled run" item gated the next full
+screen. Diagnosis (read-only sweep) traced the leak to two sources, with
+file/DB handles ruled out:
+
+  Type   Slope/ticker  Source
+  REG       flat       (sqlite caches close cleanly)
+  IPv6      ~3.3       unclosed yfinance sessions
+  PIPE      ~2.1       per-iteration ThreadPoolExecutor
+
+Source 1 — `ThreadPoolExecutor(max_workers=1)` was being created inside the
+per-ticker loop in `run_screening.py`. On Python 3.14/Darwin, the executor's
+internal wakeup pipe FDs lingered until GC even after the `with` block's
+`shutdown(wait=True)`. Fixed by hoisting a single executor around the whole
+loop. The 20-ticker harness saw zero 30s timeouts in practice, so the
+shared `max_workers=1` executor is safe; if a real hang ever occurs, the
+queued ticker will time out and surface the problem rather than mask it.
+
+Source 2 — `data_fetcher.fetch_market_data` instantiated `yf.Ticker(...)` for
+the primary ticker plus SPY and the sector ETF on every call. Each `Ticker`
+carried a `curl_cffi.requests.Session` whose connection pool kept idle HTTPS
+sockets alive with no explicit close path. Fixed by binding each `yf.Ticker`
+to a local, wrapping the use site in `try / finally`, and calling
+`_close_yf_ticker(t)` in the finally clause. A future optimization noted in
+a comment is to hoist the SPY + sector-ETF fetches out of the per-ticker
+loop entirely (they currently re-fetch per call), but that is a performance
+improvement, not a leak fix.
+
+Validation: instrumented `count_fds()` between tickers on a 20-name run.
+
+  Before fix:  154 → 152 → 158 → ... → 253  (slope ~6/ticker, monotonic)
+  After fix:   152 → 152 → 152 → ... → 152  (slope 0/ticker, flat)
+
+Full Stage 01 run on 20 tickers at `ulimit -n 256` completed clean
+including the transcript prefetch (492 transcripts cached). The
+`ulimit -n 8192` guidance in CLAUDE.md and README remains in place as a
+belt-and-suspenders safety net but is no longer load-bearing for the
+500-ticker screen.
+
+---
+
+## Open Issues (as of 2026-05-29; Architecture B re-scoped 2026-05-28; Chief prompt reverted 2026-05-28; entry-price refactor landed 2026-05-28; Debate Moderator added 2026-05-28; Stage 01 FD leak fixed 2026-05-29)
 
 **Must fix before relying on shortlist**
 
-- Stage 01 file-handle leak: Stage 01 does not release file/DB handles between
-  tickers. Worked around with `ulimit -n 8192` per-terminal. Must be fixed
-  before any unattended or scheduled run.
+- ~~Stage 01 file-handle leak~~ — **FIXED.** See chronological entry below.
+  ~6 FDs/ticker leak (3.3 sockets + 2.1 pipes) traced to a per-iteration
+  `ThreadPoolExecutor` and unclosed `yf.Ticker.session` urllib3 pools.
+  Resolved; post-fix per-ticker slope is ~0. `ulimit -n 8192` guidance is
+  kept as a safety net but no longer load-bearing.
 
 **Pending**
 
