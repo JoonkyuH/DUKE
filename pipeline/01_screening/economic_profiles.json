@@ -35,6 +35,18 @@
       "classification_source": "manual_v1",
       "review_date": "2026-01"
     },
+    "SYF": {
+      "profile": "banking",
+      "rationale": "Synchrony is a consumer-credit lender (private-label/store cards) that carries credit risk on its own balance sheet and takes deposits. GICS industry 'Credit Services' maps to payments_network, which is wrong: that profile is for pure networks (Visa/Mastercard). Same collision as COF — 'Credit Services' lumps balance-sheet lenders with fee-based networks, so SYF needs an override (the GICS string itself stays mapped to payments_network for V/MA).",
+      "classification_source": "manual_v1",
+      "review_date": "2026-05"
+    },
+    "JBL": {
+      "profile": "industrial_manufacturer",
+      "rationale": "Jabil is an EMS contract manufacturer (~9% gross margin), not an electronic-component specialist. GICS industry 'Electronic Components' maps to electronic_components (connectors/specialty-glass economics: mid-30s gross margin), which over-credits JBL's thin assembly margins. Routed to industrial_manufacturer, which fits its low-margin, capex-light assembly model.",
+      "classification_source": "manual_v1",
+      "review_date": "2026-05"
+    },
     "GE": {
       "profile": "aerospace_defense",
       "rationale": "Post-spinoff GE Aerospace is a pure aviation engine and defense company. Aerospace & Defense GICS industry string correctly maps here.",
@@ -50,6 +62,7 @@
     "Software - Application":              "enterprise_software",
     "Credit Services":                     "payments_network",
     "Consumer Electronics":                "consumer_electronics",
+    "Electronic Components":               "electronic_components",
     "Drug Manufacturers - General":        "pharma_innovator",
     "Medical Devices":                     "medtech_device",
     "Entertainment":                       "digital_media",
@@ -222,6 +235,10 @@
     "consumer_electronics": {
       "description": "Pure or predominantly hardware consumer electronics. Lower margins, more cyclical.",
       "examples": ["SONY", "LOGI"]
+    },
+    "electronic_components": {
+      "description": "Electronic component specialists — connectors, specialty glass. Normal margin/FCF businesses (mid-30s gross margin, mid-teens FCF margin) that neutral 'unknown' thresholds under-score. Above-industrial quality but below semiconductor margins. EMS/contract assemblers (e.g. JBL) are routed to industrial_manufacturer instead.",
+      "examples": ["APH", "TEL", "GLW"]
     },
     "digital_media": {
       "description": "Content and streaming. Subscriber growth alongside margins.",

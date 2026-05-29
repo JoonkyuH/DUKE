@@ -536,14 +536,30 @@ writes those to the journal directly; Chief
 contributes recommendation + entry_price_rationale
 prose.
 
-SYF misclassification: GICS "Credit Services"
-maps to payments_network, but SYF is a consumer-
-credit lender. Needs a banking ticker_override
-(same pattern as COF).
+~~SYF misclassification~~ — FIXED. GICS "Credit
+Services" maps to payments_network (correct for V/MA),
+but SYF is a consumer-credit lender → SYF banking
+ticker_override added (mirrors COF/AXP). "Credit
+Services" lumps balance-sheet lenders with fee-based
+networks, so the fix is a per-ticker override, not a
+GICS remap. Modest live impact: SYF's gross/fcf-margin
+metrics are None regardless of profile (a lender has
+no such EDGAR concepts), so the banking disable of
+those is redundant; the real correction is net_cash
+(disabled under banking) + the revenue multiplier.
+PYPL also carries "Credit Services" but is a payments
+platform — left alone (separate judgment, not swept).
 
-Electronic Components profile gap: APH, TEL, GLW
-route to unknown/neutral. The bucket warrants a
-dedicated economic profile.
+~~Electronic Components profile gap~~ — FIXED. New
+electronic_components profile (multipliers 0.60 across,
+NO disabled signals — every signal is meaningful;
+unknown's neutral 1.0 thresholds just under-scored
+them ~20-25 BQ pts). GICS "Electronic Components" →
+electronic_components. Lifts component specialists
+APH/TEL/GLW out of unknown. JBL carries the same GICS
+string but is a ~9%-GM EMS contract manufacturer →
+JBL industrial_manufacturer ticker_override excludes
+it. Not cyclical, not in any gate.
 
 Expand commodity-cyclical classification — per-ticker
 passes still PENDING. Done so far: energy (7ae2272)

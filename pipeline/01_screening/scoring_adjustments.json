@@ -30,6 +30,11 @@
       "revenue_growth_multiplier": 0.65,
       "fcf_margin_multiplier": 0.70
     },
+    "electronic_components": {
+      "gross_margin_multiplier": 0.60,
+      "revenue_growth_multiplier": 0.60,
+      "fcf_margin_multiplier": 0.60
+    },
     "digital_media": {
       "gross_margin_multiplier": 0.70,
       "revenue_growth_multiplier": 0.70,
