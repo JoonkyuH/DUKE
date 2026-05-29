@@ -462,7 +462,7 @@ baseline is gone.
 
 ### 2026-05-29 Session
 
-**(commit hash recorded post-commit)** — `fix: Stage 01 file-handle leak — hoist ThreadPoolExecutor out of per-ticker loop, close yfinance sessions`
+**857258a** — `fix: Stage 01 file-handle leak — hoist ThreadPoolExecutor out of per-ticker loop, close yfinance sessions`
 Stage 01 was leaking ~6 file descriptors per ticker. The `ulimit -n 8192`
 per-terminal workaround was required to survive 500-ticker S&P 500 runs and
 the "must fix before unattended/scheduled run" item gated the next full
@@ -502,6 +502,77 @@ including the transcript prefetch (492 transcripts cached). The
 `ulimit -n 8192` guidance in CLAUDE.md and README remains in place as a
 belt-and-suspenders safety net but is no longer load-bearing for the
 500-ticker screen.
+
+**7ae2272** — `fix: mid-cycle FCF normalization for commodity-cyclicals — peak-cycle FCF no longer reads as durable quality/cheapness (energy-gated)`
+EQT (natural-gas E&P) still screened #1 on the S&P 500 harness at 64.6,
+even though the commodity-cyclical archetype override (04260c0) had already
+force-routed it to deep_value and the advisory FLAG_CYCLICAL_PEAK_RISK was
+firing. That earlier entry's "EQT is no longer an open issue" was premature:
+the override changed the archetype label and lit a flag, but nothing acted on
+the flag, so EQT's peak-cycle free cash flow was still scored as durable.
+
+A read-only diagnose (this session) separated the two suspected causes and
+ranked them:
+- The gross-profit/depletion path was NOT the active lever. `energy_upstream`
+  already disables `gross_margin` (E&P gross profit excludes DD&A/depletion),
+  so the inflated margin contributed 0 to EQT's score. Confirmed: EQT's
+  mispricing hypothesis carried no gross-margin line.
+- The lever was peak-cycle FCF, surfacing in three FCF-derived signals at
+  once — VG 96 (P/FCF 9×, the value-trap signature: a cyclical trades cheap on
+  peak cash flow precisely because the market prices mean reversion), EQ 61.7
+  (FCF/NI), and BQ's fcf_margin. One root cause, three symptoms.
+
+A second read-only check confirmed the data to fix it was already in hand: the
+cached EDGAR companyfacts blob holds 15+ years of CFO/CapEx; only `_extract`'s
+`n_annual=2` default was truncating it. EQT clean window FY2021–25 FCF
+[607, 2065, 1160, 573, 2838]M → 5yr mid-cycle ≈ $1.45B vs a TTM (trailing 4q)
+of $4.05B = 2.80× peak. No new fetching, no paid feed (distinct from the
+data-blocked DCF/reverse-DCF anchors).
+
+The fix (gated on `is_commodity_cyclical` — the same predicate that
+force-routes the archetype and fires the flag, so the flag and the
+normalization are now the same event):
+- `common/edgar_client.py` `fetch_financials`: `n_annual` 2 → 6 for the
+  cash-flow concepts (CFO, capex) only.
+- `signal_scorer.py` `_mid_cycle_fcf`: mean of the consecutive clean trailing
+  FY window (CapEx present and > 0 — deep history has XBRL concept-switch gaps,
+  e.g. EQT CapEx tagged 0 in FY2015), min 3 / max 5 years. Fewer than 3 clean
+  years → fall back to TTM and do not normalize.
+- `compute_fundamental_metrics`: for cyclicals only, substitute mid-cycle FCF
+  into P/FCF, fcf_margin and FCF/NI (which also moves the pfcf-derived
+  historical-discount signal). Raw `fcf_ttm` + `mid_cycle_fcf` both kept; the
+  mispricing hypothesis discloses "TTM FCF $X vs Nyr mid-cycle $Y (Z× peak)".
+- `reason_codes.py`: FLAG_CYCLICAL_PEAK_RISK now fires off `fcf_peak_ratio >
+  1.2` (TTM vs mid-cycle), with the old raw-TTM `fcf_margin > 15` proxy as the
+  sparse-history fallback so a peak cyclical is never un-flagged.
+
+Validated on the EQT/XOM/CVX/MSFT/NVDA harness:
+- EQT 64.6 #1 → 51.2 #4 (NVDA now #1). VG 96 → 82, EQ 61.7 → 33.7,
+  P/FCF 9× → 24×. Dethroned. ✓
+- MSFT 54.6, all six sub-scores identical — the gate leaves compounders alone.
+- NVDA untouched despite a 1.94× FCF peak: it is semiconductor_platform, not a
+  commodity cyclical, so the gate correctly ignores a secular grower. This is
+  the gate-leak test, and it is the whole safety story.
+
+Two deliberate, documented properties:
+- SYMMETRIC (user decision: keep): normalization also RAISED trough cyclicals
+  whose TTM FCF sits below mid-cycle (XOM 29.4 → 43.4 at 0.52× peak, CVX
+  41.8 → 51.6 at 0.63×). The mid-cycle figure is the honest estimate
+  regardless of cycle position; this is "normalize through the cycle," not a
+  one-way peak penalty.
+- PEG NOT normalized: in this codebase PEG is P/E ÷ revenue-growth
+  (earnings-based, no FCF term), so the FCF substitution is mechanically a
+  no-op on it. EQT's PEG stayed 0.2× on peak NET INCOME, which is why VG only
+  fell 96 → 82 rather than collapsing; EQT was dethroned mainly via EQ and the
+  historical-discount signal. Closing the value-trap on VG itself needs
+  mid-cycle EARNINGS normalization — recorded as a follow-up.
+
+Why it mattered: the shortlist is the artifact the book actually trades off. A
+peak cyclical ranking #1 would have routed a mean-reverting commodity producer
+into Stages 02–07 as the top idea. Untested path: the <3-clean-years TTM
+fallback was not exercised by live data (all three energy names had a full 5yr
+window) — the logic is in place but unverified against a real sparse-history
+cyclical.
 
 ---
 
@@ -555,6 +626,25 @@ belt-and-suspenders safety net but is no longer load-bearing for the
 - Electronic Components profile gap: APH, TEL, GLW route to unknown/neutral.
   The bucket warrants a dedicated economic profile — without it, DTS scores
   for electronic components names are suppressed by neutral multipliers.
+
+- Expand commodity-cyclical classification (NEXT, after 7ae2272): the
+  mid-cycle FCF normalization is gated on `is_commodity_cyclical`, which
+  currently covers only energy (energy_upstream / integrated_energy /
+  energy_midstream). Other commodity cyclicals — metals & mining, chemicals,
+  homebuilders/residential construction, autos — route to
+  `industrial_manufacturer`, which has no peak-cycle handling, so they get
+  peak-cycle FCF scored as durable exactly as EQT used to. Extending coverage
+  is a classification question (which GICS industries are price-takers) and
+  warrants its own diagnose before widening the gate: a false positive would
+  wrongly normalize a secular grower (cf. NVDA at 1.94× FCF peak, correctly
+  left alone). The residual risk of 7ae2272 lives here — the gate is the
+  safety boundary.
+
+- Mid-cycle EARNINGS normalization (follow-up to 7ae2272): PEG is
+  earnings-based (P/E ÷ rev-growth), so the FCF normalization is a no-op on it
+  — a peak cyclical's PEG stays cheap on peak net income, leaving the VG
+  signal partially saturated. Closing the value-trap on VG itself needs
+  mid-cycle earnings, parallel to the mid-cycle FCF approach.
 
 - Contradiction channel wired but never validated with live data. Requires two
   consecutive Stage 02 runs on the same ticker (first run populates
