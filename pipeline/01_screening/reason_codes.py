@@ -120,6 +120,8 @@ def assign_reason_codes(
     fcf_ttm      = m.get("fcf_ttm")
     fcf_ann1     = m.get("fcf_ann1")
     rev_pairs    = m.get("rev_increasing_pairs")
+    fcf_normalized = m.get("fcf_normalized", False)
+    fcf_peak_ratio = m.get("fcf_peak_ratio")
 
     # ── Reason Codes ──────────────────────────
 
@@ -212,10 +214,19 @@ def assign_reason_codes(
     # ── Profile-aware adjustments ─────────────
     economic_profile = record.get("classification", {}).get("economic_profile", "unknown")
 
-    # Commodity-cyclical peak-cycle warning: a price-taker generating a high
-    # FCF margin is almost certainly riding elevated commodity prices.
-    if is_commodity_cyclical(economic_profile) and fcf_margin is not None and fcf_margin > 15:
-        flags.append(FLAG_CYCLICAL_PEAK_RISK)
+    # Commodity-cyclical peak-cycle warning. This flag and the FCF normalization
+    # in signal_scorer are now the SAME event: when a price-taker's TTM FCF
+    # materially exceeds its trailing mid-cycle average, the scorer normalizes
+    # the FCF-derived ratios and we flag the name. fcf_peak_ratio = TTM /
+    # mid-cycle; >1.2 means TTM FCF is ≥20% above mid-cycle (a cyclical peak).
+    # When history is too sparse to normalize (fcf_normalized False, <3 clean
+    # years), fall back to the raw-TTM fcf_margin > 15 proxy so a peak cyclical
+    # is never silently un-flagged.
+    if is_commodity_cyclical(economic_profile):
+        if fcf_normalized and fcf_peak_ratio is not None and fcf_peak_ratio > 1.2:
+            flags.append(FLAG_CYCLICAL_PEAK_RISK)
+        elif not fcf_normalized and fcf_margin is not None and fcf_margin > 15:
+            flags.append(FLAG_CYCLICAL_PEAK_RISK)
 
     # Suppress codes/flags tied to signals structurally disabled for this profile.
     disabled = get_disabled_signals(economic_profile)

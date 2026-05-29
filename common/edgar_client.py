@@ -432,15 +432,20 @@ def fetch_financials(ticker: str, as_of: str | None = None) -> dict:
     operating_income = ex(usd("OperatingIncomeLoss"))
     net_income       = ex(usd("NetIncomeLoss", "NetIncomeLossAvailableToCommonStockholdersBasic"))
 
+    # Cash-flow concepts carry a deeper annual history (n_annual=6) so the
+    # scorer can compute a trailing mid-cycle FCF average for commodity-cyclical
+    # normalization. The full series is already in the cached companyfacts blob;
+    # the default n_annual=2 was the only thing truncating it. n_quarterly is
+    # unchanged, and other concepts stay at the default (only FCF normalizes).
     operating_cf = ex(usd(
         "NetCashProvidedByUsedInOperatingActivities",
         "NetCashProvidedByUsedInOperatingActivitiesContinuingOperations",
-    ))
+    ), n_annual=6)
     capex = ex(usd(
         "PaymentsToAcquireProductiveAssets",
         "PaymentsToAcquirePropertyPlantAndEquipment",
         "PaymentsForCapitalImprovements",
-    ))
+    ), n_annual=6)
     free_cash_flow = _fcf(operating_cf, capex)
 
     total_debt = ex(usd(

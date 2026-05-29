@@ -34,6 +34,7 @@ from economic_profile_classifier import (
     classify,
     get_multipliers,
     get_disabled_signals,
+    is_commodity_cyclical,
 )
 
 log = logging.getLogger("signal_scorer")
@@ -104,6 +105,42 @@ def _latest_annual_fy(metric: dict) -> Optional[int]:
         return None
 
 
+def _mid_cycle_fcf(
+    fcf_annual:   list,
+    capex_annual: list,
+    min_years:    int = 3,
+    max_years:    int = 5,
+) -> tuple[Optional[float], int]:
+    """
+    Trailing mid-cycle FCF average for commodity-cyclical normalization.
+
+    Walks back from the most recent fiscal year, including only CONSECUTIVE
+    years where FCF is present AND CapEx is present and positive. Deep EDGAR
+    history has XBRL concept-switch gaps (e.g. CapEx tagged 0 or missing in
+    some years), which would corrupt a naive average; stopping at the first
+    gap keeps the window contiguous and recent. Caps the window at max_years.
+
+    Returns (mean_fcf, n_years_used). mean_fcf is None when fewer than
+    min_years clean consecutive years are available — the caller then falls
+    back to TTM FCF and does not normalize.
+
+    Both lists are expected most-recent-first (as _fcf / _extract return them).
+    """
+    capex_by_period = {e.get("period"): e.get("val") for e in (capex_annual or [])}
+    clean: list[float] = []
+    for e in (fcf_annual or []):
+        cx  = capex_by_period.get(e.get("period"))
+        val = e.get("val")
+        if cx is None or cx <= 0 or val is None:
+            break                          # gap → window ends here (stay contiguous)
+        clean.append(val)
+        if len(clean) >= max_years:
+            break
+    if len(clean) < min_years:
+        return None, len(clean)
+    return sum(clean) / len(clean), len(clean)
+
+
 # ─────────────────────────────────────────────
 # METRICS COMPUTATION (single pass per ticker)
 # ─────────────────────────────────────────────
@@ -123,13 +160,14 @@ def compute_fundamental_metrics(
                         "week_52_high": float, "week_52_low": float}
     economic_profile — profile string from economic_profile_classifier.classify()
     """
-    rev  = fund_d.get("revenue", {})
-    gp   = fund_d.get("gross_profit", {})
-    ni   = fund_d.get("net_income", {})
-    fcf  = fund_d.get("free_cash_flow", {})
-    debt = fund_d.get("total_debt", {})
-    cash = fund_d.get("cash_and_equivalents", {})
-    shr  = fund_d.get("shares_outstanding", {})
+    rev   = fund_d.get("revenue", {})
+    gp    = fund_d.get("gross_profit", {})
+    ni    = fund_d.get("net_income", {})
+    fcf   = fund_d.get("free_cash_flow", {})
+    capex = fund_d.get("capex", {})
+    debt  = fund_d.get("total_debt", {})
+    cash  = fund_d.get("cash_and_equivalents", {})
+    shr   = fund_d.get("shares_outstanding", {})
 
     # ── Revenue ──────────────────────────────
     rev_ttm  = _ttm(rev)
@@ -249,6 +287,39 @@ def compute_fundamental_metrics(
     if "net_cash" in disabled:
         net_cash = net_cash_pct = None
 
+    # ── Commodity-cyclical FCF normalization ──────
+    # A commodity price-taker's TTM FCF reflects where it sits in the price
+    # cycle, not durable earning power. Peak-cycle FCF makes P/FCF look cheap,
+    # fcf_margin look high, and FCF/NI look like exemplary cash conversion — the
+    # value-trap signature that ranks a peak cyclical (EQT) #1. For these
+    # profiles only — gated on is_commodity_cyclical, the SAME predicate that
+    # force-routes the archetype and fires FLAG_CYCLICAL_PEAK_RISK — substitute
+    # a trailing mid-cycle FCF average into the FCF-derived ratios the scorers
+    # read. Non-cyclical profiles (compounders) are untouched. Raw TTM values
+    # (fcf_ttm, mid_cycle_fcf) are preserved alongside for traceability.
+    #
+    # NOTE: peg_ratio is intentionally NOT normalized here — in this codebase
+    # PEG is P/E ÷ revenue-growth (earnings-based), with no FCF term, so an
+    # FCF substitution is mechanically a no-op on it. Normalizing PEG would
+    # require normalizing net income, which is outside this FCF-only fix.
+    mid_cycle_fcf, fcf_norm_years = _mid_cycle_fcf(
+        fcf.get("annual", []) if isinstance(fcf, dict) else [],
+        capex.get("annual", []) if isinstance(capex, dict) else [],
+    )
+    fcf_normalized = False
+    fcf_peak_ratio = None
+    if (is_commodity_cyclical(economic_profile)
+            and "fcf_margin" not in disabled
+            and mid_cycle_fcf is not None
+            and mid_cycle_fcf > 0):
+        fcf_normalized = True
+        if fcf_ttm is not None:
+            fcf_peak_ratio = fcf_ttm / mid_cycle_fcf
+        # Substitute mid-cycle FCF into the ratios the signal functions read.
+        pfcf_ratio = (market_cap / mid_cycle_fcf) if market_cap else None
+        fcf_margin = _margin(mid_cycle_fcf, rev_ttm)
+        fcf_to_ni  = (mid_cycle_fcf / ni_ttm) if (ni_ttm is not None and ni_ttm > 0) else None
+
     return {
         # Revenue
         "rev_ttm":              rev_ttm,
@@ -270,6 +341,11 @@ def compute_fundamental_metrics(
         "ni_ttm":               ni_ttm,
         "ni_ann0":              ni_ann0,
         "fcf_to_ni":            fcf_to_ni,              # quality ratio; >1 = high quality
+        # Commodity-cyclical FCF normalization (cyclicals only; else passthrough)
+        "mid_cycle_fcf":        mid_cycle_fcf,          # trailing clean-year FCF avg, or None
+        "fcf_normalized":       fcf_normalized,         # True → ratios above use mid-cycle FCF
+        "fcf_peak_ratio":       fcf_peak_ratio,         # fcf_ttm / mid_cycle_fcf (>1 = peak)
+        "fcf_normalization_years": fcf_norm_years,      # clean consecutive years averaged
         # Balance sheet
         "net_cash":             net_cash,               # absolute (negative = net debt)
         "net_cash_pct":         net_cash_pct,           # % of mktcap (negative = net debt)
@@ -890,6 +966,21 @@ def build_mispricing_hypothesis(
                 parts.append(f"Valuation is stretched ({vg:.0f}/100): {', '.join(val_details)}.")
             else:
                 parts.append(f"Valuation is fair vs growth ({vg:.0f}/100): {', '.join(val_details)}.")
+
+    # Commodity-cyclical FCF normalization disclosure: P/FCF, fcf_margin and
+    # FCF/NI above use a trailing mid-cycle FCF average, not peak-cycle TTM FCF.
+    if metrics.get("fcf_normalized"):
+        ttm  = metrics.get("fcf_ttm")
+        mid  = metrics.get("mid_cycle_fcf")
+        yrs  = metrics.get("fcf_normalization_years")
+        if ttm is not None and mid is not None:
+            parts.append(
+                f"FCF normalized for cyclicality: TTM FCF ${ttm/1e9:.2f}B vs "
+                f"{yrs}yr mid-cycle ${mid/1e9:.2f}B "
+                f"({metrics.get('fcf_peak_ratio'):.2f}× peak) — valuation/quality "
+                f"signals scored on the mid-cycle figure to avoid extrapolating "
+                f"peak-cycle cash flow."
+            )
 
     # ── Historical discount narrative ─────────
     pct_from_high = metrics.get("pct_from_high")
