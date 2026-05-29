@@ -62,6 +62,12 @@
     "Oil & Gas Integrated":                "integrated_energy",
     "Oil & Gas Midstream":                 "energy_midstream",
     "Oil & Gas Refining & Marketing":      "integrated_energy",
+    "Gold":                                "commodity_cyclical",
+    "Copper":                              "commodity_cyclical",
+    "Steel":                               "commodity_cyclical",
+    "Aluminum":                            "commodity_cyclical",
+    "Other Industrial Metals & Mining":    "commodity_cyclical",
+    "Agricultural Inputs":                 "commodity_cyclical",
     "REIT - Industrial":                   "reit",
     "REIT - Retail":                       "reit",
     "REIT - Residential":                  "reit",
@@ -171,7 +177,7 @@
     }
   },
 
-  "commodity_cyclical_profiles": ["energy_upstream", "integrated_energy", "energy_midstream"],
+  "commodity_cyclical_profiles": ["energy_upstream", "integrated_energy", "energy_midstream", "commodity_cyclical"],
 
   "special_handling": {
     "banking": {
@@ -189,6 +195,10 @@
     "energy_upstream": {
       "disabled_signals": ["gross_margin"],
       "note": "EDGAR gross profit for E&P excludes DD&A and depletion (the largest cost of an upstream producer), so reported gross margin is structurally inflated and not comparable across industries."
+    },
+    "commodity_cyclical": {
+      "disabled_signals": ["gross_margin"],
+      "note": "Hard-commodity producers (metals & mining, fertilizers). Same extractive/processing cost-structure issue as E&P — EDGAR gross profit excludes depletion/DD&A, so reported gross margin is not comparable across industries. Gross margin disabled; mid-cycle FCF normalization applies (see commodity_cyclical_profiles)."
     }
   },
 
@@ -256,6 +266,10 @@
     "energy_midstream": {
       "description": "Pipeline and midstream. Toll road economics.",
       "examples": ["KMI"]
+    },
+    "commodity_cyclical": {
+      "description": "Hard-commodity price-takers: metals & mining (gold, copper, steel, aluminum, other industrial metals) and fertilizers/agricultural inputs. Cash flows track a commodity price the producer does not control; peak-cycle FCF is not durable. Mid-cycle FCF normalization applies.",
+      "examples": ["NEM", "FCX", "NUE", "STLD", "MOS", "CF"]
     },
     "utility_regulated": {
       "description": "Regulated utility. Regulated returns, capex-heavy.",

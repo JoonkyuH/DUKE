@@ -77,8 +77,11 @@ Classification order:
   2. gics_industry pattern  (confidence 0.85)
      gics_industry_patterns covers the full live
      S&P 500 GICS industry vocabulary (~52 patterns).
-     ~12 strings deliberately left unmapped → unknown:
-       Gold, Copper, Steel, Agricultural Inputs,
+     Gold, Copper, Steel, Aluminum, Other Industrial
+     Metals & Mining, and Agricultural Inputs now map
+     to commodity_cyclical (was unmapped → unknown;
+     see Mid-cycle FCF normalization). Still
+     deliberately unmapped → unknown:
        Advertising Agencies, Grocery Stores,
        Food Distribution, Medical Care Facilities,
        Conglomerates, Information Technology Services,
@@ -98,6 +101,9 @@ Special handling:
   reit: fcf_margin disabled
   energy_upstream: gross_margin disabled
     (E&P gross profit excludes DD&A/depletion)
+  commodity_cyclical: gross_margin disabled
+    (metals/fertilizer; extractive cost structure,
+     same depletion/DD&A issue as E&P)
 
 ### Mid-cycle FCF normalization (commodity cyclicals)
 Commodity price-takers report FCF that tracks where
@@ -109,11 +115,23 @@ EQT #1.
 
 Fix: for `is_commodity_cyclical` profiles only
 (energy_upstream / integrated_energy / energy_midstream
-— the same predicate that force-routes the archetype
-to deep_value and fires FLAG_CYCLICAL_PEAK_RISK),
-substitute a trailing MID-CYCLE FCF average for TTM FCF
-in the ratios the scorers read: P/FCF, fcf_margin,
-FCF/NI. Non-cyclical profiles are untouched.
+/ commodity_cyclical — the same predicate that
+force-routes the archetype to deep_value and fires
+FLAG_CYCLICAL_PEAK_RISK), substitute a trailing
+MID-CYCLE FCF average for TTM FCF in the ratios the
+scorers read: P/FCF, fcf_margin, FCF/NI. Non-cyclical
+profiles are untouched.
+
+Gate membership: energy was first (7ae2272). Metals &
+mining + fertilizer added next via a new
+commodity_cyclical profile: GICS Gold / Copper / Steel
+/ Aluminum / Other Industrial Metals & Mining /
+Agricultural Inputs route to it, and it is in
+commodity_cyclical_profiles. This fixed the live NEM
+mis-rank (gold at peak, 3.28×, was #1 at 67.1 on the
+`unknown` profile → 49.1, FLAG fires). Chemicals and
+Bucket 2 (homebuilders/autos/machinery/building
+materials) deliberately NOT sweeped — see Pending.
 
   Data: `common/edgar_client.py` fetch_financials now
     pulls n_annual=6 for the cash-flow concepts (CFO,
@@ -127,6 +145,13 @@ FCF/NI. Non-cyclical profiles are untouched.
     than 3 clean years → fall back to TTM, do not
     normalize (the FLAG fires off the raw-TTM proxy
     instead so a peak cyclical is never un-flagged).
+  Denominator guard: _mid_cycle_fcf also returns None
+    (→ TTM fallback) when the mean is <= 0, below a
+    revenue floor (< 0.01 × rev_ttm), or a meaningless
+    boom/bust straddle. A near-zero denominator makes
+    P/FCF and FCF/NI explode or flip sign. ALB (lithium,
+    5yr mean ≈ −$0.1B → −10× ratios) exposed this; it
+    was latent in the energy fix too.
   Substitution: in compute_fundamental_metrics, after
     the profile-aware nulling. Raw fcf_ttm and
     mid_cycle_fcf both kept in the metrics dict; the
@@ -520,25 +545,33 @@ Electronic Components profile gap: APH, TEL, GLW
 route to unknown/neutral. The bucket warrants a
 dedicated economic profile.
 
-Expand commodity-cyclical classification (NEXT, after
-the mid-cycle FCF fix): `is_commodity_cyclical` /
-`commodity_cyclical_profiles` currently covers only
-energy (energy_upstream / integrated_energy /
-energy_midstream). Other cyclicals — metals & mining,
-chemicals, homebuilders/residential construction,
-autos — route to `industrial_manufacturer`, which has
-NO peak-cycle handling, so they get peak-cycle FCF
-scored as durable exactly as EQT used to. The
-mid-cycle FCF machinery is now in place and gated on
-`is_commodity_cyclical`; extending coverage is mostly
-a classification/profile question (which GICS
-industries are commodity price-takers), and warrants
-its own diagnose before widening the gate — a false
-positive would wrongly normalize a secular grower
-(cf. NVDA at 1.94× FCF peak, correctly left alone
-because semiconductor_platform is not in the set).
-Residual risk of the whole fix lives here: the gate
-is the safety boundary.
+Expand commodity-cyclical classification — per-ticker
+passes still PENDING. Done so far: energy (7ae2272)
+and metals & mining + fertilizer (commodity_cyclical
+profile: Gold/Copper/Steel/Aluminum/Other Industrial
+Metals & Mining/Agricultural Inputs). Still NOT in the
+gate, each needing its own review because GICS can't
+make the call cleanly:
+  - Chemicals: "Chemicals" (DOW, CE) not yet verified
+    free of specialty names; "Specialty Chemicals"
+    COLLIDES commodity (LYB petrochem, ALB lithium)
+    with genuine specialty (LIN/SHW/ECL/APD/PPG —
+    pricing power). Needs ticker_overrides, not a GICS
+    sweep.
+  - Bucket 2 (homebuilders/residential construction,
+    autos, heavy machinery, building materials):
+    cyclical but not pure price-takers; each needs a
+    cyclical-vs-secular call and a TSLA-style exclusion
+    ("Auto Manufacturers" collides F/GM with secular
+    TSLA).
+The mid-cycle FCF machinery is in place and gated on
+`is_commodity_cyclical`; extending coverage is the
+classification question. A false positive would
+wrongly normalize a secular grower (cf. NVDA at 1.94×
+FCF peak, correctly left alone — semiconductor_platform
+not in the set). Residual risk of the whole fix lives
+here: the gate is the safety boundary, so only
+GICS-confirmed-clean strings are swept per pass.
 
 Mid-cycle EARNINGS normalization (follow-up to the FCF
 fix): PEG (P/E ÷ rev-growth) is earnings-based, so the

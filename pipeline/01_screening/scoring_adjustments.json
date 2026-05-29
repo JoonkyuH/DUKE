@@ -90,6 +90,11 @@
       "revenue_growth_multiplier": 0.40,
       "fcf_margin_multiplier": 0.60
     },
+    "commodity_cyclical": {
+      "gross_margin_multiplier": 0.55,
+      "revenue_growth_multiplier": 0.50,
+      "fcf_margin_multiplier": 0.55
+    },
     "utility_regulated": {
       "gross_margin_multiplier": 0.45,
       "revenue_growth_multiplier": 0.40,

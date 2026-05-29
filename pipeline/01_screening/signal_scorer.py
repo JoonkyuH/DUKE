@@ -108,6 +108,7 @@ def _latest_annual_fy(metric: dict) -> Optional[int]:
 def _mid_cycle_fcf(
     fcf_annual:   list,
     capex_annual: list,
+    rev_ttm:      Optional[float] = None,
     min_years:    int = 3,
     max_years:    int = 5,
 ) -> tuple[Optional[float], int]:
@@ -120,9 +121,15 @@ def _mid_cycle_fcf(
     some years), which would corrupt a naive average; stopping at the first
     gap keeps the window contiguous and recent. Caps the window at max_years.
 
-    Returns (mean_fcf, n_years_used). mean_fcf is None when fewer than
-    min_years clean consecutive years are available — the caller then falls
-    back to TTM FCF and does not normalize.
+    Returns (mean_fcf, n_years_used). mean_fcf is None — caller falls back to
+    TTM FCF and does NOT normalize — when any of:
+      - fewer than min_years clean consecutive years are available;
+      - the mean is <= 0 or near-zero relative to revenue (a near-zero
+        denominator makes P/FCF and FCF/NI explode or flip sign — worse than
+        not normalizing; ALB's lithium FCF straddled zero, 5yr mean ≈ −$0.1B
+        → −10× ratios. This guard also protects the energy profiles);
+      - the clean series straddles zero and the mean is tiny relative to the
+        boom/bust spread, so the average is not a meaningful mid-cycle figure.
 
     Both lists are expected most-recent-first (as _fcf / _extract return them).
     """
@@ -138,7 +145,18 @@ def _mid_cycle_fcf(
             break
     if len(clean) < min_years:
         return None, len(clean)
-    return sum(clean) / len(clean), len(clean)
+
+    mean = sum(clean) / len(clean)
+    # Denominator guards (see docstring): positive, above a revenue-relative
+    # floor, and not a meaningless boom/bust straddle.
+    if mean <= 0:
+        return None, len(clean)
+    if rev_ttm is not None and rev_ttm > 0 and mean < 0.01 * rev_ttm:
+        return None, len(clean)
+    spread = max(clean) - min(clean)
+    if min(clean) < 0 < max(clean) and spread > 0 and mean < 0.10 * spread:
+        return None, len(clean)
+    return mean, len(clean)
 
 
 # ─────────────────────────────────────────────
@@ -305,6 +323,7 @@ def compute_fundamental_metrics(
     mid_cycle_fcf, fcf_norm_years = _mid_cycle_fcf(
         fcf.get("annual", []) if isinstance(fcf, dict) else [],
         capex.get("annual", []) if isinstance(capex, dict) else [],
+        rev_ttm=rev_ttm,
     )
     fcf_normalized = False
     fcf_peak_ratio = None
