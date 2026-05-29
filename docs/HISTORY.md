@@ -678,6 +678,74 @@ distort the shortlist the book trades off. Pure classification — lower risk th
 the cyclical work; the only things to watch were the leak checks (V/MA intact,
 ANET intact, JBL excluded), all clean.
 
+**CRM Stage 02→07 smoke test (no commit — generated artifacts only)**
+First full-pipeline run since the Debate Moderator (a4a5792) and the entry-price
+refactor (b5e5d24). One ticker (CRM, shortlist #1) sent end-to-end before the
+30-name Baseline 2.0 batch, so a schema/wiring bug would surface on ticker 1
+rather than partway through a 30-name run with API spend behind it.
+
+**Machinery: GO.** All six stages (02 Research → 03 Refinery → 04 Scoring →
+05 Debate → 06 Synthesis → 07 Output) executed clean; every artifact landed
+well-formed. The Moderator-era wiring works live:
+- Stage 05 both analysts emitted `scenario_price` (bull $370, bear $195, each
+  with mechanism + grounding). `moderator` block present: sum-10 allocation
+  bull 6.0 / bear 4.0, `lean=bull_leans`, `margin=2.0`, `decisive_evidence`
+  populated (EV-007, CRPO 13% cc vs 10% revenue growth),
+  `moderator_parse_failed=False`, outcome `bull_prevails` — NOT a fallback
+  INCONCLUSIVE. Self-scores demoted to audit-only: `net_adj=+1.3` is the
+  margin-scaled blend (0.56×7 + 0.44×−6), not the raw ±7/−6.
+- Stage 06 `computed_entry` is Python-computed (entry 192.96, range
+  [192.96, 253.33], target_2to1 253.33, `price_gate_passed=true`,
+  `case_label=BELOW_BEAR`); the Chief minted NO entry numbers (entry_price /
+  range / target / gate all absent from chief_analyst_output) — only
+  `recommendation` + `entry_price_rationale` prose. `merit_lean=bull_leans` /
+  `merit_margin=2.0` / `decisive_evidence` threaded into the Chief brief and
+  persisted to the journal.
+- Stage 07 journal `DEC-CRM-20260529.json` written; merit_lean / merit_margin /
+  decisive_evidence persisted; entry numbers sourced verbatim from
+  computed_entry (not re-minted). action=watch, 6 learning_hooks.
+
+**Bug surfaced — Stage 05 `scenario_price` is not reconciled against the live
+price.** CRM end-state: archetype quality_compounder, merit_lean bull_leans
+(+2.0), `price_gate_passed=true`, `case_label=BELOW_BEAR`, recommendation
+**watch**. Walked through:
+- Current price $192.96 is CORRECT, not stale — confirmed it flows verbatim
+  from Stage 01 `price_data.current_price` (192.96) into Stage 06
+  `current_price_used` (192.96), same value, no drift. CRM was +9.5% on the
+  day, below its MA-200 (220.6) — a beaten-down name bouncing off lows.
+- The bear built its floor top-down: FY28 non-GAAP EPS impaired to ~$12.50,
+  multiple compressed to 16x → $200, rounded to $195. It never checked that
+  number against the live quote.
+- Back out the market's actual multiple: $192.96 / $12.50 ≈ **15.4x** — the
+  stock already trades BELOW the bear's own "pessimistic" 16x, on the bear's
+  own impaired EPS. The bear's downside case is less bearish than the current
+  tape. So the $195 "bear floor" isn't a downside — it's ~fair value / current
+  price. To function as a genuine floor it needs a lower multiple (~13-14x) or
+  a deeper EPS cut. (The bull is likely the same gap: scenario $370 vs a ~$266
+  YTD high, also unreconciled against where the stock trades.)
+
+**The pipeline handled the bad input correctly.** The entry-price calculator
+flagged BELOW_BEAR (current ≤ bear floor) and the Chief downgraded to watch with
+a named reason — explicitly noting "the bear scenario price may itself be
+understated rather than overstated," i.e. it recognized the bear floor might be
+too high and refused to treat BELOW_BEAR as an automatic buy. Correct downstream
+behavior on a mis-calibrated upstream input.
+
+**Defect location:** Stage 05 bull/bear prompts. The analysts derive
+`scenario_price` from fundamental mechanics (EPS × multiple) without
+sanity-checking against `current_price` or the 52-week range.
+
+**Blast-radius prediction:** any beaten-down name (trading below its MA-200) can
+produce a bear floor above current price → BELOW_BEAR → forced watch. If a
+cluster of names returns BELOW_BEAR in the 30-name batch, the root cause is bear
+scenarios running high, NOT a price-feed problem. Both fix and the BELOW_BEAR
+override-vs-annotate design question are logged in Open Issues (PENDING).
+
+**Baseline 2.0 status:** smoke test = GO on machinery; the 30-name batch has NOT
+been run. Open decision: fix the bull/bear scenario calibration first (clean
+baseline) vs. run the 30 now and catalog the BELOW_BEAR blast radius before
+fixing.
+
 ---
 
 ## Open Issues (as of 2026-05-29; Architecture B re-scoped 2026-05-28; Chief prompt reverted 2026-05-28; entry-price refactor landed 2026-05-28; Debate Moderator added 2026-05-28; Stage 01 FD leak fixed 2026-05-29)
@@ -691,6 +759,31 @@ ANET intact, JBL excluded), all clean.
   kept as a safety net but no longer load-bearing.
 
 **Pending**
+
+- **Stage 05 `scenario_price` not reconciled against the live price** (surfaced
+  by the CRM smoke test, 2026-05-29; see chronological entry). The bull/bear
+  analysts derive `scenario_price` from fundamental mechanics (EPS × multiple)
+  without sanity-checking against `current_price` or the 52-week range, so a
+  bear floor can land ABOVE the live quote and produce a spurious BELOW_BEAR.
+  CRM: bear floor $195 (FY28 EPS ~$12.50 × 16x) vs live $192.96 — the stock
+  already trades at ~15.4x, below the bear's own "pessimistic" 16x, so the bear
+  case is less bearish than the tape. Confirmed not a price-feed bug:
+  $192.96 flows verbatim Stage 01 → Stage 06. **Blast radius:** any name below
+  its MA-200 can trip BELOW_BEAR → forced watch; a cluster of BELOW_BEAR in the
+  30-name batch means bear scenarios running high, not stale prices. **Fix
+  (PENDING):** Stage 05 bull/bear prompts should require the scenario_price to
+  be reconciled against current_price — justify a floor above the live quote, or
+  model a genuine trough (lower multiple / deeper cut). The pipeline handles the
+  bad input correctly today (calculator flags BELOW_BEAR; Chief downgrades to
+  watch with a named reason), so this is calibration quality, not a wiring break.
+
+- **BELOW_BEAR: override-to-watch vs annotate — design decision PENDING.**
+  Secondary question raised by the above: should `case_label=BELOW_BEAR`
+  override the recommendation to watch (current behavior), or instead
+  annotate/flag the packet while leaving the gate-derived recommendation intact?
+  A name trading below even a pessimistic scenario can be a genuine buy, not a
+  reason to stand down. Tied to the scenario-calibration fix — if bear floors
+  become trustworthy, BELOW_BEAR carries more signal.
 
 - ~~**NEW TOP PRIORITY — Entry-price computation in Python.**~~
   **DONE in `b5e5d24`.** New module
