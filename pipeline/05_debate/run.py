@@ -36,6 +36,7 @@ sys.path.insert(0, str(_REPO_ROOT))
 
 from position_builder import build_bull_brief, build_bear_brief  # noqa: E402
 from debate_recorder import record_debate, _make_debate_id        # noqa: E402
+from debate_scorer import compute_debate_scores                    # noqa: E402
 from common.brief_adapter import build_evidence_packet           # noqa: E402
 
 try:
@@ -46,6 +47,8 @@ except ImportError:
 _MODEL          = "claude-sonnet-4-6"
 _MAX_TOKENS     = 16384  # Round 1: bull/bear independent positions (raised from 4096 — Path B prompt expansion pushed responses past the prior cap, causing silent truncation→parse-fail)
 _MAX_TOKENS_R2  = 16384  # Round 2: rebuttals must respond to every opposing argument
+_MOD_MODEL      = "claude-sonnet-4-6"
+_MOD_MAX_TOKENS = 8192   # Debate Moderator: neutral evidence referee
 _REPO_ROOT  = _THIS_DIR.parent.parent   # pipeline/05_debate/../../ = repo root
 
 
@@ -249,6 +252,145 @@ def _print_summary(record: dict) -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# DEBATE MODERATOR — neutral evidence referee
+# ─────────────────────────────────────────────────────────────────────────────
+# The Moderator scores evidence asymmetry on a fixed pool of 10 points (bull +
+# bear sum to 10). The code-side derive_lean below normalises the LLM's two
+# scores and applies a ±0.5 epsilon band (tightened from ±1.0 in EDIT 2a) — the
+# LLM cannot decide its own "balanced" label. This is the structural tax that
+# kills the all-balanced default.
+#
+# As of EDIT 2 the Moderator drives:
+#   - the debate outcome label (via debate_scorer._outcome_and_weights_from_moderator)
+#   - the 70/30 (margin-scaled) winner/loser weighting on the self-scores
+#   - the Chief's merit_lean anchor (threaded via synthesizer._build_brief)
+# Self-scores (bull_score_adj / bear_score_adj) remain in the debate record
+# for audit/traceability but no longer feed the outcome classifier or the
+# weighting ratio.
+
+def _strip_scores(d: dict) -> dict:
+    return {k: v for k, v in (d or {}).items()
+            if k not in ("score_adjustment", "confidence_adjustment")}
+
+
+def _build_moderator_brief(debate_dict: dict) -> dict:
+    return {
+        "ticker":       debate_dict.get("ticker"),
+        "company_name": debate_dict.get("company_name"),
+        "instructions": (
+            "You are the Debate Moderator. Read both positions, both rebuttals, "
+            "and the contentions. Allocate exactly 10 points between bull and "
+            "bear based on grounded surviving evidence — not advocacy volume. "
+            "Return the JSON structure specified in the system prompt."
+        ),
+        "bull_position": _strip_scores(debate_dict.get("bull_position") or {}),
+        "bear_position": _strip_scores(debate_dict.get("bear_position") or {}),
+        "bull_rebuttal": _strip_scores(debate_dict.get("bull_rebuttal") or {}),
+        "bear_rebuttal": _strip_scores(debate_dict.get("bear_rebuttal") or {}),
+        "contentions":   debate_dict.get("contentions") or [],
+    }
+
+
+def derive_lean(bull, bear) -> tuple[str | None, float]:
+    """
+    Code-side lean derivation. Normalises to sum-10 then applies the +/-1.0
+    epsilon band. "balanced" only when the normalised scores are within 1.0 of
+    each other; otherwise the higher score wins. Returns (lean, signed margin).
+    margin = bull - bear after normalisation (positive = bull leans).
+    """
+    bull = float(bull or 0)
+    bear = float(bear or 0)
+    total = bull + bear
+    if total <= 0:
+        return None, 0.0
+    b = 10.0 * bull / total
+    r = 10.0 * bear / total
+    margin = round(b - r, 2)
+    # Epsilon band: balanced only when scores are within 0.5 of each other.
+    # Tightened from 1.0 to 0.5 in EDIT 2a — the 1.0 band suppressed the four
+    # real bear reads (DXCM/FSLR/GEN/PAYX at 5.5/4.5) and three thin bull reads
+    # observed in the 21-ticker harness sample; 0.5 surfaces them.
+    if abs(margin) <= 0.5:
+        return "balanced", margin
+    return ("bull_leans" if margin > 0 else "bear_leans"), margin
+
+
+def _moderator_fallback() -> dict:
+    """Surface parse failure visibly — do NOT default to balanced."""
+    return {
+        "analyst_role":         "debate_moderator",
+        "bull_evidence_score":  None,
+        "bear_evidence_score":  None,
+        "lean":                 None,
+        "margin":               None,
+        "decisive_evidence":    "",
+        "reasoning":            "Moderator parse failed — verdict unavailable. Downstream consumers should treat this as a failure mode, not as a balanced verdict.",
+        "contention_calls":     [],
+        "moderator_parse_failed": True,
+    }
+
+
+def _apply_moderator_verdict_to_debate_dict(debate_dict: dict) -> None:
+    """
+    Overwrite outcome + debate-adjusted scores on debate_dict using the
+    Moderator block. record_debate already populated these from the self-scores
+    earlier in the run; this rewrites them with Moderator-driven values.
+
+    Self-scores remain in bull_position / bear_position for traceability — they
+    no longer drive the outcome label or the weighting ratio.
+    """
+    moderator = debate_dict.get("moderator")
+    base_ev   = float(debate_dict.get("base_evidence_score")   or 0.0)
+    base_conf = float(debate_dict.get("base_confidence_score") or 0.0)
+    bull = debate_dict.get("bull_position") or {}
+    bear = debate_dict.get("bear_position") or {}
+    scores = compute_debate_scores(
+        base_evidence_score=base_ev,
+        base_confidence_score=base_conf,
+        bull_score_adj=float(bull.get("score_adjustment")      or 0.0),
+        bull_conf_adj =float(bull.get("confidence_adjustment") or 0.0),
+        bear_score_adj=float(bear.get("score_adjustment")      or 0.0),
+        bear_conf_adj =float(bear.get("confidence_adjustment") or 0.0),
+        moderator=moderator,
+    )
+    outcome = scores["outcome"]
+    debate_dict["outcome"] = outcome.value if hasattr(outcome, "value") else str(outcome)
+    debate_dict["debate_evidence_score"]   = scores["debate_evidence_score"]
+    debate_dict["debate_confidence_score"] = scores["debate_confidence_score"]
+    debate_dict["net_score_adjustment"]    = scores["net_score_adjustment"]
+    meta = debate_dict.setdefault("metadata", {})
+    meta["net_conf_adjustment"] = scores["net_conf_adjustment"]
+
+
+def _call_moderator(client, debate_dict: dict) -> dict:
+    """Run the Moderator. Single attempt. Returns a dict — the moderator block
+    that gets attached to the debate record."""
+    with open(_THIS_DIR / "prompts" / "debate_moderator.md") as f:
+        system_prompt = f.read()
+    brief  = _build_moderator_brief(debate_dict)
+    print("  calling Debate Moderator...", flush=True)
+    parsed, _raw = _invoke_llm(client, system_prompt, brief, "Debate Moderator", _MOD_MAX_TOKENS)
+    if parsed is None:
+        print("  WARNING: Moderator parse failed; using fallback (lean=None, scores=None)")
+        return _moderator_fallback()
+    bull = parsed.get("bull_evidence_score")
+    bear = parsed.get("bear_evidence_score")
+    lean, margin = derive_lean(bull, bear)
+    return {
+        "analyst_role":         "debate_moderator",
+        "bull_evidence_score":  bull,
+        "bear_evidence_score":  bear,
+        "lean":                 lean,            # code-derived, not the LLM's
+        "margin":               margin,
+        "lean_llm_reported":    parsed.get("lean"),
+        "decisive_evidence":    parsed.get("decisive_evidence") or "",
+        "reasoning":            parsed.get("reasoning") or "",
+        "contention_calls":     parsed.get("contention_calls") or [],
+        "moderator_parse_failed": False,
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # MAIN
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -413,6 +555,18 @@ def main() -> None:
     debate_dict["metadata"]["round_2_complete"]            = not (bull_parse_failed or bear_parse_failed)
     debate_dict["metadata"]["bull_rebuttal_parse_failed"]  = bull_parse_failed
     debate_dict["metadata"]["bear_rebuttal_parse_failed"]  = bear_parse_failed
+
+    # ── Debate Moderator: neutral evidence referee (drives outcome + weighting) ──
+    # EDIT 2 rewire: the Moderator's lean drives the outcome label and its
+    # margin drives the margin-scaled (0.50..0.80) winner/loser weighting.
+    # Self-scores stay in the record for traceability but no longer feed
+    # the outcome classifier or the weight ratio. record_debate populated
+    # outcome/scores from a moderator-less call above (→ INCONCLUSIVE
+    # fallback); the call below overwrites those fields with
+    # Moderator-driven values.
+    print("\nDebate Moderator")
+    debate_dict["moderator"] = _call_moderator(client, debate_dict)
+    _apply_moderator_verdict_to_debate_dict(debate_dict)
 
     # ── Write output ──────────────────────────────────────────────────────────
     date_tag = scoring.get("scored_at", "")[:10].replace("-", "") or args.date or "unknown"

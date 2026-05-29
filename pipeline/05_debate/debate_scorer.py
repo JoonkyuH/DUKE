@@ -2,37 +2,41 @@
 debate_scorer.py
 Computes debate-adjusted scores and classifies the debate outcome.
 
-Each analyst submits a score_adjustment [-15, +15] and a confidence_adjustment
-[-10, +10] representing how much they believe the Layer 4 baseline should shift.
+After the EDIT 2 rewire (Debate Moderator), outcome and weighting are driven by
+the Moderator's `lean` + `margin`, not the analysts' self-scores. The
+self-scores remain in the debate record for traceability — they no longer feed
+the outcome classifier or the weighting ratio.
 
-Outcome is determined first from the provisional 50/50 average. The winning
-side then receives greater weight in the final net adjustment:
-  BULL_PREVAILS → bull 70%, bear 30%
-  BEAR_PREVAILS → bear 70%, bull 30%
-  BALANCED / INCONCLUSIVE → 50/50
+  Outcome  comes from Moderator.lean:
+    bull_leans → BULL_PREVAILS
+    bear_leans → BEAR_PREVAILS
+    balanced   → BALANCED
+    None (Moderator parse failure) → INCONCLUSIVE
+      (INCONCLUSIVE is now a failure state only, not normal operation.)
 
-Outcome rules (evaluated in order):
-  BULL_PREVAILS:  provisional_net > +3.5
-  BEAR_PREVAILS:  provisional_net < -3.5
-  INCONCLUSIVE:   |bull_adj - bear_adj| > 12 AND |provisional_net| <= 3.5
-                  (large disagreement, unresolved by averaging)
-  BALANCED:       everything else
+  Weighting comes from Moderator.margin (margin-scaled):
+    winner_w = 0.50 + min(|margin|, MARGIN_SCALE_CAP) / MARGIN_SCALE_CAP
+               * (WINNER_MAX_WEIGHT - WINNER_MIN_WEIGHT)
+             = 0.50 .. 0.80
+    loser_w  = 1 - winner_w
+    Winner = bull if margin > 0, bear if margin < 0; on balanced 0.50 / 0.50.
 """
+
+from typing import Optional
 
 from debate_types import DebateOutcome
 
 
 SCORE_ADJ_MAX     = 15.0   # Absolute bound for score adjustments (unchanged)
 CONF_ADJ_MAX      = 10.0   # Absolute bound for confidence adjustments (unchanged)
-PREVAIL_THRESHOLD =  3.5   # Net movement above this = one side prevailed
-INCONCLUSIVE_GAP  = 12.0   # Analyst disagreement gap above which debate is inconclusive
 
-_PREVAIL_WEIGHTS = {
-    DebateOutcome.BULL_PREVAILS: (0.70, 0.30),
-    DebateOutcome.BEAR_PREVAILS: (0.30, 0.70),
-    DebateOutcome.BALANCED:      (0.50, 0.50),
-    DebateOutcome.INCONCLUSIVE:  (0.50, 0.50),
-}
+# Margin-scaled weighting constants (tunable):
+# winner gets WINNER_MIN_WEIGHT (50%) at zero margin and scales linearly to
+# WINNER_MAX_WEIGHT (80%) as the Moderator margin approaches MARGIN_SCALE_CAP.
+# Loser gets the complement.
+WINNER_MIN_WEIGHT = 0.50
+WINNER_MAX_WEIGHT = 0.80
+MARGIN_SCALE_CAP  = 10.0   # Moderator scores sum to 10; max possible |margin| is 10.
 
 
 def compute_debate_scores(
@@ -42,21 +46,29 @@ def compute_debate_scores(
     bull_conf_adj:         float,
     bear_score_adj:        float,
     bear_conf_adj:         float,
+    moderator:             Optional[dict] = None,
 ) -> dict:
     """
     Compute debate-adjusted evidence and confidence scores and classify outcome.
 
-    Outcome is determined from the provisional 50/50 net. The winning side then
-    receives 70% weight in the final net adjustment so that a decisive debate
-    moves scores further than a balanced one.
+    Outcome is driven by the Debate Moderator's `lean`. Weighting is driven by
+    the Moderator's `margin` (margin-scaled — bigger margin → winner gets more
+    weight, up to 80/20). Self-scores still feed the net adjustment via
+    weight × score_adj — but the weight RATIO is no longer derived from the
+    self-scores themselves.
 
     Args:
         base_evidence_score:   Layer 4 evidence_score (pre-debate baseline)
         base_confidence_score: Layer 4 confidence_score (pre-debate baseline)
         bull_score_adj:        Bull analyst's recommended evidence_score adjustment
-        bull_conf_adj:         Bull analyst's recommended confidence_score adjustment
+                                  (audit-only — no longer drives outcome/weighting)
+        bull_conf_adj:         Bull analyst's confidence_score adjustment (audit-only)
         bear_score_adj:        Bear analyst's recommended evidence_score adjustment
-        bear_conf_adj:         Bear analyst's recommended confidence_score adjustment
+                                  (audit-only)
+        bear_conf_adj:         Bear analyst's confidence_score adjustment (audit-only)
+        moderator:             Moderator block from debate_dict["moderator"].
+                                  None or {"lean": None} → INCONCLUSIVE outcome
+                                  with 50/50 weighting (failure mode).
 
     Returns dict with:
         debate_evidence_score   (float)
@@ -71,12 +83,9 @@ def compute_debate_scores(
     bull_conf_adj  = _clamp(bull_conf_adj,  -CONF_ADJ_MAX,  CONF_ADJ_MAX)
     bear_conf_adj  = _clamp(bear_conf_adj,  -CONF_ADJ_MAX,  CONF_ADJ_MAX)
 
-    # Classify outcome from the provisional 50/50 average
-    provisional_net = (bull_score_adj + bear_score_adj) / 2.0
-    outcome = _determine_outcome(provisional_net, bull_score_adj, bear_score_adj)
+    # Outcome + weights from the Moderator (or INCONCLUSIVE fallback)
+    outcome, bull_w, bear_w = _outcome_and_weights_from_moderator(moderator)
 
-    # Apply outcome-based weights: winner gets 70%, loser gets 30%
-    bull_w, bear_w = _PREVAIL_WEIGHTS[outcome]
     net_score_adj = bull_w * bull_score_adj + bear_w * bear_score_adj
     net_conf_adj  = bull_w * bull_conf_adj  + bear_w * bear_conf_adj
 
@@ -92,18 +101,43 @@ def compute_debate_scores(
     }
 
 
-def _determine_outcome(
-    provisional_net: float,
-    bull_adj:        float,
-    bear_adj:        float,
-) -> DebateOutcome:
-    if provisional_net > PREVAIL_THRESHOLD:
-        return DebateOutcome.BULL_PREVAILS
-    if provisional_net < -PREVAIL_THRESHOLD:
-        return DebateOutcome.BEAR_PREVAILS
-    if abs(bull_adj - bear_adj) > INCONCLUSIVE_GAP:
-        return DebateOutcome.INCONCLUSIVE
-    return DebateOutcome.BALANCED
+def _outcome_and_weights_from_moderator(
+    moderator: Optional[dict],
+) -> tuple[DebateOutcome, float, float]:
+    """
+    Map a Moderator block to (outcome, bull_w, bear_w).
+
+    Moderator block shape (from pipeline/05_debate/run.py _call_moderator):
+        {"lean": "bull_leans" | "bear_leans" | "balanced" | None,
+         "margin": float, ...}
+
+    INCONCLUSIVE is now a failure state — it fires only when the Moderator
+    block is missing or its lean is None (parse failure).
+    """
+    if not moderator or moderator.get("lean") is None:
+        return DebateOutcome.INCONCLUSIVE, 0.5, 0.5
+
+    lean = moderator.get("lean")
+    margin = float(moderator.get("margin") or 0.0)
+
+    if lean == "balanced":
+        return DebateOutcome.BALANCED, 0.5, 0.5
+
+    # Margin-scaled weighting: winner_w 0.50 .. 0.80 as |margin| grows.
+    abs_m   = min(abs(margin), MARGIN_SCALE_CAP)
+    winner_w = (
+        WINNER_MIN_WEIGHT
+        + (abs_m / MARGIN_SCALE_CAP) * (WINNER_MAX_WEIGHT - WINNER_MIN_WEIGHT)
+    )
+    loser_w = 1.0 - winner_w
+
+    if lean == "bull_leans":
+        return DebateOutcome.BULL_PREVAILS, winner_w, loser_w
+    if lean == "bear_leans":
+        return DebateOutcome.BEAR_PREVAILS, loser_w, winner_w
+
+    # Unrecognized lean string — defensive fall-through to INCONCLUSIVE.
+    return DebateOutcome.INCONCLUSIVE, 0.5, 0.5
 
 
 def _clamp(value: float, lo: float, hi: float) -> float:

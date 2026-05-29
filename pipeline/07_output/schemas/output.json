@@ -79,6 +79,19 @@
       "description": "The 2:1 reward/risk entry price X = (bull + 2*bear)/3. Reference number; the entry recommendation already accounts for this via case_label and entry_range."
     },
     "investment_archetype":    { "type": ["string", "null"] },
+    "merit_lean": {
+      "type": ["string", "null"],
+      "enum": ["bull_leans", "bear_leans", "balanced", null],
+      "description": "Debate Moderator's verdict — the Chief's merit-lean anchor. Null when the Moderator failed to parse (debate inconclusive)."
+    },
+    "merit_margin": {
+      "type": ["number", "null"],
+      "description": "Signed Moderator margin on normalised-to-10 scale (positive = bull). Drives the margin-scaled winner/loser weighting in compute_debate_scores."
+    },
+    "decisive_evidence": {
+      "type": ["string", "null"],
+      "description": "Single most decisive item the Moderator named for the leaning side. Empty when balanced or when Moderator failed."
+    },
     "executive_summary":       { "type": ["string", "null"] },
     "what_would_change_this":  { "type": ["string", "null"] },
     "blocking_issues": {

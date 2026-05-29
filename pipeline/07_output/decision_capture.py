@@ -259,6 +259,12 @@ def _build_record(
         #   final_confidence_score, conviction_1_to_10 (not the shorthand versions of these names)
         "screening_archetype":       syn.get("chief_analyst_brief", {}).get("screening_archetype"),
         "investment_archetype":      ca.get("investment_archetype_confirmed"),
+        # Debate Moderator verdict — the Chief's merit-lean anchor. Persisted
+        # for journal traceability so post-hoc outcome tracking can correlate
+        # decisions against the actual merit-lean call.
+        "merit_lean":                syn.get("chief_analyst_brief", {}).get("merit_lean"),
+        "merit_margin":              syn.get("chief_analyst_brief", {}).get("merit_margin"),
+        "decisive_evidence":         syn.get("chief_analyst_brief", {}).get("decisive_evidence", ""),
         "executive_summary":         ca.get("executive_summary"),
         "what_would_change_this":    ca.get("what_would_change_this"),
         "blocking_issues":           ca.get("blocking_issues", []),

@@ -76,6 +76,31 @@
     "original_conviction":     { "type": "string", "description": "Layer 4 conviction, passed through for traceability." },
     "original_recommendation": { "type": "string", "description": "Layer 4 recommendation, passed through for traceability." },
 
+    "moderator": {
+      "type": ["object", "null"],
+      "description": "Debate Moderator verdict — neutral evidence referee. Drives outcome + weighting in compute_debate_scores; supplies merit_lean anchor to the Chief Analyst. Null if Moderator failed to parse.",
+      "properties": {
+        "analyst_role":        { "type": "string", "enum": ["debate_moderator"] },
+        "bull_evidence_score": { "type": "number", "minimum": 0, "maximum": 10 },
+        "bear_evidence_score": { "type": "number", "minimum": 0, "maximum": 10 },
+        "lean":                { "type": ["string", "null"], "enum": ["bull_leans", "bear_leans", "balanced", null], "description": "Code-derived lean (epsilon = 0.5). 'balanced' only when |normalised bull - bear| <= 0.5." },
+        "margin":              { "type": "number", "description": "Signed margin (positive = bull) on normalised-to-10 scale." },
+        "decisive_evidence":   { "type": "string", "description": "Single most decisive item the Moderator named; empty when balanced." },
+        "reasoning":           { "type": "string" },
+        "contention_calls":    {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "contention_id": { "type": "string" },
+              "favored":       { "type": "string", "enum": ["bull", "bear", "tie"] },
+              "basis":         { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+
     "metadata": {
       "type": "object",
       "properties": {

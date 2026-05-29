@@ -127,6 +127,14 @@ def _build_brief(
 
         "debate_outcome": debate_record.get("outcome"),
 
+        # Debate Moderator verdict (EDIT 2): the Chief's merit-lean anchor.
+        # `merit_lean` replaces the self-score-based inference the Chief used to
+        # do internally. `decisive_evidence` is the single most decisive item
+        # the Moderator named for the leaning side.
+        "merit_lean":         (debate_record.get("moderator") or {}).get("lean"),
+        "merit_margin":       (debate_record.get("moderator") or {}).get("margin"),
+        "decisive_evidence":  (debate_record.get("moderator") or {}).get("decisive_evidence", ""),
+
         "bull_position": {
             "summary":               bull.get("summary"),
             "key_arguments":         bull.get("key_arguments", []),

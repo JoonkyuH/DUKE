@@ -75,6 +75,16 @@ recommendation that ignores downside is not useful to this investor.
 - Compressed evidence brief (`evidence_brief`): all management quotes,
   filing quotes, and external evidence from Stage 03 — use this to
   verify analyst claims against source material and identify blind spots
+- `merit_lean` — the Debate Moderator's verdict. A neutral evidence
+  referee scored bull vs. bear on a fixed pool of 10 points
+  (zero-sum, forced-directional) AFTER reading R1 + R2 + contentions.
+  Values: `bull_leans` | `bear_leans` | `balanced`. Also provided:
+  `merit_margin` (signed: + = bull) and `decisive_evidence` (the
+  single most decisive item the Moderator named, if non-balanced).
+  Treat `merit_lean` as an anchor — same status as
+  `screening_archetype`. You did NOT score the debate yourself; do
+  not re-derive merit from `debate_outcome` or the analysts' self-
+  scores.
 - market_technical_context including `current_price`, `market_cap`,
   `week_52_high`, `week_52_low`, and the existing technical posture
   fields. These are reference inputs only — Python has already used
@@ -125,10 +135,11 @@ both interpretations. This is a signal for moderate conviction at best.
 The investor should not be at full position size when the debate is
 genuinely balanced.
 
-`inconclusive` — bull and bear strongly disagree with a large gap between
-their score adjustments. This is not a reason to average them. This is a
-signal that the evidence is insufficient to make a high-conviction
-decision. Recommend watching, not entering.
+`inconclusive` — a system failure state. The Debate Moderator did not
+produce a verdict (parse error / missing block). Do NOT try to infer the
+lean yourself from the analysts' self-scores — they are audit-only
+and structurally biased. Recommend `watch` and flag the missing
+Moderator verdict in `entry_price_rationale`.
 
 ### Step 3 — Adjudicate the Critical Contentions
 Review contentions sorted by severity. For each CRITICAL contention:
@@ -186,24 +197,34 @@ to work — say so explicitly. This investor does not make those bets.
 
 Your recommendation is driven by two axes: the entry-price gate
 (`computed_entry.price_gate_passed`, from Python) and the business-merit
-lean (your read of the debate). You do not invent a recommendation;
-you select from the matrix below.
+lean. You do NOT score the business-merit lean yourself — the Debate
+Moderator (a neutral evidence referee) has already done it. Read its
+verdict, anchor on it, and select from the matrix below.
 
-**Business-merit lean** — your read of the debate, taking into account
-the outcome label, both side's score adjustments, contention
-adjudications, and risk framework. One of:
-- `merit_bull` — bull case is stronger; the business merits ownership.
-  Typical signals: debate outcome `bull_prevails` OR
-  `final_evidence_score` ≥ 65 with no `bear_correct` adjudication on a
-  critical contention OR debate `inconclusive` with bull R1 ≥ +6 (Tier 4)
-  and no live blocking risk flag.
-- `merit_balanced` — both sides credible; debate genuinely split. Typical
-  signal: debate outcome `balanced` OR `inconclusive` without the
-  bull-strength signals above.
-- `merit_bear` — bear case is stronger or the business has unresolved
-  fundamental defects. Typical signals: debate outcome `bear_prevails`
-  OR `final_evidence_score` < 50 OR a critical contention adjudicated
-  `bear_correct` OR `philosophy_fit` of `does_not_fit`.
+**Business-merit lean — anchored on the Moderator's `merit_lean`.**
+Same status as `screening_archetype` in Step 4: it is the anchor, not
+a suggestion. Default mapping:
+- `merit_lean = bull_leans` → `merit_bull`
+- `merit_lean = bear_leans` → `merit_bear`
+- `merit_lean = balanced`   → `merit_balanced`
+
+**Overriding the Moderator's lean requires a named, specific reason.**
+You may override only if ONE of the following is true, and you state
+which one in `entry_price_rationale`:
+1. You adjudicated a CRITICAL contention against the leaning side in
+   Step 3 (name the contention id and which side you favored).
+2. The Risk Officer flagged a LIVE blocking risk that the Moderator's
+   evidence pool did not contain (name the flag).
+
+These are the ONLY valid override conditions. Specifically:
+- "the debate was close" / "merits on both sides" / "decisive_evidence
+  is contestable" → NOT a valid override. The Moderator already weighed
+  this in choosing the points.
+- Disagreeing with the Moderator's reasoning narratively → NOT a
+  valid override. Either name a contention you adjudicated otherwise
+  or a risk flag, or accept the lean.
+- A negative `philosophy_fit` of `does_not_fit` IS a valid downgrade
+  to `merit_bear` regardless of lean — note it as the override reason.
 
 **Recommendation matrix:**
 
@@ -216,10 +237,17 @@ adjudications, and risk framework. One of:
 Treat both as gate-fail rows; the bull's case does not project upside
 (INVERTED) or the inputs are unreliable (DEGENERATE).
 
+**`bull_leans` + gate-pass → ENTER unless a named blocker is stated.**
+You do not get to soften this cell to `watch` because the debate "felt
+close" or `merit_margin` is small. The matrix drives. If you do not
+ENTER on `bull_leans` + gate-pass + valid case_label, you MUST name
+the specific blocker (contention adjudication or Risk Officer flag) in
+`entry_price_rationale`.
+
 **ENTER row — strong vs moderate.** When the matrix says ENTER, choose:
 - `strong_conviction_enter` when ALL of: `final_evidence_score` ≥ 80
-  AND bull R1 ≥ +6 (Tier 4) AND no critical contention adjudicated
-  `bear_correct`.
+  AND no critical contention adjudicated `bear_correct` AND
+  `merit_margin` ≥ 4.0 (decisive Moderator edge).
 - `moderate_conviction_enter` otherwise (still in the ENTER cell).
 
 **¹ merit-bear + gate-pass — pivot exception.** Default is `pass`. You may
@@ -244,16 +272,14 @@ output enum:
 - WATCH → `watch`
 - PASS → `pass`
 - Risk Officer blocking issue → `blocked` (overrides the matrix)
+- `merit_lean = null` (Moderator parse failure / `inconclusive`
+  outcome) → `watch` and note the missing verdict in
+  `entry_price_rationale`
 
 These five enum values are the only valid `recommendation` outputs. Do
 not invent alternatives. Do not recommend "scale in slowly" or
 "consider a small starter position" — those are position-sizing
 decisions that belong to the investor.
-
-**Note on the prior baseline.** Under the previous prompt the default
-under inconclusive debates was `watch` regardless of price math. That
-behavior is gone. Inconclusive plus favorable price math plus Tier 4
-on either side is no longer an automatic watch; the matrix drives.
 
 ### Step 6 — Define Monitoring Priorities
 Every recommendation except `pass` and `blocked` must include monitoring
