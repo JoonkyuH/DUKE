@@ -574,6 +574,62 @@ fallback was not exercised by live data (all three energy names had a full 5yr
 window) — the logic is in place but unverified against a real sparse-history
 cyclical.
 
+**1f04754** — `fix: extend commodity-cyclical gate to metals + fertilizer (Gold/Copper/Steel/Aluminum/Other Metals/Ag Inputs); guard mid-cycle FCF against near-zero denominators`
+The mid-cycle FCF machinery (7ae2272) was gated on `is_commodity_cyclical`, but
+that gate contained energy only. A read-only diagnose of the broader cyclical
+universe (metals, chemicals, homebuilders, autos, machinery) found NEM (gold,
+at all-time highs) was the live EQT-analog: TTM FCF 3.28× its 5yr mid-cycle,
+sitting on the `unknown` profile (the metals GICS strings were on the
+deliberately-unmapped list), so its peak-cycle FCF went unnormalized and NEM
+screened #1 at 67.1 with the full EQT signature (STRONG_FCF, UNDERVALUED_PEG,
+LOW_PFCF, HIGH_EARNINGS_QUALITY).
+
+The diagnose's key structural finding was that the specialty/commodity (and
+cyclical/secular) line cuts THROUGH single yfinance GICS industry strings, so a
+GICS-only gate can only safely sweep the strings confirmed clean:
+- `Specialty Chemicals` is shared by genuine specialty (LIN/SHW/ECL/APD/PPG —
+  pricing power) and commodity producers (LYB petrochemicals, ALB lithium).
+- `Auto Manufacturers` is shared by cyclical (F/GM) and secular (TSLA).
+- Metals/fertilizer strings (Gold/Copper/Steel/Aluminum/Other Industrial Metals
+  & Mining/Agricultural Inputs) are clean — no specialty hides under them.
+
+This pass swept only the clean strings. Two surgical changes:
+
+1. New `commodity_cyclical` economic profile, mirroring energy_upstream:
+   `gross_margin` disabled (metals/fertilizer share E&P's extractive cost
+   structure — EDGAR gross profit excludes depletion/DD&A, so gross margin
+   isn't comparable), multipliers gm 0.55 / rev 0.50 / fcf 0.55. The six clean
+   GICS strings route to it, and it is added to `commodity_cyclical_profiles`
+   so the mid-cycle FCF normalization + FLAG_CYCLICAL_PEAK_RISK fire.
+
+2. Mid-cycle FCF denominator guard in `_mid_cycle_fcf`: returns None (→ TTM
+   fallback, no normalization) when the clean-year mean is <= 0, below a
+   revenue floor (< 0.01 × rev_ttm), or a meaningless boom/bust straddle. A
+   near-zero denominator makes P/FCF and FCF/NI explode or flip sign — worse
+   than not normalizing. ALB (lithium, 5yr mean ≈ −$0.1B → −10.25× ratio)
+   exposed this; it was latent in the energy fix too, just never triggered.
+
+Validated (NEM FCX NUE STLD MOS CF EQT MSFT NVDA DOW CE F DHI ALB):
+- NEM 67.1 #1 → 49.1 FAIL. commodity_cyclical; VG 76 → 50, EQ 70 → 42, P/FCF
+  13× → 42× (TTM $9.24B vs 5yr mid-cycle $2.81B, 3.28× peak); flag fires.
+- Trough metals rise symmetrically (FCX 24.5 → 28.5, NUE 25.0 → 44.9, STLD
+  26.8 → 39.8); CF and MOS, at cyclical lows, normalize up and now pass. Same
+  approved symmetric behavior as XOM/CVX — the gate can lift a depressed
+  commodity name into the shortlist on its mid-cycle economics.
+- Held strings unchanged: DOW, CE (Chemicals), F (Auto), DHI (Residential
+  Construction) all still industrial_manufacturer, identical sub-scores — the
+  mapping did not leak beyond the six intended strings.
+- Non-cyclicals + energy regression-clean: MSFT 54.6, NVDA 77.2 (composite),
+  EQT 51.2 — unchanged.
+- ALB guard: routes to industrial_manufacturer (Specialty Chemicals is held,
+  not swept) and `_mid_cycle_fcf` returns None → TTM fallback, no garbage.
+
+Still pending (per-ticker passes, deliberately out of scope): chemicals
+(DOW/CE verification + LYB/ALB ticker_overrides) and Bucket 2
+(homebuilders/autos/machinery/building materials, each needing a
+cyclical-vs-secular call and a TSLA-style exclusion). The gate remains the
+safety boundary — only GICS-confirmed-clean strings are swept per pass.
+
 ---
 
 ## Open Issues (as of 2026-05-29; Architecture B re-scoped 2026-05-28; Chief prompt reverted 2026-05-28; entry-price refactor landed 2026-05-28; Debate Moderator added 2026-05-28; Stage 01 FD leak fixed 2026-05-29)
@@ -627,18 +683,22 @@ cyclical.
   The bucket warrants a dedicated economic profile — without it, DTS scores
   for electronic components names are suppressed by neutral multipliers.
 
-- Expand commodity-cyclical classification (NEXT, after 7ae2272): the
-  mid-cycle FCF normalization is gated on `is_commodity_cyclical`, which
-  currently covers only energy (energy_upstream / integrated_energy /
-  energy_midstream). Other commodity cyclicals — metals & mining, chemicals,
-  homebuilders/residential construction, autos — route to
-  `industrial_manufacturer`, which has no peak-cycle handling, so they get
-  peak-cycle FCF scored as durable exactly as EQT used to. Extending coverage
-  is a classification question (which GICS industries are price-takers) and
-  warrants its own diagnose before widening the gate: a false positive would
-  wrongly normalize a secular grower (cf. NVDA at 1.94× FCF peak, correctly
-  left alone). The residual risk of 7ae2272 lives here — the gate is the
-  safety boundary.
+- Expand commodity-cyclical classification — per-ticker passes still pending.
+  Done: energy (7ae2272) and metals & mining + fertilizer (1f04754 — new
+  `commodity_cyclical` profile; Gold/Copper/Steel/Aluminum/Other Industrial
+  Metals & Mining/Agricultural Inputs). Still OUT of the gate, each needing
+  its own review because GICS cannot make the call cleanly:
+    - Chemicals: `Chemicals` (DOW, CE) not yet verified free of specialty
+      names; `Specialty Chemicals` collides commodity (LYB petrochem, ALB
+      lithium) with genuine specialty (LIN/SHW/ECL/APD/PPG, pricing power) →
+      needs ticker_overrides, not a GICS sweep.
+    - Bucket 2 (homebuilders/residential construction, autos, heavy machinery,
+      building materials): cyclical but not pure price-takers; each needs a
+      cyclical-vs-secular call and a TSLA-style exclusion (`Auto Manufacturers`
+      collides F/GM with secular TSLA).
+  A false positive would wrongly normalize a secular grower (cf. NVDA at 1.94×
+  FCF peak, correctly left alone). The residual risk lives here — the gate is
+  the safety boundary, so only GICS-confirmed-clean strings are swept per pass.
 
 - Mid-cycle EARNINGS normalization (follow-up to 7ae2272): PEG is
   earnings-based (P/E ÷ rev-growth), so the FCF normalization is a no-op on it
